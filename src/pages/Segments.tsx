@@ -15,41 +15,27 @@ import { useEffect, useState } from "react"
 import { dataService } from "@/lib/dataService"
 
 const Segments = () => {
-  const [segments] = useState([
-    {
-      id: 'premium_seekers',
-      name: 'Premium Seekers',
-      description: 'High-value customers who prefer premium experiences',
-      size: 150,
-      avgLifetimeValue: 2500,
-      avgAge: 28,
-      topCity: 'São Paulo',
-      preferredItems: ['Rock', 'Eletrônica', 'VIP'],
-      color: '#9333EA'
-    },
-    {
-      id: 'mainstream_audience',
-      name: 'Mainstream Audience', 
-      description: 'General audience with diverse preferences',
-      size: 600,
-      avgLifetimeValue: 1200,
-      avgAge: 25,
-      topCity: 'Rio de Janeiro',
-      preferredItems: ['Pop', 'Sertanejo', 'MPB'],
-      color: '#3B82F6'
-    },
-    {
-      id: 'budget_conscious',
-      name: 'Budget Conscious',
-      description: 'Price-sensitive audience looking for value', 
-      size: 250,
-      avgLifetimeValue: 800,
-      avgAge: 23,
-      topCity: 'Belo Horizonte',
-      preferredItems: ['Forró', 'Funk', 'Pagode'],
-      color: '#10B981'
+  const [segments, setSegments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadSegments = async () => {
+      try {
+        const segmentData = await dataService.getSegmentAnalysis()
+        setSegments(segmentData)
+      } catch (error) {
+        console.error('Error loading segments:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-  ])
+
+    loadSegments()
+  }, [])
+
+  if (loading) {
+    return <div className="p-6">Loading segments...</div>
+  }
 
   return (
     <div className="space-y-6">

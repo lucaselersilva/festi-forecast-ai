@@ -200,6 +200,99 @@ class DataService {
       totalSold
     }
   }
+
+  async getSegmentAnalysis() {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+
+    if (error) {
+      throw new Error(`Error fetching events for segments: ${error.message}`)
+    }
+
+    const events = data || []
+    
+    // Analyze by genre
+    const genreStats = events.reduce((acc: any, event) => {
+      if (!acc[event.genre]) {
+        acc[event.genre] = {
+          count: 0,
+          totalRevenue: 0,
+          totalSold: 0,
+          totalCapacity: 0,
+          avgPrice: 0,
+          cities: new Set()
+        }
+      }
+      acc[event.genre].count++
+      acc[event.genre].totalRevenue += event.revenue || 0
+      acc[event.genre].totalSold += event.sold_tickets || 0
+      acc[event.genre].totalCapacity += event.capacity
+      acc[event.genre].avgPrice += event.ticket_price
+      acc[event.genre].cities.add(event.city)
+      return acc
+    }, {})
+
+    // Convert to segments
+    const segments = Object.entries(genreStats).map(([genre, stats]: [string, any]) => ({
+      id: genre.toLowerCase().replace(/\s+/g, '-'),
+      name: `${genre} Enthusiasts`,
+      description: `Customers who prefer ${genre.toLowerCase()} events`,
+      size: stats.count,
+      avgLifetimeValue: stats.totalRevenue / stats.count,
+      avgAge: 25 + Math.floor(Math.random() * 20), // Mock age data
+      topCity: Array.from(stats.cities)[0],
+      preferredItems: [genre, 'Live Music', 'Concerts'],
+      color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`
+    })).sort((a, b) => b.size - a.size).slice(0, 6)
+
+    return segments
+  }
+
+  async getSponsorAnalysis() {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+
+    if (error) {
+      throw new Error(`Error fetching events for sponsors: ${error.message}`)
+    }
+
+    const events = data || []
+    
+    // Analyze genres for sponsor affinity
+    const genreStats = events.reduce((acc: any, event) => {
+      if (!acc[event.genre]) {
+        acc[event.genre] = {
+          events: 0,
+          totalRevenue: 0,
+          totalAttendance: 0,
+          avgPrice: 0
+        }
+      }
+      acc[event.genre].events++
+      acc[event.genre].totalRevenue += event.revenue || 0
+      acc[event.genre].totalAttendance += event.sold_tickets || 0
+      acc[event.genre].avgPrice += event.ticket_price
+      return acc
+    }, {})
+
+    // Create sponsor categories based on genres
+    const sponsors = Object.entries(genreStats).map(([genre, stats]: [string, any]) => {
+      const avgPrice = stats.avgPrice / stats.events
+      const category = avgPrice > 100 ? 'Premium' : avgPrice > 50 ? 'Mid-tier' : 'Mass Market'
+      
+      return {
+        name: `${genre} Partner`,
+        category,
+        affinity: Math.min(95, (stats.totalRevenue / 1000000) * 10 + 60), // Scale affinity based on revenue
+        budget: stats.totalRevenue * 0.05, // 5% of total revenue as potential budget
+        keywords: [genre, 'Music', 'Entertainment']
+      }
+    }).sort((a, b) => b.affinity - a.affinity).slice(0, 8)
+
+    return sponsors
+  }
 }
 
 export const dataService = new DataService()

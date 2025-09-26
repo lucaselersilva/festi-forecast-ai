@@ -29,34 +29,27 @@ import {
   PolarRadiusAxis,
   Radar
 } from "recharts"
-const mockSponsors = [
-  {
-    id: '1',
-    name: 'Brahma',
-    category: 'Bebidas',
-    affinity: 85,
-    budget: 50000,
-    brandKeywords: ['Cerveja', 'Premium', 'Festa']
-  },
-  {
-    id: '2', 
-    name: 'Red Bull',
-    category: 'Energético',
-    affinity: 78,
-    budget: 35000,
-    brandKeywords: ['Energia', 'Adrenalina', 'Jovem']
-  },
-  {
-    id: '3',
-    name: 'Nubank',
-    category: 'Fintech', 
-    affinity: 72,
-    budget: 40000,
-    brandKeywords: ['Digital', 'Moderno', 'Inovação']
-  }
-]
+import { useEffect, useState } from "react"
+import { dataService } from "@/lib/dataService"
 
 const Sponsors = () => {
+  const [sponsors, setSponsors] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadSponsors = async () => {
+      try {
+        const sponsorData = await dataService.getSponsorAnalysis()
+        setSponsors(sponsorData)
+      } catch (error) {
+        console.error('Error loading sponsors:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadSponsors()
+  }, [])
   const affinityData = [
     { category: 'Cerveja Premium', affinity: 85, reach: 450 },
     { category: 'Energético', affinity: 78, reach: 380 },
@@ -89,6 +82,10 @@ const Sponsors = () => {
     { subject: 'Brand Fit', A: 85, B: 90, fullMark: 150 },
     { subject: 'ROI', A: 65, B: 85, fullMark: 150 }
   ]
+
+  if (loading) {
+    return <div className="p-6">Loading sponsor data...</div>
+  }
 
   const colors = ['#9333EA', '#3B82F6', '#10B981', '#F59E0B']
 
@@ -125,8 +122,8 @@ const Sponsors = () => {
         <TabsContent value="overview" className="space-y-6">
           {/* Sponsors Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {mockSponsors.map((sponsor) => (
-              <Card key={sponsor.id} className="glass border-border/50 hover:border-primary/20 transition-all hover:shadow-glow">
+            {sponsors.map((sponsor, index) => (
+              <Card key={index} className="glass border-border/50 hover:border-primary/20 transition-all hover:shadow-glow">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <Briefcase className="w-5 h-5 text-primary" />
@@ -166,7 +163,7 @@ const Sponsors = () => {
                       Keywords
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      {sponsor.brandKeywords.map((keyword) => (
+                      {sponsor.keywords.map((keyword: string) => (
                         <Badge key={keyword} variant="outline" className="text-xs">
                           {keyword}
                         </Badge>
