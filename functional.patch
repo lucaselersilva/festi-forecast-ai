@@ -1,0 +1,367 @@
+*** Begin Patch
+*** Update File: package.json
+@@
+   "scripts": {
+-    "dev": "vite",
++    "dev": "concurrently \"npm:dev:*\"",
++    "dev:client": "vite",
++    "dev:server": "ts-node --esm server/index.ts",
+     "build": "vite build",
+     "build:dev": "vite build --mode development",
+     "lint": "eslint .",
+-    "preview": "vite preview"
++    "preview": "vite preview",
++    "server": "ts-node --esm server/index.ts",
++    "postinstall": "cd server && python -m pip install -r requirements.txt || true"
+   },
+@@
+-    "zod": "^3.25.76"
++    "zod": "^3.25.76",
++    "axios": "^1.7.4",
++    "dotenv": "^16.4.5",
++    "express": "^4.19.2"
+   },
+@@
+-    "vite": "^5.4.19"
++    "vite": "^5.4.19",
++    "concurrently": "^9.0.0",
++    "ts-node": "^10.9.2"
++  },
++  "engines": {
++    "node": ">=18"
+   }
+*** End Patch
+
+*** Begin Patch
+*** Update File: vite.config.ts
+@@
+ export default defineConfig(({ mode }) => ({
+-  server: {
+-    host: "::",
+-    port: 8080,
+-  },
++  server: {
++    host: "::",
++    port: 8080,
++    proxy: {
++      '/api': {
++        target: 'http://localhost:4000',
++        changeOrigin: true,
++        secure: false
++      }
++    }
++  },
+*** End Patch
+
+*** Begin Patch
+*** Update File: src/App.tsx
+@@
+-import Settings from "./pages/Settings";
++import Settings from "./pages/Settings";
++import Forecast from "./pages/Forecast";
+@@
+-                <Route path="/sponsors" element={<Sponsors />} />
++                <Route path="/sponsors" element={<Sponsors />} />
++                <Route path="/forecast" element={<Forecast />} />
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/pages/Forecast.tsx
++import RealForecastPanel from "@/components/RealForecastPanel";
++
++const Forecast = () => (
++  <div className="p-4">
++    <RealForecastPanel />
++  </div>
++);
++
++export default Forecast;
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/components/RealForecastPanel.tsx
++import React, { useState } from "react";
++import { forecast } from "../lib/api";
++
++export default function RealForecastPanel() {
++  const [loading, setLoading] = useState(false);
++  const [result, setResult] = useState<any>(null);
++  const [error, setError] = useState<string | null>(null);
++
++  const run = async () => {
++    try {
++      setLoading(true);
++      setError(null);
++      const data = await forecast();
++      setResult(data);
++    } catch (e: any) {
++      setError(e?.response?.data?.error || e.message);
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  return (
++    <div className="p-4 border rounded-2xl space-y-3">
++      <h2 className="text-xl font-semibold">Previsão com IA (dados grandes)</h2>
++      <p className="text-sm opacity-80">
++        Usa modelos reais em Python (scikit-learn). Coloque seus CSVs em <code>/data</code> ou use os padrões.
++      </p>
++      <button onClick={run} disabled={loading} className="px-3 py-2 rounded-xl border">
++        {loading ? "Prevendo..." : "Rodar previsão"}
++      </button>
++      {error && <div className="text-red-600 text-sm">{error}</div>}
++      {result && (
++        <div className="space-y-2">
++          <div className="text-sm">
++            <b>Métricas (holdout):</b> R² tickets{' '}
++            {result.metrics.tickets_r2?.toFixed(3)} | MAE tickets{' '}
++            {result.metrics.tickets_mae?.toFixed(1)} | R² receita{' '}
++            {result.metrics.revenue_r2?.toFixed(3)} | MAE receita{' '}
++            {result.metrics.revenue_mae?.toFixed(2)}
++          </div>
++          <div className="text-sm">
++            <b>Resumo:</b> {result.summary.total_events} eventos | {result.summary.sum_pred_tickets} ingressos | R$ {result.summary.sum_pred_revenue.toLocaleString("pt-BR")}
++          </div>
++          <div className="max-h-64 overflow-auto text-sm">
++            <table className="min-w-full">
++              <thead>
++                <tr>
++                  <th className="text-left">Data</th>
++                  <th className="text-left">Cidade</th>
++                  <th>Local</th>
++                  <th>Gênero</th>
++                  <th>Tickets</th>
++                  <th>Receita (R$)</th>
++                </tr>
++              </thead>
++              <tbody>
++                {result.summary.top5_by_revenue.map((r: any, i: number) => (
++                  <tr key={i}>
++                    <td>{r.date}</td>
++                    <td>{r.city}</td>
++                    <td>{r.venue}</td>
++                    <td>{r.genre}</td>
++                    <td>{r.pred_sold_tickets}</td>
++                    <td>{r.pred_revenue.toLocaleString("pt-BR")}</td>
++                  </tr>
++                ))}
++              </tbody>
++            </table>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: src/lib/api.ts
++import axios from "axios";
++
++export async function forecast(historyCsvPath?: string, futureCsvPath?: string) {
++  const { data } = await axios.post("/api/forecast", { historyCsvPath, futureCsvPath });
++  return data as {
++    metrics: {
++      tickets_r2: number | null;
++      tickets_mae: number | null;
++      revenue_r2: number | null;
++      revenue_mae: number | null;
++    };
++    forecast: any[];
++    summary: any;
++  };
++}
+*** End Patch
+
+*** Begin Patch
+*** Add File: server/index.ts
++import express from "express";
++import { spawn } from "child_process";
++import path from "path";
++import fs from "fs";
++import dotenv from "dotenv";
++
++dotenv.config();
++
++const app = express();
++app.use(express.json({ limit: "10mb" }));
++
++// Discover data directory
++const DATA_DIR = path.resolve(process.cwd(), "data");
++if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
++
++// POST /api/forecast { historyCsvPath?, futureCsvPath? }
++app.post("/api/forecast", async (req, res) => {
++  try {
++    const history = req.body.historyCsvPath || path.join(DATA_DIR, "events_history_quase_reais.csv");
++    const future  = req.body.futureCsvPath  || path.join(DATA_DIR, "events_future_to_forecast.csv");
++
++    if (!fs.existsSync(history)) return res.status(400).json({ error: `historyCsvPath not found: ${history}` });
++    if (!fs.existsSync(future))  return res.status(400).json({ error: `futureCsvPath not found: ${future}` });
++
++    const py = spawn("python", [path.join(__dirname, "forecast_model.py"), history, future], { cwd: __dirname });
++
++    let stdout = "";
++    let stderr = "";
++
++    py.stdout.on("data", (d) => { stdout += d.toString(); });
++    py.stderr.on("data", (d) => { stderr += d.toString(); });
++
++    py.on("close", (code) => {
++      if (code !== 0) {
++        return res.status(500).json({ error: "Model error", detail: stderr || stdout });
++      }
++      try {
++        const parsed = JSON.parse(stdout);
++        res.json(parsed);
++      } catch (e) {
++        res.status(500).json({ error: "Failed to parse model output", detail: e instanceof Error ? e.message : String(e), raw: stdout });
++      }
++    });
++  } catch (e:any) {
++    res.status(500).json({ error: (e as Error).message });
++  }
++});
++
++// Example endpoint for summarization/insights with LLM
++app.post("/api/insight", async (req, res) => {
++  try {
++    const { summary } = req.body;
++    if (!process.env.OPENAI_API_KEY) return res.status(400).json({ error: "OPENAI_API_KEY not configured" });
++    // Example: call to LLM service; implement with your provider
++    res.json({
++      ok: true,
++      suggestion: "With demand peaking on Saturdays and strong positive impact from trends, consider raising ticket prices 5–8% for events with trend scores above 75 and marketing spend above median, and maintain 'last call' campaigns 48h prior."
++    });
++  } catch (e:any) {
++    res.status(500).json({ error: (e as Error).message });
++  }
++});
++
++const PORT = process.env.PORT || 4000;
++app.listen(PORT, () => {
++  console.log(`API running on http://localhost:${PORT}`);
++});
+*** End Patch
+
+*** Begin Patch
+*** Add File: server/forecast_model.py
++import sys, json
++import pandas as pd
++import numpy as np
++from sklearn.compose import ColumnTransformer
++from sklearn.preprocessing import OneHotEncoder
++from sklearn.pipeline import Pipeline
++from sklearn.metrics import r2_score, mean_absolute_error
++from sklearn.ensemble import GradientBoostingRegressor
++
++# Usage: python forecast_model.py <hist_csv> <future_csv>
++hist_path = sys.argv[1]
++future_path = sys.argv[2]
++
++hist = pd.read_csv(hist_path)
++future = pd.read_csv(future_path)
++
++# Ensure required columns exist
++required_cols = [
++    "date","city","venue","artist","genre","ticket_price","marketing_spend",
++    "google_trends_genre","instagram_mentions","temp_c","precip_mm","day_of_week",
++    "is_holiday_brazil_hint","capacity","sold_tickets","revenue"
++]
++for c in required_cols:
++    if c not in hist.columns:
++        raise ValueError(f"Missing column in history data: {c}")
++
++X = hist[["date","city","venue","genre","ticket_price","marketing_spend",
++          "google_trends_genre","instagram_mentions","temp_c","precip_mm",
++          "day_of_week","is_holiday_brazil_hint","capacity"]].copy()
++y_tickets = hist["sold_tickets"].astype(float)
++y_revenue = hist["revenue"].astype(float)
++
++# Feature engineering: extract month and day-of-week numeric
++X["month"] = pd.to_datetime(X["date"]).dt.month
++X["dow_num"] = pd.to_datetime(X["date"]).dt.dayofweek
++X = X.drop(columns=["date"])
++
++futureX = future[["date","city","venue","genre","ticket_price","marketing_spend",
++                  "google_trends_genre","instagram_mentions","temp_c","precip_mm",
++                  "day_of_week","is_holiday_brazil_hint","capacity"]].copy()
++futureX["month"] = pd.to_datetime(futureX["date"]).dt.month
++futureX["dow_num"] = pd.to_datetime(futureX["date"]).dt.dayofweek
++futureX = futureX.drop(columns=["date"])
++
++categoricals = ["city","venue","genre","day_of_week"]
++numericals = [
++    "ticket_price","marketing_spend","google_trends_genre","instagram_mentions",
++    "temp_c","precip_mm","is_holiday_brazil_hint","capacity","month","dow_num"
++]
++
++pre = ColumnTransformer([
++    ("cat", OneHotEncoder(handle_unknown="ignore"), categoricals),
++    ("num", "passthrough", numericals)
++])
++
++tickets_model = Pipeline([
++    ("pre", pre),
++    ("gb", GradientBoostingRegressor(random_state=42))
++])
++
++revenue_model = Pipeline([
++    ("pre", pre),
++    ("gb", GradientBoostingRegressor(random_state=42))
++])
++
++# Simple holdout split
++msk = np.random.RandomState(42).rand(len(X)) < 0.85
++Xtr, Xte = X[msk], X[~msk]
++yt_tr, yt_te = y_tickets[msk], y_tickets[~msk]
++yr_tr, yr_te = y_revenue[msk], y_revenue[~msk]
++
++tickets_model.fit(Xtr, yt_tr)
++revenue_model.fit(Xtr, yr_tr)
++
++pred_t_test = tickets_model.predict(Xte)
++pred_r_test = revenue_model.predict(Xte)
++
++metrics = {
++    "tickets_r2": float(r2_score(yt_te, pred_t_test)) if len(yt_te) > 0 else None,
++    "tickets_mae": float(mean_absolute_error(yt_te, pred_t_test)) if len(yt_te) > 0 else None,
++    "revenue_r2": float(r2_score(yr_te, pred_r_test)) if len(yr_te) > 0 else None,
++    "revenue_mae": float(mean_absolute_error(yr_te, pred_r_test)) if len(yr_te) > 0 else None,
++}
++
++future_pred_t = tickets_model.predict(futureX)
++future_pred_r = revenue_model.predict(futureX)
++
++out = future.copy()
++out["pred_sold_tickets"] = np.maximum(0, future_pred_t).round().astype(int)
++out["pred_revenue"] = np.maximum(0, future_pred_r).round(2)
++
++top5 = out.sort_values("pred_revenue", ascending=False).head(5)
++summary = {
++    "total_events": int(out.shape[0]),
++    "sum_pred_tickets": int(out["pred_sold_tickets"].sum()),
++    "sum_pred_revenue": float(out["pred_revenue"].sum()),
++    "top5_by_revenue": top5[["date","city","venue","genre","ticket_price","marketing_spend",
++                             "pred_sold_tickets","pred_revenue"]].to_dict(orient="records")
++}
++
++print(json.dumps({ "metrics": metrics, "forecast": out.to_dict(orient="records"), "summary": summary }))
+*** End Patch
+
+*** Begin Patch
+*** Add File: server/requirements.txt
++pandas==2.2.2
++numpy==1.26.4
++scikit-learn==1.4.2
+*** End Patch
+
+*** Begin Patch
+*** Add File: .env.example
++OPENAI_API_KEY=
++# Optional: API keys for external data ingestion
++TICKETMASTER_API_KEY=
++OPENWEATHER_API_KEY=
+*** End Patch
