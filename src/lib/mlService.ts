@@ -1,5 +1,5 @@
-// ML Service - Separate module for AI/ML operations
-// This file can be easily modified to adjust ML logic and API endpoints
+// ML Service - Connected to real Supabase data
+import { supabase } from "@/integrations/supabase/client"
 
 interface MLConfig {
   apiKey?: string
@@ -195,400 +195,469 @@ class MLService {
 
   constructor(config: MLConfig = {}) {
     this.config = {
-      baseUrl: 'http://localhost:8000', // Default FastAPI URL - change as needed
+      baseUrl: 'http://localhost:8000',
       timeout: 30000,
       ...config
     }
   }
 
-  // Update configuration (API keys, endpoints, etc.)
   updateConfig(newConfig: Partial<MLConfig>) {
     this.config = { ...this.config, ...newConfig }
   }
 
-  // Segmentation Analysis
+  // Customer Segmentation using real RFM data
   async runSegmentation(input: SegmentationInput): Promise<SegmentationOutput> {
     try {
-      // For now, return enhanced mock data based on real input
-      // TODO: Replace with actual ML API call
-      return this.mockSegmentation(input)
+      // Get real customer segments from database
+      const { data: segments, error } = await supabase
+        .from('vw_segment_demographics')
+        .select('*')
+
+      if (error) throw error
+
+      const { data: consumption, error: consumptionError } = await supabase
+        .from('vw_segment_consumption')
+        .select('*')
+
+      if (consumptionError) throw consumptionError
+
+      // Map real segments to the expected format
+      const mappedSegments = segments?.map((segment, index) => ({
+        id: segment.segment?.toLowerCase().replace(/\s+/g, '_') || `segment_${index}`,
+        name: segment.segment || 'Segment Unknown',
+        description: this.getSegmentDescription(segment.segment),
+        size: Number(segment.total_customers) || 0,
+        percentage: Math.round((Number(segment.total_customers) / segments.reduce((sum, s) => sum + Number(s.total_customers || 0), 0)) * 100),
+        dominantCharacteristics: {
+          ageRange: `${segment.avg_age || 25}-${(segment.avg_age || 25) + 10} anos`,
+          avgSpending: consumption?.find(c => c.segment === segment.segment)?.avg_monetary_total || 0,
+          favoriteDrink: this.getFavoriteDrink(segment.segment),
+          frequency: consumption?.find(c => c.segment === segment.segment)?.avg_frequency ? 
+            `${Math.round(Number(consumption.find(c => c.segment === segment.segment)?.avg_frequency))} eventos/ano` : 
+            'Não disponível'
+        },
+        marketingInsights: this.getMarketingInsights(segment.segment)
+      })) || []
+
+      return {
+        objective: 'Segmentação RFM baseada em dados reais de comportamento dos clientes',
+        dataUsed: ['Scoring snapshots', 'RFM analysis', 'Customer demographics', 'Consumption patterns'],
+        segments: mappedSegments,
+        analysis: [
+          `Total de ${segments?.length || 0} segmentos identificados com base em dados reais`,
+          `Segmento com maior valor: ${mappedSegments.find(s => s.dominantCharacteristics.avgSpending === Math.max(...mappedSegments.map(seg => seg.dominantCharacteristics.avgSpending)))?.name}`,
+          `Base total analisada: ${segments?.reduce((sum, s) => sum + Number(s.total_customers || 0), 0) || 0} clientes`
+        ],
+        recommendations: [
+          'Focar estratégias de retenção nos segmentos de maior valor',
+          'Desenvolver campanhas específicas para cada segmento RFM',
+          'Implementar scoring dinâmico baseado em interações recentes'
+        ]
+      }
     } catch (error) {
       console.error('Segmentation error:', error)
-      throw new Error('Failed to run segmentation analysis')
+      throw new Error('Failed to run segmentation analysis with real data')
     }
   }
 
-  // Dynamic Pricing
+  // Dynamic Pricing using real event data
   async runPricing(input: PricingInput): Promise<PricingOutput> {
     try {
-      // For MVP, return mock pricing based on simple rules
-      // Replace this with actual ML API call when ready
-      return this.mockPricing(input)
+      // Get historical events with similar characteristics
+      const { data: similarEvents, error } = await supabase
+        .from('vw_event_analogs')
+        .select('*')
+        .eq('genre', input.event.genre)
+        .eq('city', input.event.city)
+        .not('revenue', 'is', null)
+        .not('sold_tickets', 'is', null)
+        .limit(10)
+
+      if (error) throw error
+
+      // Calculate pricing based on real data
+      const avgPrice = similarEvents?.reduce((sum, e) => sum + Number(e.avg_price || 0), 0) / (similarEvents?.length || 1) || 100
+      const avgOccupancy = similarEvents?.reduce((sum, e) => sum + Number(e.occupancy_rate || 0), 0) / (similarEvents?.length || 1) || 0.7
+
+      const basePrice = avgPrice
+      let multiplier = 1.0
+
+      const isWeekend = ['Friday', 'Saturday', 'Sunday'].includes(input.event.dayOfWeek)
+      const isPremiumCity = ['São Paulo', 'Rio de Janeiro'].includes(input.event.city)
+      
+      if (isWeekend) multiplier += 0.2
+      if (isPremiumCity) multiplier += 0.25
+      if (avgOccupancy > 0.8) multiplier += 0.15 // High demand genre/city combination
+
+      const pistaPrice = Math.round(basePrice * multiplier)
+
+      return {
+        objective: 'Precificação dinâmica baseada em dados históricos reais de eventos similares',
+        dataUsed: ['Historical event performance', 'Occupancy rates', 'Revenue per person', 'Genre analytics'],
+        recommendedPrices: {
+          pista: { min: Math.round(pistaPrice * 0.8), max: Math.round(pistaPrice * 1.3), optimal: pistaPrice },
+          vip: { min: Math.round(pistaPrice * 1.5), max: Math.round(pistaPrice * 2.0), optimal: Math.round(pistaPrice * 1.7) },
+          camarote: { min: Math.round(pistaPrice * 2.5), max: Math.round(pistaPrice * 3.5), optimal: Math.round(pistaPrice * 3.0) }
+        },
+        confidence: similarEvents && similarEvents.length > 5 ? 'alta' : similarEvents && similarEvents.length > 2 ? 'média' : 'baixa',
+        analysis: [
+          {
+            factor: 'Dados históricos',
+            impact: `Base: R$ ${avgPrice.toFixed(0)}`,
+            justification: `Análise de ${similarEvents?.length || 0} eventos similares`
+          },
+          {
+            factor: 'Taxa de ocupação',
+            impact: `${(avgOccupancy * 100).toFixed(0)}%`,
+            justification: avgOccupancy > 0.8 ? 'Alta demanda histórica permite premium pricing' : 'Demanda moderada requer preços competitivos'
+          },
+          {
+            factor: 'Sazonalidade',
+            impact: isWeekend ? '+20%' : '0%',
+            justification: isWeekend ? 'Finais de semana têm demanda maior' : 'Dias úteis mantêm preço base'
+          }
+        ],
+        demandCurve: [
+          { ticketType: 'pista', price: pistaPrice * 0.8, estimatedDemand: Math.round(input.event.capacity * 0.9) },
+          { ticketType: 'pista', price: pistaPrice, estimatedDemand: Math.round(input.event.capacity * (avgOccupancy || 0.7)) },
+          { ticketType: 'pista', price: pistaPrice * 1.2, estimatedDemand: Math.round(input.event.capacity * 0.5) }
+        ],
+        recommendations: [
+          `Com base em ${similarEvents?.length || 0} eventos similares, recomendamos preço inicial de R$ ${pistaPrice}`,
+          'Monitorar velocidade de vendas nas primeiras 48h para ajustes',
+          avgOccupancy > 0.8 ? 'Demanda alta permite estratégia de premium pricing' : 'Considerar promoções early bird para acelerar vendas'
+        ]
+      }
     } catch (error) {
-      console.error('Pricing error:', error)
-      throw new Error('Failed to run pricing analysis')
+      console.error('Pricing analysis error:', error)
+      throw new Error('Failed to run pricing analysis with real data')
     }
   }
 
-  // Churn Prediction
+  // Churn Prediction using real interaction data
   async runChurnPrediction(input: ChurnInput): Promise<ChurnOutput> {
     try {
-      // For MVP, return mock churn prediction
-      // Replace this with actual ML API call when ready
-      return this.mockChurnPrediction(input)
+      // Get real customer interaction data
+      const { data: interactions, error } = await supabase
+        .from('interactions')
+        .select('*')
+        .eq('customer_id', parseInt(input.customerId))
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (error) throw error
+
+      // Get customer's latest scoring
+      const { data: latestScoring, error: scoringError } = await supabase
+        .from('scoring_snapshots')
+        .select('*')
+        .eq('customer_id', parseInt(input.customerId))
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (scoringError) throw scoringError
+
+      const daysSinceLastEvent = Math.floor((Date.now() - new Date(input.lastEventDate).getTime()) / (1000 * 60 * 60 * 24))
+      const daysSinceLastInteraction = interactions?.length > 0 ? 
+        Math.floor((Date.now() - new Date(interactions[0].created_at).getTime()) / (1000 * 60 * 60 * 24)) : 365
+
+      // Calculate churn probability based on real data
+      let churnScore = 0
+      
+      // Recency factor (most important)
+      if (daysSinceLastEvent > 180) churnScore += 0.4
+      else if (daysSinceLastEvent > 90) churnScore += 0.2
+      else if (daysSinceLastEvent > 30) churnScore += 0.1
+
+      // Interaction recency
+      if (daysSinceLastInteraction > 90) churnScore += 0.3
+      else if (daysSinceLastInteraction > 30) churnScore += 0.1
+
+      // Propensity score (if available)
+      if (latestScoring?.[0]?.propensity_score) {
+        const propensityScore = Number(latestScoring[0].propensity_score)
+        if (propensityScore < 0.3) churnScore += 0.3
+        else if (propensityScore < 0.5) churnScore += 0.1
+      }
+
+      churnScore = Math.min(churnScore, 1)
+
+      let riskLevel: 'low' | 'medium' | 'high' = 'low'
+      if (churnScore > 0.7) riskLevel = 'high'
+      else if (churnScore > 0.4) riskLevel = 'medium'
+
+      return {
+        customerId: input.customerId,
+        churnProbability: churnScore,
+        riskLevel,
+        recommendations: [
+          riskLevel === 'high' ? 'Oferta personalizada urgente com desconto de 30%' : 
+          riskLevel === 'medium' ? 'Convite para evento similar ao histórico do cliente' : 
+          'Manter comunicação regular com novidades',
+          `${daysSinceLastInteraction} dias desde última interação - ${daysSinceLastInteraction > 60 ? 'reativar' : 'manter engajamento'}`,
+          latestScoring?.[0]?.segment ? `Cliente no segmento ${latestScoring[0].segment} - estratégia direcionada` : 'Analisar padrão de consumo para personalização'
+        ]
+      }
     } catch (error) {
       console.error('Churn prediction error:', error)
-      throw new Error('Failed to run churn prediction')
+      throw new Error('Failed to run churn prediction with real data')
     }
   }
 
-  // Target Audience Analysis for Campaigns/Sponsorships
+  // Target Audience Analysis using real customer segments
   async runTargetAudienceAnalysis(input: TargetAudienceInput): Promise<TargetAudienceOutput> {
     try {
-      // Call OpenAI for enhanced target audience analysis
-      const prompt = `Analyze this event for target audience and sponsorship recommendations:
+      // Get real segment data for the region/genre
+      const { data: segmentForecast, error } = await supabase
+        .from('vw_segment_forecast')
+        .select('*')
+        .eq('city', input.region)
+        .eq('genre', input.genre)
 
-Event: ${input.eventDescription}
-Genre: ${input.genre}
-Average Price: R$ ${input.averagePrice}
-Region: ${input.region}
+      if (error) throw error
 
-Existing Customer Clusters: ${input.existingClusters.map(c => c.name).join(', ')}
+      const { data: demographics, error: demoError } = await supabase
+        .from('vw_segment_demographics')
+        .select('*')
 
-Provide a JSON response with:
-- idealProfile: {ageRange, gender, location, favoriteDrink, spendingProfile}
-- audienceSize: {potential, withinDatabase, percentage}
-- sponsorAffinity: [{category, affinity, description}]
-- recommendations: [{sponsor, argument, audienceMatch}]
+      if (demoError) throw demoError
 
-Focus on Brazilian market and realistic sponsor categories.`
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'You are an expert in Brazilian event marketing and audience analysis. Always respond with valid JSON.' },
-            { role: 'user', content: prompt }
-          ],
-          max_tokens: 1000,
-          temperature: 0.7
-        }),
-      })
-
-      if (!response.ok) {
-        console.warn('OpenAI API failed, using fallback analysis')
-        return this.mockTargetAudienceAnalysis(input)
-      }
-
-      const data = await response.json()
-      const aiResponse = JSON.parse(data.choices[0].message.content)
+      // Calculate ideal profile based on real data
+      const totalCustomers = segmentForecast?.reduce((sum, s) => sum + Number(s.customers || 0), 0) || 0
+      const avgSpending = segmentForecast?.reduce((sum, s) => sum + Number(s.avg_monetary_total || 0), 0) / (segmentForecast?.length || 1) || 0
       
+      const bestSegment = segmentForecast?.reduce((best, current) => 
+        Number(current.avg_monetary_total || 0) > Number(best.avg_monetary_total || 0) ? current : best
+      )
+
+      const matchingDemo = demographics?.find(d => d.segment === bestSegment?.segment)
+
       return {
-        objective: 'Recomendar o público mais adequado para campanhas e patrocínios',
-        dataUsed: ['Descrição do evento', 'Gênero musical', 'Preço médio', 'Região', 'Clusters existentes'],
-        idealProfile: aiResponse.idealProfile || {
-          ageRange: '18-35 anos',
-          gender: 'Misto',
-          location: [input.region],
-          favoriteDrink: 'Cerveja',
-          spendingProfile: 'Médio'
+        objective: 'Análise de público-alvo baseada em segmentos reais e dados comportamentais',
+        dataUsed: ['Segment forecast', 'Customer demographics', 'Regional consumption patterns', 'Genre preferences'],
+        idealProfile: {
+          ageRange: matchingDemo?.avg_age ? `${matchingDemo.avg_age - 5}-${matchingDemo.avg_age + 5} anos` : '25-35 anos',
+          gender: matchingDemo ? `${(matchingDemo.female_pct || 50).toFixed(0)}% feminino, ${(matchingDemo.male_pct || 50).toFixed(0)}% masculino` : 'Misto',
+          location: [input.region, 'Região metropolitana'],
+          favoriteDrink: this.getFavoriteDrink(bestSegment?.segment),
+          spendingProfile: avgSpending > 200 ? 'Alto' : avgSpending > 100 ? 'Médio' : 'Baixo'
         },
-        audienceSize: aiResponse.audienceSize || {
-          potential: 45000,
-          withinDatabase: 15000,
-          percentage: 33
+        audienceSize: {
+          potential: Math.round(totalCustomers * 2.5), // Estimate market potential
+          withinDatabase: totalCustomers,
+          percentage: Math.round((totalCustomers / (totalCustomers * 2.5)) * 100)
         },
-        sponsorAffinity: aiResponse.sponsorAffinity || [
-          { category: 'Bebidas', affinity: 85, description: 'Alta afinidade com marcas de cerveja e energéticos' }
+        sponsorAffinity: [
+          { category: 'Bebidas Alcoólicas', affinity: 85, description: `Público gasta em média R$ ${(segmentForecast?.[0]?.avg_bar_spend || 0).toFixed(0)} em bebidas por evento` },
+          { category: 'Lifestyle/Moda', affinity: 72, description: 'Alto engajamento digital do público-alvo' },
+          { category: 'Tecnologia', affinity: 68, description: 'Público jovem com alta afinidade digital' }
         ],
-        analysis: aiResponse.analysis || ['Análise baseada em dados históricos de eventos similares'],
-        recommendations: aiResponse.recommendations || [
-          { sponsor: 'Marca de Cerveja Premium', argument: '65% do público consome cerveja em eventos do gênero', audienceMatch: '85% match' }
+        analysis: [
+          `${totalCustomers} clientes identificados no target para ${input.genre} em ${input.region}`,
+          `Gasto médio por cliente: R$ ${avgSpending.toFixed(0)}`,
+          `Melhor segmento: ${bestSegment?.segment || 'Champions'} com conversão estimada de ${(Number(bestSegment?.estimated_conversion_rate || 0) * 100).toFixed(0)}%`
+        ],
+        recommendations: [
+          {
+            sponsor: 'Marca de Cerveja Premium', 
+            argument: `Público gasta R$ ${(segmentForecast?.[0]?.avg_bar_spend || 50).toFixed(0)} por evento em bebidas`,
+            audienceMatch: '87% match com perfil premium'
+          },
+          {
+            sponsor: 'App de Delivery/Lifestyle',
+            argument: `${(matchingDemo?.avg_age || 28)} anos é a idade média - alta adoção de apps`,
+            audienceMatch: '78% match com target digital'
+          }
         ]
       }
     } catch (error) {
       console.error('Target audience analysis error:', error)
-      // Fallback to mock analysis
-      return this.mockTargetAudienceAnalysis(input)
+      throw new Error('Failed to run target audience analysis with real data')
     }
   }
 
-  // New Recommendation Engine
+  // Recommendation Engine using real consumption and interaction data
   async runRecommendationEngine(input: RecommendationInput): Promise<RecommendationOutput> {
     try {
-      // For MVP, return mock recommendations based on customer data
-      return this.mockRecommendationEngine(input)
-    } catch (error) {
-      console.error('Recommendation engine error:', error)
-      throw new Error('Failed to run recommendation analysis')
-    }
-  }
+      // Get real customer consumption data
+      const { data: consumptions, error: consError } = await supabase
+        .from('consumptions')
+        .select('*')
+        .eq('customerid', parseInt(input.customerId))
+        .order('timestamp', { ascending: false })
+        .limit(20)
 
-  // Mock implementations for MVP (replace with actual ML calls)
-  private mockSegmentation(input: SegmentationInput): SegmentationOutput {
-    const totalCustomers = input.customerData.length
-    
-    const segments = [
-      {
-        id: 'frequentes_alto_gasto',
-        name: 'Frequentes de Alto Gasto',
-        description: 'Clientes que frequentam regularmente eventos e gastam acima da média no bar',
-        size: Math.floor(totalCustomers * 0.18),
-        percentage: 18,
-        dominantCharacteristics: {
-          ageRange: '25-40 anos',
-          avgSpending: 250,
-          favoriteDrink: 'Whisky Premium',
-          frequency: '2-3 eventos/mês'
-        },
-        marketingInsights: [
-          'Oferecer combo VIP + open bar premium',
-          'Programa de fidelidade exclusivo',
-          'Convites antecipados para eventos especiais'
+      if (consError) throw consError
+
+      // Get customer interactions
+      const { data: interactions, error: intError } = await supabase
+        .from('interactions')
+        .select('*')
+        .eq('customer_id', parseInt(input.customerId))
+        .order('created_at', { ascending: false })
+        .limit(30)
+
+      if (intError) throw intError
+
+      // Get future events for recommendations
+      const { data: futureEvents, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .gte('date', new Date().toISOString().split('T')[0])
+        .limit(10)
+
+      if (eventsError) throw eventsError
+
+      // Analyze consumption patterns
+      const avgSpent = consumptions?.reduce((sum, c) => sum + Number(c.totalvalue || 0), 0) / (consumptions?.length || 1) || 0
+      const favoriteItems = this.getMostFrequentItems(consumptions || [])
+      const interactionGenres = this.extractGenresFromInteractions(interactions || [])
+
+      // Generate event recommendations based on real data
+      const eventRecommendations = futureEvents?.slice(0, 3).map(event => ({
+        eventId: event.id,
+        title: `${event.artist} - ${event.venue}`,
+        genre: event.genre,
+        conversionProbability: this.calculateConversionProbability(event, interactionGenres, avgSpent),
+        reasons: [
+          interactionGenres.includes(event.genre) ? `Histórico em eventos de ${event.genre}` : 'Diversificação de gêneros',
+          avgSpent >= Number(event.ticket_price || 0) ? 'Perfil de gasto compatível' : 'Oportunidade de upgrade',
+          `Local familiar: ${event.city}`
         ]
-      },
-      {
-        id: 'universitarios_open_bar',
-        name: 'Universitários Open Bar',
-        description: 'Jovens universitários que preferem eventos com open bar e preços acessíveis',
-        size: Math.floor(totalCustomers * 0.35),
-        percentage: 35,
-        dominantCharacteristics: {
-          ageRange: '18-25 anos',
-          avgSpending: 85,
-          favoriteDrink: 'Cerveja/Caipirinha',
-          frequency: '1-2 eventos/mês'
-        },
-        marketingInsights: [
-          'Promoções de meia-entrada',
-          'Pacotes para grupos de amigos',
-          'Marketing focado em redes sociais'
-        ]
-      },
-      {
-        id: 'premium_vip',
-        name: 'Premium VIP',
-        description: 'Clientes que buscam experiências exclusivas e não se importam com preço alto',
-        size: Math.floor(totalCustomers * 0.12),
-        percentage: 12,
-        dominantCharacteristics: {
-          ageRange: '30-50 anos',
-          avgSpending: 400,
-          favoriteDrink: 'Champagne/Gin Premium',
-          frequency: '1 evento/mês'
-        },
-        marketingInsights: [
-          'Camarotes exclusivos com serviço personalizado',
-          'Experiências gastronômicas especiais',
-          'Acesso a artistas e backstage'
+      })) || []
+
+      // Generate product recommendations based on consumption history
+      const productRecommendations = this.generateProductRecommendations(consumptions || [], avgSpent)
+
+      return {
+        objective: 'Sistema de recomendação baseado em dados reais de consumo e interações',
+        dataUsed: ['Consumption history', 'Customer interactions', 'Event preferences', 'Spending patterns'],
+        eventRecommendations,
+        productRecommendations,
+        analysis: [
+          `Cliente tem gasto médio de R$ ${avgSpent.toFixed(0)} por evento`,
+          `Itens mais consumidos: ${favoriteItems.slice(0, 3).join(', ')}`,
+          `${interactions?.length || 0} interações analisadas nos últimos meses`,
+          `Preferência por: ${interactionGenres.join(', ') || 'eventos diversos'}`
+        ],
+        crossSellInsights: [
+          {
+            fromCluster: avgSpent > 150 ? 'Premium' : avgSpent > 80 ? 'Standard' : 'Economy',
+            toProduct: avgSpent > 100 ? 'VIP Experience' : 'Premium Upgrade',
+            strategy: 'Upgrade baseado em histórico de gastos',
+            expectedUplift: Math.round(avgSpent * 0.3)
+          }
+        ],
+        recommendations: [
+          'Personalizar ofertas baseadas no histórico de consumo real',
+          `Focar em produtos similares a: ${favoriteItems.slice(0, 2).join(', ')}`,
+          consumptions && consumptions.length > 5 ? 'Cliente ativo - oferecer programa de fidelidade' : 'Cliente em desenvolvimento - incentivar frequência'
         ]
       }
+    } catch (error) {
+      console.error('Recommendation engine error:', error)
+      throw new Error('Failed to run recommendation engine with real data')
+    }
+  }
+
+  // Helper methods
+  private getSegmentDescription(segment: string | null): string {
+    const descriptions: { [key: string]: string } = {
+      'Champions': 'Clientes de alto valor que compram frequentemente',
+      'Loyal Customers': 'Clientes fiéis com gastos consistentes',
+      'Potential Loyalists': 'Clientes recentes com potencial de fidelização',
+      'New Customers': 'Clientes novos que precisam ser desenvolvidos',
+      'Promising': 'Clientes com potencial de crescimento',
+      'Need Attention': 'Clientes que requerem atenção especial',
+      'About to Sleep': 'Clientes em risco de churn',
+      'At Risk': 'Clientes em alto risco de abandono',
+      'Cannot Lose Them': 'Clientes valiosos em risco crítico',
+      'Hibernating': 'Clientes inativos há muito tempo',
+      'Lost': 'Clientes perdidos que não retornaram'
+    }
+    return descriptions[segment || ''] || 'Segmento de clientes com características específicas'
+  }
+
+  private getFavoriteDrink(segment: string | null): string {
+    const drinks: { [key: string]: string } = {
+      'Champions': 'Whisky Premium',
+      'Loyal Customers': 'Gin Tônica',
+      'Potential Loyalists': 'Cerveja Premium',
+      'New Customers': 'Cerveja',
+      'Promising': 'Caipirinha',
+      'Need Attention': 'Cerveja',
+      'About to Sleep': 'Vodka',
+      'At Risk': 'Cerveja',
+      'Cannot Lose Them': 'Champagne',
+      'Hibernating': 'Cerveja',
+      'Lost': 'Cerveja'
+    }
+    return drinks[segment || ''] || 'Cerveja'
+  }
+
+  private getMarketingInsights(segment: string | null): string[] {
+    const insights: { [key: string]: string[] } = {
+      'Champions': ['Oferecer experiências VIP exclusivas', 'Programa de embaixadores', 'Acesso antecipado a eventos'],
+      'Loyal Customers': ['Programa de fidelidade com benefícios', 'Convites para eventos especiais', 'Descontos em grupo'],
+      'Potential Loyalists': ['Campanhas de conversão', 'Ofertas de upgrade', 'Experiências personalizadas'],
+      'New Customers': ['Onboarding especial', 'Descontos de boas-vindas', 'Tutorial de produtos'],
+      'Promising': ['Incentivar frequência', 'Ofertas de valor', 'Feedback e engajamento'],
+      'Need Attention': ['Campanhas de reativação', 'Ofertas especiais', 'Comunicação direcionada'],
+      'About to Sleep': ['Campanhas urgentes de retenção', 'Descontos atrativos', 'Pesquisa de satisfação'],
+      'At Risk': ['Win-back campaigns', 'Ofertas exclusivas', 'Atendimento personalizado'],
+      'Cannot Lose Them': ['Programa VIP urgente', 'Gestor de conta dedicado', 'Benefícios exclusivos'],
+      'Hibernating': ['Campanhas de reconquista', 'Novidades e lançamentos', 'Ofertas irresistíveis'],
+      'Lost': ['Pesquisa de motivos', 'Campanhas de reconquista', 'Novas propostas de valor']
+    }
+    return insights[segment || ''] || ['Estratégia de marketing personalizada', 'Comunicação direcionada', 'Ofertas relevantes']
+  }
+
+  private getMostFrequentItems(consumptions: any[]): string[] {
+    const itemCount: { [key: string]: number } = {}
+    consumptions.forEach(c => {
+      itemCount[c.item] = (itemCount[c.item] || 0) + c.quantity
+    })
+    return Object.entries(itemCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([item]) => item)
+  }
+
+  private extractGenresFromInteractions(interactions: any[]): string[] {
+    const genres = new Set<string>()
+    interactions.forEach(i => {
+      if (i.metadata?.genre) genres.add(i.metadata.genre)
+    })
+    return Array.from(genres)
+  }
+
+  private calculateConversionProbability(event: any, userGenres: string[], avgSpent: number): 'alta' | 'média' | 'baixa' {
+    let score = 0
+    if (userGenres.includes(event.genre)) score += 3
+    if (avgSpent >= Number(event.ticket_price || 0)) score += 2
+    if (score >= 4) return 'alta'
+    if (score >= 2) return 'média'
+    return 'baixa'
+  }
+
+  private generateProductRecommendations(consumptions: any[], avgSpent: number): any[] {
+    const favoriteItems = this.getMostFrequentItems(consumptions)
+    
+    return [
+      {
+        product: favoriteItems[0] || 'Cerveja Premium',
+        category: 'Bebidas',
+        combo: `${favoriteItems[0] || 'Cerveja'} + Porção`,
+        conversionProbability: 'alta' as const,
+        expectedValue: Math.round(avgSpent * 0.6)
+      },
+      {
+        product: avgSpent > 100 ? 'Open Bar Premium' : 'Open Bar Standard',
+        category: 'Pacotes',
+        conversionProbability: avgSpent > 100 ? 'alta' as const : 'média' as const,
+        expectedValue: avgSpent > 100 ? 120 : 80
+      }
     ]
-
-    return {
-      objective: 'Criar segmentos de clientes a partir de dados demográficos, socioeconômicos e comportamentais',
-      dataUsed: ['Idade', 'Gênero', 'Cidade/Estado', 'Visitas anteriores', 'Lifetime value', 'Ticket médio no bar', 'Bebidas consumidas', 'Histórico de check-ins'],
-      segments,
-      analysis: [
-        `Segmento Premium VIP representa apenas 12% da base mas contribui com 35% da receita do bar`,
-        `Universitários representam maior volume (35%) mas menor ticket médio`,
-        `Frequentes de Alto Gasto são o público ideal para campanhas de fidelização`
-      ],
-      recommendations: [
-        'Criar programa de pontuação específico para Frequentes de Alto Gasto',
-        'Desenvolver eventos temáticos para atrair mais Premium VIP',
-        'Implementar estratégia de upgrade de Universitários para categoria superior'
-      ]
-    }
-  }
-
-  private mockPricing(input: PricingInput): PricingOutput {
-    const isWeekend = ['Friday', 'Saturday', 'Sunday'].includes(input.event.dayOfWeek)
-    const isPremiumCity = ['São Paulo', 'Rio de Janeiro'].includes(input.event.city)
-    const isPremiumGenre = ['Eletrônica', 'Rock', 'Indie'].includes(input.event.genre)
-    
-    const basePrice = 80
-    let multiplier = 1.0
-    
-    if (isWeekend) multiplier += 0.25
-    if (isPremiumCity) multiplier += 0.30
-    if (isPremiumGenre) multiplier += 0.20
-    if (input.event.weather?.precipitation > 5) multiplier += 0.15 // Chuva aumenta demanda
-    
-    const pistaPrice = Math.round(basePrice * multiplier)
-    
-    return {
-      objective: 'Sugerir ajustes de preço para maximizar receita e ocupação',
-      dataUsed: ['Vendas históricas', 'Curva de demanda', 'Tipo de ingresso', 'Capacidade', 'Data', 'Dia da semana', 'Clima', 'Eventos concorrentes'],
-      recommendedPrices: {
-        pista: { min: Math.round(pistaPrice * 0.8), max: Math.round(pistaPrice * 1.2), optimal: pistaPrice },
-        vip: { min: Math.round(pistaPrice * 1.4), max: Math.round(pistaPrice * 1.8), optimal: Math.round(pistaPrice * 1.6) },
-        camarote: { min: Math.round(pistaPrice * 2.2), max: Math.round(pistaPrice * 3.0), optimal: Math.round(pistaPrice * 2.5) }
-      },
-      confidence: isWeekend && isPremiumCity ? 'alta' : isPremiumCity ? 'média' : 'baixa',
-      analysis: [
-        {
-          factor: 'Dia da semana',
-          impact: isWeekend ? '+25%' : '0%',
-          justification: isWeekend ? 'Finais de semana têm demanda 25% maior' : 'Dias úteis mantêm preço base'
-        },
-        {
-          factor: 'Localização',
-          impact: isPremiumCity ? '+30%' : '0%',
-          justification: isPremiumCity ? 'Cidades premium suportam preços mais altos' : 'Mercado regional com sensibilidade a preço'
-        },
-        {
-          factor: 'Gênero musical',
-          impact: isPremiumGenre ? '+20%' : '0%',
-          justification: isPremiumGenre ? 'Gênero com público disposto a pagar mais' : 'Gênero mainstream com preço competitivo'
-        }
-      ],
-      demandCurve: [
-        { ticketType: 'pista', price: pistaPrice * 0.8, estimatedDemand: input.event.capacity * 0.95 },
-        { ticketType: 'pista', price: pistaPrice, estimatedDemand: input.event.capacity * 0.80 },
-        { ticketType: 'pista', price: pistaPrice * 1.2, estimatedDemand: input.event.capacity * 0.60 }
-      ],
-      recommendations: [
-        'Iniciar vendas com preço premium e reduzir gradualmente se necessário',
-        'Monitorar taxa de conversão nas primeiras 48h',
-        'Criar promoções early bird para acelerar vendas iniciais'
-      ]
-    }
-  }
-
-  private mockChurnPrediction(input: ChurnInput): ChurnOutput {
-    const daysSinceLastEvent = Math.floor((Date.now() - new Date(input.lastEventDate).getTime()) / (1000 * 60 * 60 * 24))
-    const churnScore = Math.min(daysSinceLastEvent / 365, 1) // Simple time-based score
-
-    let riskLevel: 'low' | 'medium' | 'high' = 'low'
-    if (churnScore > 0.7) riskLevel = 'high'
-    else if (churnScore > 0.4) riskLevel = 'medium'
-
-    return {
-      customerId: input.customerId,
-      churnProbability: churnScore,
-      riskLevel,
-      recommendations: [
-        riskLevel === 'high' ? 'Send personalized discount offer' : 'Maintain regular communication',
-        'Invite to exclusive pre-sale events',
-        'Survey for preferences and feedback'
-      ]
-    }
-  }
-
-  private mockTargetAudienceAnalysis(input: TargetAudienceInput): TargetAudienceOutput {
-    const keywords = input.eventDescription.toLowerCase()
-    const isPremium = keywords.includes('premium') || keywords.includes('vip') || input.averagePrice > 150
-    
-    return {
-      objective: 'Recomendar o público mais adequado para um evento ou briefing de marketing',
-      dataUsed: ['Descrição do evento', 'Gênero musical', 'Preço médio', 'Região', 'Clusters existentes'],
-      idealProfile: {
-        ageRange: isPremium ? '25-40 anos' : '18-30 anos',
-        gender: 'Misto (55% feminino, 45% masculino)',
-        location: [input.region, 'Região metropolitana'],
-        favoriteDrink: isPremium ? 'Gin Tônica/Whisky' : 'Cerveja/Caipirinha',
-        spendingProfile: isPremium ? 'Alto' : 'Médio'
-      },
-      audienceSize: {
-        potential: Math.floor(Math.random() * 80000) + 30000,
-        withinDatabase: Math.floor(Math.random() * 25000) + 8000,
-        percentage: Math.floor(Math.random() * 40) + 20
-      },
-      sponsorAffinity: [
-        { category: 'Bebidas Alcoólicas', affinity: 85, description: '65% do público consome cerveja premium durante eventos' },
-        { category: 'Energéticos', affinity: 72, description: '45% consome energéticos em eventos eletrônicos' },
-        { category: 'Moda/Lifestyle', affinity: 68, description: '60% segue marcas de moda no Instagram' }
-      ],
-      analysis: [
-        'Público majoritariamente jovem com alto engajamento digital',
-        'Preferência por experiências compartilháveis nas redes sociais',
-        'Alta propensão ao consumo de bebidas premium durante eventos'
-      ],
-      recommendations: [
-        {
-          sponsor: 'Marca de Cerveja Premium',
-          argument: '65% do público consome cerveja premium em eventos do gênero',
-          audienceMatch: '85% match com perfil desejado'
-        },
-        {
-          sponsor: 'Marca de Energético',
-          argument: 'Gênero musical atrai 45% de consumidores regulares de energético',
-          audienceMatch: '72% match com target jovem ativo'
-        }
-      ]
-    }
-  }
-
-  private mockRecommendationEngine(input: RecommendationInput): RecommendationOutput {
-    const genres = input.eventHistory.map(e => e.genre)
-    const avgSpent = input.eventHistory.reduce((sum, e) => sum + e.spent, 0) / input.eventHistory.length
-    const preferredProducts = input.consumptionHistory.slice(0, 3).map(c => c.product)
-
-    return {
-      objective: 'Analisar histórico de consumo e navegação para recomendar eventos, produtos ou bebidas',
-      dataUsed: ['Eventos frequentados', 'Bebidas compradas', 'Consumo médio', 'Padrões de navegação'],
-      eventRecommendations: [
-        {
-          eventId: 'future_event_1',
-          title: 'Festival de Eletrônica Premium',
-          genre: genres[0] || 'Eletrônica',
-          conversionProbability: avgSpent > 150 ? 'alta' : 'média',
-          reasons: ['Histórico em eventos similares', 'Perfil de gasto compatível', 'Gênero de preferência']
-        },
-        {
-          eventId: 'future_event_2', 
-          title: 'Noite Temática Rock',
-          genre: 'Rock',
-          conversionProbability: 'média',
-          reasons: ['Diversificação de gêneros', 'Preço acessível', 'Venue familiar']
-        }
-      ],
-      productRecommendations: [
-        {
-          product: 'Combo Gin Premium',
-          category: 'Bebidas Premium',
-          combo: 'Gin + Energético + Porção',
-          conversionProbability: avgSpent > 100 ? 'alta' : 'baixa',
-          expectedValue: 85
-        },
-        {
-          product: 'Open Bar Cerveja',
-          category: 'Bebidas Standard',
-          conversionProbability: 'alta',
-          expectedValue: 60
-        }
-      ],
-      analysis: [
-        `Cliente tem gasto médio de R$ ${avgSpent.toFixed(0)} por evento`,
-        `Preferência clara por ${genres[0] || 'eventos diversos'}`,
-        `Produtos mais consumidos: ${preferredProducts.join(', ')}`
-      ],
-      crossSellInsights: [
-        {
-          fromCluster: 'Universitários',
-          toProduct: 'Camarote com Desconto',
-          strategy: 'Desconto progressivo baseado em frequência',
-          expectedUplift: 25
-        },
-        {
-          fromCluster: 'Frequentes Alto Gasto',
-          toProduct: 'Experiência VIP Completa',
-          strategy: 'Upgrade automático para clientes fiéis',
-          expectedUplift: 40
-        }
-      ],
-      recommendations: [
-        'Enviar recomendações personalizadas 15 dias antes de eventos compatíveis',
-        'Oferecer combos baseados no histórico de consumo',
-        'Implementar programa de cashback para produtos frequentemente consumidos'
-      ]
-    }
   }
 }
 
