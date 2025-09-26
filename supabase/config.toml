@@ -47,5 +47,8 @@ verify_jwt = false
 [functions.revenue-analysis]
 verify_jwt = false
 
-[functions.test-simple]
+[functions.advanced-segmentation]
+verify_jwt = false
+
+[functions.export-report]
 verify_jwt = false
