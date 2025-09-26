@@ -7,7 +7,8 @@ import {
   Briefcase, 
   Settings,
   TrendingUp,
-  FileText
+  FileText,
+  Target
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 

@@ -13,6 +13,7 @@ import AdminLogs from "./pages/AdminLogs";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Forecast from "./pages/Forecast";
+import InsightsPlanner from "./pages/InsightsPlanner";
 
 const queryClient = new QueryClient();
 
