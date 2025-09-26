@@ -226,6 +226,12 @@ export default function InsightsPlanner() {
       return;
     }
 
+    // Show loading toast
+    const loadingToast = toast({
+      title: `🔄 Gerando relatório ${format.toUpperCase()}...`,
+      description: "Aguarde enquanto processamos seus dados",
+    });
+
     try {
       console.log("📄 Exporting report in format:", format);
       
@@ -260,25 +266,27 @@ export default function InsightsPlanner() {
         a.download = `insights-report-${Date.now()}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
-      } else if (format === "pdf" && response.data?.pdfStructure) {
-        // For PDF, log structure for now (can be extended with jsPDF)
-        console.log("PDF structure:", response.data.pdfStructure);
-        toast({
-          title: "Estrutura PDF gerada",
-          description: "Consulte o console para a estrutura do PDF",
-        });
+      } else if (format === "pdf" && response.data) {
+        // Handle PDF download
+        const blob = new Blob([response.data], { type: "application/pdf" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `insights-report-${Date.now()}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
       }
 
       toast({
-        title: "Export realizado",
-        description: `Relatório ${format.toUpperCase()} gerado com sucesso`,
+        title: `✅ Relatório ${format.toUpperCase()} gerado!`,
+        description: "Download iniciado automaticamente. Verifique sua pasta de downloads.",
       });
 
     } catch (error) {
       console.error("Export error:", error);
       toast({
-        title: "Erro no export",
-        description: "Falha ao gerar relatório",
+        title: "❌ Erro no export",
+        description: error instanceof Error ? error.message : "Tente novamente em alguns instantes",
         variant: "destructive",
       });
     }
