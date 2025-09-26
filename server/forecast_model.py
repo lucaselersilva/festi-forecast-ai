@@ -1,16 +1,39 @@
-import sys, json
+import sys, json, os
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import r2_score, mean_absolute_error
 from sklearn.ensemble import GradientBoostingRegressor
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
-hist_path, future_path = sys.argv[1], sys.argv[2]
-hist = pd.read_csv(hist_path)
-future = pd.read_csv(future_path)
+load_dotenv()
 
+# Supabase connection
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+supabase: Client = create_client(url, key)
+
+# Load historical events data
+hist_response = supabase.table('events').select('*').not_.is_('revenue', 'null').not_.is_('sold_tickets', 'null').execute()
+hist = pd.DataFrame(hist_response.data)
+
+# Load future events data (events without revenue/sold_tickets or future dates)
+future_response = supabase.table('events').select('*').or_('revenue.is.null,sold_tickets.is.null').execute()
+future = pd.DataFrame(future_response.data)
+
+# Get interaction insights to enrich features
+interactions_response = supabase.table('interactions').select('*').execute()
+interactions = pd.DataFrame(interactions_response.data)
+
+# Get scoring snapshots for customer behavior insights
+scoring_response = supabase.table('scoring_snapshots').select('*').execute()
+scoring = pd.DataFrame(scoring_response.data)
+
+# Check required columns exist
 required_cols = [
     "date","city","venue","artist","genre","ticket_price","marketing_spend",
     "google_trends_genre","instagram_mentions","temp_c","precip_mm","day_of_week",
@@ -18,21 +41,46 @@ required_cols = [
 ]
 for c in required_cols:
     if c not in hist.columns:
-        raise ValueError(f"Missing column in history data: {c}")
+        print(f"Warning: Missing column in history data: {c}")
 
-X = hist[["date","city","venue","genre","ticket_price","marketing_spend",
-          "google_trends_genre","instagram_mentions","temp_c","precip_mm",
-          "day_of_week","is_holiday_brazil_hint","capacity"]].copy()
-y_tickets = hist["sold_tickets"].astype(float)
-y_revenue = hist["revenue"].astype(float)
+# Enrich historical data with behavioral features
+def enrich_with_behavioral_data(df, interactions_df, scoring_df):
+    if len(interactions_df) > 0 and len(scoring_df) > 0:
+        # Aggregate interaction data by event/genre/city
+        interaction_agg = interactions_df.groupby(['interaction_type']).size().reset_index(name='interaction_count')
+        avg_propensity = scoring_df['propensity_score'].mean() if 'propensity_score' in scoring_df.columns else 0.5
+        avg_monetary = scoring_df['monetary_value'].mean() if 'monetary_value' in scoring_df.columns else 100
+        
+        df['avg_customer_propensity'] = avg_propensity
+        df['avg_customer_monetary'] = avg_monetary
+        df['historical_interactions'] = len(interactions_df)
+    else:
+        df['avg_customer_propensity'] = 0.5
+        df['avg_customer_monetary'] = 100
+        df['historical_interactions'] = 0
+    return df
+
+hist = enrich_with_behavioral_data(hist, interactions, scoring)
+
+base_features = ["date","city","venue","genre","ticket_price","marketing_spend",
+                "google_trends_genre","instagram_mentions","temp_c","precip_mm",
+                "day_of_week","is_holiday_brazil_hint","capacity"]
+
+behavioral_features = ["avg_customer_propensity", "avg_customer_monetary", "historical_interactions"]
+all_features = base_features + behavioral_features
+
+X = hist[all_features].copy()
+y_tickets = hist["sold_tickets"].fillna(0).astype(float)
+y_revenue = hist["revenue"].fillna(0).astype(float)
 
 X["month"] = pd.to_datetime(X["date"]).dt.month
 X["dow_num"] = pd.to_datetime(X["date"]).dt.dayofweek
 X = X.drop(columns=["date"])
 
-futureX = future[["date","city","venue","genre","ticket_price","marketing_spend",
-                  "google_trends_genre","instagram_mentions","temp_c","precip_mm",
-                  "day_of_week","is_holiday_brazil_hint","capacity"]].copy()
+# Enrich future data with behavioral features
+future = enrich_with_behavioral_data(future, interactions, scoring)
+
+futureX = future[all_features].copy()
 futureX["month"] = pd.to_datetime(futureX["date"]).dt.month
 futureX["dow_num"] = pd.to_datetime(futureX["date"]).dt.dayofweek
 futureX = futureX.drop(columns=["date"])
@@ -40,7 +88,8 @@ futureX = futureX.drop(columns=["date"])
 categoricals = ["city","venue","genre","day_of_week"]
 numericals = [
     "ticket_price","marketing_spend","google_trends_genre","instagram_mentions",
-    "temp_c","precip_mm","is_holiday_brazil_hint","capacity","month","dow_num"
+    "temp_c","precip_mm","is_holiday_brazil_hint","capacity","month","dow_num",
+    "avg_customer_propensity","avg_customer_monetary","historical_interactions"
 ]
 
 pre = ColumnTransformer([

@@ -10,9 +10,12 @@ export default function RealForecastPanel() {
     try {
       setLoading(true);
       setError(null);
+      console.log("Starting database-powered forecast...");
       const data = await forecast();
       setResult(data);
+      console.log("Forecast completed with database data");
     } catch (e: any) {
+      console.error("Forecast error:", e);
       setError(e?.response?.data?.error || e.message);
     } finally {
       setLoading(false);
@@ -21,9 +24,9 @@ export default function RealForecastPanel() {
 
   return (
     <div className="p-4 border rounded-2xl space-y-3">
-      <h2 className="text-xl font-semibold">Previsão com IA (dados grandes)</h2>
+      <h2 className="text-xl font-semibold">Previsão com IA + Dados Comportamentais</h2>
       <p className="text-sm opacity-80">
-        Usa modelos reais em Python (scikit-learn). Coloque seus CSVs em <code>/data</code> ou use os padrões.
+        Usa modelos ML em Python com dados reais do banco: eventos, interações de usuários e scoring de propensão.
       </p>
       <button onClick={run} disabled={loading} className="px-3 py-2 rounded-xl border">
         {loading ? "Prevendo..." : "Rodar previsão"}

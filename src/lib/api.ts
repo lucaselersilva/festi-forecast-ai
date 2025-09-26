@@ -1,7 +1,7 @@
 import axios from "axios";
 
-export async function forecast(historyCsvPath?: string, futureCsvPath?: string) {
-  const { data } = await axios.post("/api/forecast", { historyCsvPath, futureCsvPath });
+export async function forecast() {
+  const { data } = await axios.post("/api/forecast");
   return data as {
     metrics: {
       tickets_r2: number | null;
