@@ -12,6 +12,7 @@ import Sponsors from "./pages/Sponsors";
 import AdminLogs from "./pages/AdminLogs";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Forecast from "./pages/Forecast";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/segments" element={<Segments />} />
             <Route path="/events" element={<Events />} />
             <Route path="/sponsors" element={<Sponsors />} />
+            <Route path="/sponsors" element={<Forecast />} />
             <Route path="/admin/logs" element={<AdminLogs />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
