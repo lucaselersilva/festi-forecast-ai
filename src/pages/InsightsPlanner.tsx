@@ -267,9 +267,14 @@ export default function InsightsPlanner() {
         a.click();
         window.URL.revokeObjectURL(url);
       } else if (format === "pdf" && response.data) {
-        // Handle PDF download - response.data is already an ArrayBuffer
-        const uint8Array = new Uint8Array(response.data);
-        const blob = new Blob([uint8Array], { type: "application/pdf" });
+        // Handle PDF download - response.data.data is base64 encoded PDF
+        const pdfData = response.data.data || response.data;
+        const binaryString = atob(pdfData);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: "application/pdf" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -941,6 +946,165 @@ export default function InsightsPlanner() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Enhanced Marketing ROI & Strategy Insights */}
+              {revenueData.marketingROI && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5" />
+                      Estratégia de Marketing & ROI
+                    </CardTitle>
+                    <CardDescription>
+                      Investimento otimizado com retorno projetado
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                          <div className="text-sm text-muted-foreground">Orçamento Recomendado</div>
+                          <div className="text-2xl font-bold text-primary">
+                            R$ {revenueData.marketingROI.recommendedBudget.toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="p-3 bg-muted/50 rounded">
+                            <div className="text-xs text-muted-foreground">CPA Esperado</div>
+                            <div className="font-semibold">R$ {revenueData.marketingROI.expectedCPA}</div>
+                          </div>
+                          <div className="p-3 bg-muted/50 rounded">
+                            <div className="text-xs text-muted-foreground">Break-even</div>
+                            <div className="font-semibold">{revenueData.marketingROI.breakeven} ingressos</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium mb-3">Mix de Canais Recomendado</div>
+                        <div className="space-y-2">
+                          {Object.entries(revenueData.marketingROI.channelMix).map(([channel, percentage]) => (
+                            <div key={channel} className="flex items-center justify-between">
+                              <span className="text-sm capitalize">{channel}</span>
+                              <div className="flex items-center gap-2">
+                                <Progress value={percentage as number} className="w-20 h-2" />
+                                <span className="text-sm font-medium w-8">{percentage}%</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Competitive Position */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Posição Competitiva
+                  </CardTitle>
+                  <CardDescription>
+                    Benchmarking com eventos similares na região
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{revenueData.competitiveInsights.marketPosition}</div>
+                      <div className="text-sm text-muted-foreground mt-1">Posição no Mercado</div>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">+{revenueData.competitiveInsights.priceAdvantage}%</div>
+                      <div className="text-sm text-muted-foreground mt-1">Vantagem de Preço</div>
+                    </div>
+                    <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-600">{revenueData.competitiveInsights.occupancyBenchmark}%</div>
+                      <div className="text-sm text-muted-foreground mt-1">vs. Benchmark Ocupação</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Top Customer Prospects */}
+              {advancedSegments.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Clientes Mais Prováveis
+                    </CardTitle>
+                    <CardDescription>
+                      Perfis com maior probabilidade de conversão baseados em histórico
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {advancedSegments.slice(0, 3).map((segment, index) => {
+                        const topChannel = Object.entries(segment.marketingChannels || {})
+                          .sort(([,a], [,b]) => (b as number) - (a as number))[0]?.[0] || 'digital';
+                        const probability = Math.round(segment.conversionRate * 100);
+                        const expectedSpend = segment.avgTicketSpend + segment.avgBarSpend;
+                        
+                        return (
+                          <div key={`prospect-${segment.id}`} className="flex items-start gap-4 p-4 border rounded-lg hover:shadow-md transition-shadow">
+                            <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/60 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-semibold">{segment.name}</h4>
+                                <Badge variant={probability > 70 ? "default" : probability > 50 ? "secondary" : "outline"}>
+                                  {probability}% probabilidade
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{segment.description}</p>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                                <div>
+                                  <span className="text-muted-foreground">Gasto Esperado:</span>
+                                  <span className="font-medium ml-1">R$ {expectedSpend.toLocaleString('pt-BR')}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Canal Preferido:</span>
+                                  <span className="font-medium ml-1 capitalize">{topChannel}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Potencial:</span>
+                                  <span className="font-medium ml-1">{segment.projectedAttendance} pessoas</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Recommendations */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Recomendações Estratégicas
+                  </CardTitle>
+                  <CardDescription>
+                    Estratégias baseadas na análise para maximizar resultados
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {revenueData.recommendations.map((rec, index) => (
+                      <li key={`rec-${index}`} className="flex items-start gap-3">
+                        <Target className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-sm">{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
             </div>
           ) : (
             <Card>
@@ -1173,7 +1337,7 @@ export default function InsightsPlanner() {
                   <CardContent>
                     <div className="space-y-3">
                       {sponsorshipData.insights.map((insight, index) => (
-                        <div key={index} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <div key={`insight-${index}`} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
                           <Badge variant="outline" className="mt-0.5">{index + 1}</Badge>
                           <p className="text-sm">{insight}</p>
                         </div>
@@ -1195,7 +1359,7 @@ export default function InsightsPlanner() {
                   <CardContent>
                     <div className="space-y-3">
                       {sponsorshipData.salesNarrative.map((narrative, index) => (
-                        <div key={index} className="flex items-start gap-3 p-3 bg-green-500/5 rounded-lg border border-green-500/10">
+                        <div key={`narrative-${index}`} className="flex items-start gap-3 p-3 bg-green-500/5 rounded-lg border border-green-500/10">
                           <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
                             {index + 1}
                           </div>

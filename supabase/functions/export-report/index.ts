@@ -28,12 +28,15 @@ serve(async (req) => {
     }
 
       if (format === 'pdf') {
-        const pdfBuffer = await generatePDF(data);
-        return new Response(new Uint8Array(pdfBuffer), {
+        const pdfBase64 = await generatePDF(data);
+        return new Response(JSON.stringify({ 
+          success: true, 
+          data: pdfBase64,
+          filename: `insights-report-${Date.now()}.pdf`
+        }), {
           headers: {
             ...corsHeaders,
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="insights-report-${Date.now()}.pdf"`
+            'Content-Type': 'application/json'
           },
         });
       }
@@ -139,12 +142,16 @@ function generateCSV(data: any): string {
   return csv;
 }
 
-async function generatePDF(data: any): Promise<Uint8Array> {
+async function generatePDF(data: any): Promise<string> {
   const { eventInfo, revenueData, sponsorshipData, segments } = data;
   
-  // Import jsPDF dynamically
-  const { jsPDF } = await import('https://esm.sh/jspdf@2.5.1');
-  const doc = new jsPDF();
+  console.log('Starting PDF generation with jsPDF...');
+  
+  try {
+    // Import jsPDF dynamically
+    const { jsPDF } = await import('https://esm.sh/jspdf@2.5.1');
+    const doc = new jsPDF();
+    console.log('jsPDF loaded successfully');
   
   let yPosition = 20;
   
@@ -308,7 +315,12 @@ async function generatePDF(data: any): Promise<Uint8Array> {
     });
   }
   
-  return doc.output('arraybuffer');
+    console.log('PDF generation completed successfully');
+    return doc.output('datauristring').split(',')[1]; // Return base64 string without data:application/pdf;base64, prefix
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    throw new Error(`Failed to generate PDF: ${error.message}`);
+  }
 }
 
 function generatePDFContent(data: any): string {
