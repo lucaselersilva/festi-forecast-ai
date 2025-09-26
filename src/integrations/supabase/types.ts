@@ -14,7 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      events: {
+        Row: {
+          artist: string
+          capacity: number
+          city: string
+          created_at: string
+          date: string
+          day_of_week: string
+          event_id: number
+          genre: string
+          google_trends_genre: number
+          id: string
+          instagram_mentions: number
+          is_holiday_brazil_hint: number
+          marketing_spend: number
+          precip_mm: number
+          revenue: number | null
+          sold_tickets: number | null
+          temp_c: number
+          ticket_price: number
+          updated_at: string
+          venue: string
+        }
+        Insert: {
+          artist: string
+          capacity: number
+          city: string
+          created_at?: string
+          date: string
+          day_of_week: string
+          event_id: number
+          genre: string
+          google_trends_genre: number
+          id?: string
+          instagram_mentions: number
+          is_holiday_brazil_hint?: number
+          marketing_spend: number
+          precip_mm: number
+          revenue?: number | null
+          sold_tickets?: number | null
+          temp_c: number
+          ticket_price: number
+          updated_at?: string
+          venue: string
+        }
+        Update: {
+          artist?: string
+          capacity?: number
+          city?: string
+          created_at?: string
+          date?: string
+          day_of_week?: string
+          event_id?: number
+          genre?: string
+          google_trends_genre?: number
+          id?: string
+          instagram_mentions?: number
+          is_holiday_brazil_hint?: number
+          marketing_spend?: number
+          precip_mm?: number
+          revenue?: number | null
+          sold_tickets?: number | null
+          temp_c?: number
+          ticket_price?: number
+          updated_at?: string
+          venue?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

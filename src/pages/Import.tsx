@@ -14,6 +14,7 @@ import {
   ShoppingCart
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { dataService, ImportResult } from "@/lib/dataService"
 
 type ImportStatus = 'idle' | 'processing' | 'success' | 'error'
 
@@ -21,6 +22,8 @@ const Import = () => {
   const [dragActive, setDragActive] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [importStatus, setImportStatus] = useState<ImportStatus>('idle')
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [previewData, setPreviewData] = useState<any[]>([])
   const { toast } = useToast()
 
   const handleDrag = (e: React.DragEvent) => {
@@ -43,33 +46,61 @@ const Import = () => {
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
+      const file = e.target.files[0]
+      setSelectedFile(file)
+      await generatePreview(file)
     }
   }
 
-  const simulateImport = async () => {
+  const generatePreview = async (file: File) => {
+    try {
+      const content = await file.text()
+      const events = await dataService.loadEventsFromCSV(content)
+      setPreviewData(events.slice(0, 5)) // Show first 5 rows for preview
+    } catch (error) {
+      console.error('Error generating preview:', error)
+      toast({
+        title: "Preview Error",
+        description: "Could not generate preview. Please check file format.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const performImport = async () => {
     if (!selectedFile) return
     
     setImportStatus('processing')
+    setImportResult(null)
     
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    const success = Math.random() > 0.3 // 70% success rate
-    
-    if (success) {
-      setImportStatus('success')
-      toast({
-        title: "Import Successful",
-        description: `${selectedFile.name} imported successfully with ${Math.floor(Math.random() * 500) + 100} records processed.`,
-      })
-    } else {
+    try {
+      const content = await selectedFile.text()
+      const events = await dataService.loadEventsFromCSV(content)
+      const result = await dataService.importEvents(events)
+      
+      setImportResult(result)
+      
+      if (result.success) {
+        setImportStatus('success')
+        toast({
+          title: "Import Successful",
+          description: `${result.inserted} new events imported, ${result.updated} events updated.`,
+        })
+      } else {
+        setImportStatus('error')
+        toast({
+          title: "Import Completed with Errors",
+          description: `${result.errors.length} errors occurred. Check details below.`,
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
       setImportStatus('error')
       toast({
-        title: "Import Error",
-        description: "Some validation errors occurred. Check the preview for details.",
+        title: "Import Failed",
+        description: "An unexpected error occurred during import.",
         variant: "destructive"
       })
     }
@@ -77,20 +108,20 @@ const Import = () => {
 
   const importTypes = [
     {
+      id: 'events',
+      title: 'Events',
+      icon: Calendar,
+      description: 'Import event data with sales and marketing metrics',
+      template: 'events_template.csv',
+      fields: ['event_id', 'date', 'city', 'venue', 'artist', 'genre', 'ticket_price', 'marketing_spend', 'capacity', 'sold_tickets', 'revenue']
+    },
+    {
       id: 'customers',
       title: 'Customers',
       icon: Users,
       description: 'Import customer data with demographics and preferences',
       template: 'customers_template.csv',
       fields: ['email', 'name', 'birthDate', 'gender', 'city', 'phone']
-    },
-    {
-      id: 'tickets',
-      title: 'Tickets',
-      icon: Calendar,
-      description: 'Import ticket sales and event attendance data',
-      template: 'tickets_template.csv',
-      fields: ['eventId', 'customerId', 'type', 'paidPrice', 'purchaseAt']
     },
     {
       id: 'consumption',
@@ -164,37 +195,37 @@ const Import = () => {
               )}
             </div>
 
-            {importStatus === 'idle' && (
+            {importStatus === 'idle' && previewData.length > 0 && (
               <div className="space-y-3">
-                <div className="text-sm font-medium">Sample Data Preview:</div>
+                <div className="text-sm font-medium">Data Preview:</div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left p-2">email</th>
-                        <th className="text-left p-2">name</th>
-                        <th className="text-left p-2">birthDate</th>
-                        <th className="text-left p-2">city</th>
+                        <th className="text-left p-1">Event ID</th>
+                        <th className="text-left p-1">Date</th>
+                        <th className="text-left p-1">City</th>
+                        <th className="text-left p-1">Artist</th>
+                        <th className="text-left p-1">Genre</th>
+                        <th className="text-left p-1">Price</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b">
-                        <td className="p-2">customer1@example.com</td>
-                        <td className="p-2">João Silva</td>
-                        <td className="p-2">1985-03-15</td>
-                        <td className="p-2">São Paulo</td>
-                      </tr>
-                      <tr className="border-b">
-                        <td className="p-2">customer2@example.com</td>
-                        <td className="p-2">Maria Santos</td>
-                        <td className="p-2">1990-07-22</td>
-                        <td className="p-2">Rio de Janeiro</td>
-                      </tr>
+                      {previewData.map((row, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-1">{row.event_id}</td>
+                          <td className="p-1">{row.date}</td>
+                          <td className="p-1">{row.city}</td>
+                          <td className="p-1">{row.artist}</td>
+                          <td className="p-1">{row.genre}</td>
+                          <td className="p-1">R$ {row.ticket_price}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
                 <Button 
-                  onClick={simulateImport}
+                  onClick={performImport}
                   className="w-full bg-gradient-primary hover:bg-gradient-primary/90"
                   disabled={importStatus !== 'idle'}
                 >
@@ -203,23 +234,38 @@ const Import = () => {
               </div>
             )}
 
-            {importStatus === 'success' && (
+            {importStatus === 'idle' && previewData.length === 0 && selectedFile && (
+              <div className="text-center py-4 text-muted-foreground">
+                Processing file preview...
+              </div>
+            )}
+
+            {importStatus === 'success' && importResult && (
               <div className="text-center p-4 bg-success/10 rounded-lg border border-success/20">
                 <CheckCircle className="w-8 h-8 text-success mx-auto mb-2" />
                 <p className="font-medium text-success">Import Completed Successfully!</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  247 records imported, 3 duplicates skipped
+                  {importResult.inserted} new records imported, {importResult.updated} records updated
                 </p>
               </div>
             )}
 
-            {importStatus === 'error' && (
-              <div className="text-center p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-                <AlertCircle className="w-8 h-8 text-destructive mx-auto mb-2" />
-                <p className="font-medium text-destructive">Import Failed</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  5 validation errors found in rows 12, 24, 35, 47, 58
-                </p>
+            {importStatus === 'error' && importResult && (
+              <div className="space-y-3">
+                <div className="text-center p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+                  <AlertCircle className="w-8 h-8 text-destructive mx-auto mb-2" />
+                  <p className="font-medium text-destructive">Import Completed with Errors</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {importResult.errors.length} errors found
+                  </p>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="max-h-32 overflow-y-auto bg-muted/20 p-2 rounded text-xs">
+                    {importResult.errors.map((error, index) => (
+                      <div key={index} className="text-destructive mb-1">{error}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -241,7 +287,7 @@ const Import = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="customers" className="space-y-6">
+      <Tabs defaultValue="events" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
           {importTypes.map((type) => {
             const Icon = type.icon
@@ -293,7 +339,16 @@ const Import = () => {
                       </div>
                     </div>
                     
-                    <Button variant="outline" className="w-full gap-2">
+                    <Button 
+                      onClick={() => {
+                        const link = document.createElement('a')
+                        link.href = `/templates/${type.template}`
+                        link.download = type.template
+                        link.click()
+                      }}
+                      variant="outline" 
+                      className="w-full gap-2"
+                    >
                       <Download className="w-4 h-4" />
                       Download Template
                     </Button>

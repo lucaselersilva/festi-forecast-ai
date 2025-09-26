@@ -1,0 +1,2 @@
+event_id,date,city,venue,artist,genre,ticket_price,marketing_spend,google_trends_genre,instagram_mentions,temp_c,precip_mm,day_of_week,is_holiday_brazil_hint,capacity,sold_tickets,revenue
+12345,2024-12-01,São Paulo,Arena Example,Artista Exemplo,Pop,100.00,5000.00,75.50,250,25.0,5.2,Sun,0,5000,1200,120000.00
