@@ -7,9 +7,57 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, TrendingUp, Users, DollarSign, Target, FileText, Download, BarChart3 } from "lucide-react";
+import { Calendar, TrendingUp, Users, DollarSign, Target, FileText, Download, BarChart3, PieChart, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+
+interface RevenueAnalysis {
+  revenueProjection: {
+    totalRevenue: number;
+    totalSales: number;
+    avgTicketPrice: number;
+    occupancyRate: number;
+    revenuePerSeat: number;
+  };
+  pricingTiers: Array<{
+    tier: string;
+    percentage: number;
+    capacity: number;
+    price: number;
+    expectedSales: number;
+    revenue: number;
+    conversionRate: number;
+    segmentTarget: string;
+  }>;
+  scenarioAnalysis: Array<{
+    scenario: string;
+    description: string;
+    totalRevenue: number;
+    totalSales: number;
+    occupancyRate: number;
+    avgTicketPrice: number;
+    revenuePerSeat: number;
+  }>;
+  competitiveInsights: {
+    marketPosition: string;
+    priceAdvantage: number;
+    occupancyBenchmark: number;
+    competitorCount: number;
+  };
+  recommendations: string[];
+  marketingROI: {
+    recommendedBudget: number;
+    channelMix: { digital: number; traditional: number; influencers: number };
+    expectedCPA: number;
+    breakeven: number;
+  };
+  dataQuality: {
+    historicalEvents: number;
+    segments: number;
+    confidence: string;
+  };
+}
 
 interface SponsorshipForecast {
   audience: {
@@ -45,6 +93,7 @@ interface SponsorshipForecast {
 export default function InsightsPlanner() {
   const [activeTab, setActiveTab] = useState("revenue");
   const [loading, setLoading] = useState(false);
+  const [revenueData, setRevenueData] = useState<RevenueAnalysis | null>(null);
   const [sponsorshipData, setSponsorshipData] = useState<SponsorshipForecast | null>(null);
   const [formData, setFormData] = useState({
     genre: "",
@@ -61,7 +110,7 @@ export default function InsightsPlanner() {
   const genres = ["Rock", "Eletrônica", "Funk", "Sertanejo", "Pop", "Forró", "MPB", "Rap", "Indie", "Pagode"];
   const cities = ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Salvador", "Fortaleza", "Recife", "Brasília", "Florianópolis"];
 
-  const handleSponsorshipForecast = async () => {
+  const handleCompleteAnalysis = async () => {
     if (!formData.genre || !formData.city) {
       toast({
         title: "Campos obrigatórios",
@@ -73,37 +122,59 @@ export default function InsightsPlanner() {
 
     setLoading(true);
     try {
-      console.log("🚀 Calling sponsorship forecast API...");
+      console.log("🚀 Calling complete analysis APIs...");
 
-      const response = await fetch("https://lsjzutqmwjdkhasndxbf.supabase.co/functions/v1/sponsorship-forecast", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxzanp1dHFtd2pka2hhc25keGJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NDQzMDMsImV4cCI6MjA3NDQyMDMwM30.klJ4ZbvZGpI6hPydjuRJnwUO-H3VeOIfHouMDkZ2npQ",
-        },
-        body: JSON.stringify({
-          genre: formData.genre,
-          city: formData.city,
-          targetRevenue: formData.targetRevenue ? parseFloat(formData.targetRevenue) : 500000,
-          capacity: formData.capacity ? parseInt(formData.capacity) : 5000,
-          date: formData.date || new Date().toISOString().split('T')[0],
-          sponsorBudget: formData.sponsorBudget ? parseFloat(formData.sponsorBudget) : 150000,
+      const requestData = {
+        genre: formData.genre,
+        city: formData.city,
+        targetRevenue: formData.targetRevenue ? parseFloat(formData.targetRevenue) : 500000,
+        capacity: formData.capacity ? parseInt(formData.capacity) : 5000,
+        date: formData.date || new Date().toISOString().split('T')[0],
+        sponsorBudget: formData.sponsorBudget ? parseFloat(formData.sponsorBudget) : 150000,
+      };
+
+      // Call both APIs simultaneously
+      const [revenueResponse, sponsorshipResponse] = await Promise.all([
+        fetch("https://lsjzutqmwjdkhasndxbf.supabase.co/functions/v1/revenue-analysis", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxzanp1dHFtd2pka2hhc25keGJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NDQzMDMsImV4cCI6MjA3NDQyMDMwM30.klJ4ZbvZGpI6hPydjuRJnwUO-H3VeOIfHouMDkZ2npQ",
+          },
+          body: JSON.stringify(requestData),
         }),
-      });
+        fetch("https://lsjzutqmwjdkhasndxbf.supabase.co/functions/v1/sponsorship-forecast", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxzanp1dHFtd2pka2hhc25keGJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NDQzMDMsImV4cCI6MjA3NDQyMDMwM30.klJ4ZbvZGpI6hPydjuRJnwUO-H3VeOIfHouMDkZ2npQ",
+          },
+          body: JSON.stringify(requestData),
+        })
+      ]);
 
-      const result = await response.json();
-      console.log("✅ Forecast result:", result);
+      const [revenueResult, sponsorshipResult] = await Promise.all([
+        revenueResponse.json(),
+        sponsorshipResponse.json()
+      ]);
+
+      console.log("✅ Revenue result:", revenueResult);
+      console.log("✅ Sponsorship result:", sponsorshipResult);
       
-      if (result.success) {
-        // Mock transform to expected format for UI compatibility
+      if (revenueResult.success) {
+        setRevenueData(revenueResult);
+      }
+      
+      if (sponsorshipResult.success) {
+        // Transform to expected format for UI compatibility
         const mockData = {
           audience: {
-            Heavy: { expectedAudience: Math.floor(result.predictions.expectedAttendance * 0.3), expectedSpend: 300, conversionRate: 0.8, confidence: "alta" },
-            Medium: { expectedAudience: Math.floor(result.predictions.expectedAttendance * 0.5), expectedSpend: 200, conversionRate: 0.6, confidence: "média" },
-            Light: { expectedAudience: Math.floor(result.predictions.expectedAttendance * 0.2), expectedSpend: 100, conversionRate: 0.4, confidence: "baixa" }
+            Heavy: { expectedAudience: Math.floor(sponsorshipResult.predictions.expectedAttendance * 0.3), expectedSpend: 300, conversionRate: 0.8, confidence: "alta" },
+            Medium: { expectedAudience: Math.floor(sponsorshipResult.predictions.expectedAttendance * 0.5), expectedSpend: 200, conversionRate: 0.6, confidence: "média" },
+            Light: { expectedAudience: Math.floor(sponsorshipResult.predictions.expectedAttendance * 0.2), expectedSpend: 100, conversionRate: 0.4, confidence: "baixa" }
           },
-          expectedReach: result.predictions.expectedAttendance,
-          expectedOnsiteSpend: result.predictions.expectedAttendance * 150,
+          expectedReach: sponsorshipResult.predictions.expectedAttendance,
+          expectedOnsiteSpend: sponsorshipResult.predictions.expectedAttendance * 150,
           profileHints: {
             avgAge: 28,
             genderSplit: { male: 0.55, female: 0.43, other: 0.02 },
@@ -128,35 +199,34 @@ export default function InsightsPlanner() {
               activationSuggestions: ["Experiência imersiva", "Concurso cultural"]
             }
           ],
-          salesNarrative: result.insights.recommendations,
-          insights: result.insights.recommendations,
-          dataQuality: result.predictions.revenueConfidence > 0.7 ? "alta" : "média",
+          salesNarrative: sponsorshipResult.insights.recommendations,
+          insights: sponsorshipResult.insights.recommendations,
+          dataQuality: sponsorshipResult.predictions.revenueConfidence > 0.7 ? "alta" : "média",
           uncertainty: {
             reachRange: { 
-              min: Math.floor(result.predictions.expectedAttendance * 0.8), 
-              max: Math.floor(result.predictions.expectedAttendance * 1.2) 
+              min: Math.floor(sponsorshipResult.predictions.expectedAttendance * 0.8), 
+              max: Math.floor(sponsorshipResult.predictions.expectedAttendance * 1.2) 
             },
             spendRange: { 
-              min: Math.floor(result.predictions.expectedAttendance * 120), 
-              max: Math.floor(result.predictions.expectedAttendance * 180) 
+              min: Math.floor(sponsorshipResult.predictions.expectedAttendance * 120), 
+              max: Math.floor(sponsorshipResult.predictions.expectedAttendance * 180) 
             }
           }
         };
         
         setSponsorshipData(mockData);
-        toast({
-          title: "Previsão gerada com sucesso",
-          description: `Alcance previsto: ${mockData.expectedReach.toLocaleString('pt-BR')} pessoas`,
-        });
-      } else {
-        throw new Error(result.error || "Failed to generate forecast");
       }
 
-    } catch (error) {
-      console.error("Sponsorship forecast error:", error);
       toast({
-        title: "Erro na previsão", 
-        description: error instanceof Error ? error.message : "Falha ao gerar insights de patrocínio",
+        title: "Análise completa realizada!",
+        description: `Plano de receita e patrocínio gerados com sucesso`,
+      });
+
+    } catch (error) {
+      console.error("Complete analysis error:", error);
+      toast({
+        title: "Erro na análise", 
+        description: error instanceof Error ? error.message : "Falha ao gerar análise completa",
         variant: "destructive",
       });
     } finally {
@@ -258,24 +328,290 @@ export default function InsightsPlanner() {
         </TabsList>
 
         <TabsContent value="revenue" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Análise de Receita
-              </CardTitle>
-              <CardDescription>
-                Análise detalhada de potencial de receita por evento e segmento
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Funcionalidade de Plano de Receita em desenvolvimento</p>
-                <p className="text-sm">Em breve: análise de elasticidade de preços, otimização de receita e projeções por segmento</p>
+          {!revenueData ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Análise de Receita
+                </CardTitle>
+                <CardDescription>
+                  Configure o evento acima e clique em "Gerar Plano Completo" para ver a análise detalhada
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Análise de receita disponível após configurar o evento</p>
+                  <p className="text-sm">Inclui: elasticidade de preços, otimização de receita e projeções por segmento</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Resumo Executivo de Receita */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Projeção de Receita
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={revenueData.dataQuality.confidence === "Alta" ? "default" : 
+                                   revenueData.dataQuality.confidence === "Média" ? "secondary" : "outline"}>
+                      Confiança: {revenueData.dataQuality.confidence}
+                    </Badge>
+                    <Badge variant="outline">
+                      {revenueData.dataQuality.historicalEvents} eventos históricos
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <div className="text-center p-4 bg-primary/5 rounded-lg">
+                      <div className="text-2xl font-bold text-primary">
+                        R$ {revenueData.revenueProjection.totalRevenue.toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Receita Total</div>
+                    </div>
+
+                    <div className="text-center p-4 bg-green-500/5 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">
+                        {revenueData.revenueProjection.totalSales.toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Ingressos Vendidos</div>
+                    </div>
+
+                    <div className="text-center p-4 bg-blue-500/5 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">
+                        R$ {revenueData.revenueProjection.avgTicketPrice.toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Preço Médio</div>
+                    </div>
+
+                    <div className="text-center p-4 bg-orange-500/5 rounded-lg">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {Math.round(revenueData.revenueProjection.occupancyRate * 100)}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Taxa de Ocupação</div>
+                    </div>
+
+                    <div className="text-center p-4 bg-purple-500/5 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-600">
+                        R$ {revenueData.revenueProjection.revenuePerSeat.toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Receita por Assento</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Estratégia de Preços por Tier */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieChart className="h-5 w-5" />
+                    Estratégia de Preços por Categoria
+                  </CardTitle>
+                  <CardDescription>
+                    Mix otimizado de ingressos para maximizar receita e ocupação
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {revenueData.pricingTiers.map((tier) => (
+                      <Card key={tier.tier} className="bg-gradient-to-br from-background to-muted/30">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center justify-between">
+                            {tier.tier}
+                            <Badge variant="secondary">{tier.percentage}%</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <div className="text-xl font-bold text-primary">R$ {tier.price.toLocaleString('pt-BR')}</div>
+                            <div className="text-sm text-muted-foreground">preço por ingresso</div>
+                          </div>
+                          
+                          <div>
+                            <div className="text-lg font-semibold">{tier.expectedSales.toLocaleString('pt-BR')}</div>
+                            <div className="text-sm text-muted-foreground">vendas esperadas</div>
+                            <Progress value={tier.conversionRate * 100} className="mt-1" />
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {Math.round(tier.conversionRate * 100)}% conversão
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-lg font-semibold text-green-600">
+                              R$ {tier.revenue.toLocaleString('pt-BR')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">receita do tier</div>
+                          </div>
+
+                          <Badge variant="outline" className="w-full justify-center">
+                            Alvo: {tier.segmentTarget}
+                          </Badge>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Análise de Cenários */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Análise de Cenários de Pricing
+                  </CardTitle>
+                  <CardDescription>
+                    Comparação de diferentes estratégias de precificação
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {revenueData.scenarioAnalysis.map((scenario) => (
+                      <Card key={scenario.scenario} className="bg-gradient-to-br from-background to-muted/20">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg">{scenario.scenario}</CardTitle>
+                          <CardDescription className="text-sm">
+                            {scenario.description}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <div className="font-semibold">Receita Total</div>
+                              <div className="text-primary font-bold">R$ {scenario.totalRevenue.toLocaleString('pt-BR')}</div>
+                            </div>
+                            <div>
+                              <div className="font-semibold">Ingressos</div>
+                              <div className="font-bold">{scenario.totalSales.toLocaleString('pt-BR')}</div>
+                            </div>
+                            <div>
+                              <div className="font-semibold">Ocupação</div>
+                              <div className="font-bold">{Math.round(scenario.occupancyRate * 100)}%</div>
+                            </div>
+                            <div>
+                              <div className="font-semibold">Preço Médio</div>
+                              <div className="font-bold">R$ {scenario.avgTicketPrice.toLocaleString('pt-BR')}</div>
+                            </div>
+                          </div>
+                          <div className="pt-2 border-t">
+                            <div className="font-semibold text-sm">Receita por Assento</div>
+                            <div className="text-lg font-bold text-green-600">R$ {scenario.revenuePerSeat.toLocaleString('pt-BR')}</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Insights Competitivos e Recomendações */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Posição Competitiva
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span>Posição no Mercado</span>
+                      <Badge variant={revenueData.competitiveInsights.marketPosition === "Premium" ? "default" : 
+                                     revenueData.competitiveInsights.marketPosition === "Value" ? "secondary" : "outline"}>
+                        {revenueData.competitiveInsights.marketPosition}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Vantagem de Preço</span>
+                      <span className={`font-bold ${revenueData.competitiveInsights.priceAdvantage > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {revenueData.competitiveInsights.priceAdvantage > 0 ? '+' : ''}{revenueData.competitiveInsights.priceAdvantage}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Ocupação vs. Mercado</span>
+                      <span className={`font-bold ${revenueData.competitiveInsights.occupancyBenchmark >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+                        {revenueData.competitiveInsights.occupancyBenchmark}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Concorrentes Analisados</span>
+                      <span className="font-bold">{revenueData.competitiveInsights.competitorCount}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      ROI de Marketing
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span>Orçamento Recomendado</span>
+                      <span className="font-bold text-primary">R$ {revenueData.marketingROI.recommendedBudget.toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Digital</span>
+                        <span>{revenueData.marketingROI.channelMix.digital}%</span>
+                      </div>
+                      <Progress value={revenueData.marketingROI.channelMix.digital} />
+                      
+                      <div className="flex justify-between text-sm">
+                        <span>Tradicional</span>
+                        <span>{revenueData.marketingROI.channelMix.traditional}%</span>
+                      </div>
+                      <Progress value={revenueData.marketingROI.channelMix.traditional} />
+                      
+                      <div className="flex justify-between text-sm">
+                        <span>Influenciadores</span>
+                        <span>{revenueData.marketingROI.channelMix.influencers}%</span>
+                      </div>
+                      <Progress value={revenueData.marketingROI.channelMix.influencers} />
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <span>CPA Esperado</span>
+                      <span className="font-bold">R$ {revenueData.marketingROI.expectedCPA.toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Break-even</span>
+                      <span className="font-bold text-green-600">{revenueData.marketingROI.breakeven.toLocaleString('pt-BR')} ingressos</span>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Recomendações */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Recomendações Estratégicas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {revenueData.recommendations.map((recommendation, index) => (
+                      <div key={index} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-xs font-bold text-primary">{index + 1}</span>
+                        </div>
+                        <div className="text-sm">{recommendation}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="sponsorship" className="space-y-6">
@@ -368,19 +704,19 @@ export default function InsightsPlanner() {
                   * Campos obrigatórios
                 </div>
                 <Button 
-                  onClick={handleSponsorshipForecast}
+                  onClick={handleCompleteAnalysis}
                   disabled={loading || !formData.genre || !formData.city}
                   className="flex items-center gap-2"
                 >
                   {loading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                      Gerando...
+                      Gerando Análise Completa...
                     </>
                   ) : (
                     <>
-                      <Target className="h-4 w-4" />
-                      Gerar Insights de Patrocínio
+                      <BarChart3 className="h-4 w-4" />
+                      Gerar Plano Completo (Receita + Patrocínio)
                     </>
                   )}
                 </Button>

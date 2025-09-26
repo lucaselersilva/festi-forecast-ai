@@ -83,10 +83,20 @@ serve(async (req) => {
       ]
     }
 
+    // Also include revenue insights for integrated analysis
+    const avgTicketPrice = analogData?.reduce((sum: number, event: any) => sum + (event.avg_price || 0), 0) / (analogData?.length || 1) || 100
+    const revenueInsights = {
+      recommendedTicketPrice: Math.round(avgTicketPrice),
+      projectedTicketRevenue: predictions.expectedAttendance * avgTicketPrice,
+      totalEventRevenue: (predictions.expectedAttendance * avgTicketPrice) + (sponsorBudget || 0),
+      sponsorshipPercentage: sponsorBudget > 0 ? Math.round((sponsorBudget / ((predictions.expectedAttendance * avgTicketPrice) + sponsorBudget)) * 100) : 0
+    }
+
     const response = {
       success: true,
       predictions,
       insights,
+      revenueInsights,
       timestamp: new Date().toISOString()
     }
 
