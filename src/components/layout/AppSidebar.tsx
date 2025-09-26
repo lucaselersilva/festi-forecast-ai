@@ -27,7 +27,7 @@ import {
 const mainItems = [
   { title: "Dashboard", url: "/", icon: BarChart3 },
   { title: "Import Data", url: "/import", icon: Upload },
-  { title: "Segments", url: "/segments", icon: Users },
+  { title: "Insights Planner", url: "/insights-planner", icon: Target },
   { title: "Events", url: "/events", icon: Calendar },
   { title: "Sponsors", url: "/sponsors", icon: Briefcase },
 ]

@@ -197,6 +197,20 @@ export type Database = {
             referencedRelation: "events"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_interactions_event"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_analogs"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_event"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_context"
+            referencedColumns: ["event_id"]
+          },
         ]
       }
       scoring_snapshots: {
@@ -251,11 +265,170 @@ export type Database = {
             referencedRelation: "events"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_scoring_event"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_analogs"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "fk_scoring_event"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_context"
+            referencedColumns: ["event_id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      vw_customer_rfm: {
+        Row: {
+          customer_id: number | null
+          f: number | null
+          freq_tx: number | null
+          m: number | null
+          monetary_bar: number | null
+          monetary_tickets: number | null
+          monetary_total: number | null
+          r: number | null
+          recency_days: number | null
+          segment: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_event_analogs: {
+        Row: {
+          avg_price: number | null
+          capacity: number | null
+          city: string | null
+          dow: number | null
+          event_id: string | null
+          genre: string | null
+          month_bucket: string | null
+          occupancy_rate: number | null
+          revenue: number | null
+          revenue_per_person: number | null
+          sold_tickets: number | null
+          venue: string | null
+        }
+        Insert: {
+          avg_price?: number | null
+          capacity?: number | null
+          city?: string | null
+          dow?: never
+          event_id?: string | null
+          genre?: string | null
+          month_bucket?: never
+          occupancy_rate?: never
+          revenue?: number | null
+          revenue_per_person?: never
+          sold_tickets?: number | null
+          venue?: string | null
+        }
+        Update: {
+          avg_price?: number | null
+          capacity?: number | null
+          city?: string | null
+          dow?: never
+          event_id?: string | null
+          genre?: string | null
+          month_bucket?: never
+          occupancy_rate?: never
+          revenue?: number | null
+          revenue_per_person?: never
+          sold_tickets?: number | null
+          venue?: string | null
+        }
+        Relationships: []
+      }
+      vw_event_context: {
+        Row: {
+          capacity: number | null
+          city: string | null
+          dow: number | null
+          event_date: string | null
+          event_id: string | null
+          genre: string | null
+          month_bucket: string | null
+          revenue: number | null
+          sold_tickets: number | null
+          venue: string | null
+        }
+        Insert: {
+          capacity?: number | null
+          city?: string | null
+          dow?: never
+          event_date?: string | null
+          event_id?: string | null
+          genre?: string | null
+          month_bucket?: never
+          revenue?: number | null
+          sold_tickets?: number | null
+          venue?: string | null
+        }
+        Update: {
+          capacity?: number | null
+          city?: string | null
+          dow?: never
+          event_date?: string | null
+          event_id?: string | null
+          genre?: string | null
+          month_bucket?: never
+          revenue?: number | null
+          sold_tickets?: number | null
+          venue?: string | null
+        }
+        Relationships: []
+      }
+      vw_segment_consumption: {
+        Row: {
+          avg_bar_spend: number | null
+          avg_frequency: number | null
+          avg_monetary_total: number | null
+          avg_ticket_spend: number | null
+          city: string | null
+          customers: number | null
+          genre: string | null
+          segment: string | null
+        }
+        Relationships: []
+      }
+      vw_segment_demographics: {
+        Row: {
+          avg_age: number | null
+          cities_reached: number | null
+          female_pct: number | null
+          male_pct: number | null
+          segment: string | null
+          total_customers: number | null
+        }
+        Relationships: []
+      }
+      vw_segment_forecast: {
+        Row: {
+          avg_bar_spend: number | null
+          avg_monetary_total: number | null
+          avg_ticket_spend: number | null
+          city: string | null
+          customers: number | null
+          data_quality_score: number | null
+          estimated_conversion_rate: number | null
+          expected_spend_per_customer: number | null
+          genre: string | null
+          segment: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       citext: {

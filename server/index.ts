@@ -5,6 +5,8 @@ import pricingRoutes from "./routes/pricing";
 import recommendRoutes from "./routes/recommend";
 import marketingRoutes from "./routes/marketing";
 
+import sponsorshipRoutes from "./routes/sponsorship";
+
 const app = express();
 
 // Middleware
@@ -25,6 +27,7 @@ app.get("/health", (req, res) => {
 app.use("/api/pricing", pricingRoutes);
 app.use("/api/recommend", recommendRoutes);
 app.use("/api/marketing", marketingRoutes);
+app.use("/api/sponsorship", sponsorshipRoutes);
 
 // Legacy forecast endpoint (keep existing functionality)
 app.post("/api/forecast", async (req, res) => {
