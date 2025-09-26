@@ -9,6 +9,7 @@ import {
   Users, 
   TrendingDown,
   Target,
+  ShoppingCart,
   CheckCircle,
   AlertCircle,
   Loader2
@@ -50,16 +51,20 @@ const MLRunner = ({ events, onResults }: MLRunnerProps) => {
 
   const runSegmentation = () => {
     runTask('segmentation', async () => {
+      // Mock customer data based on events for demo
       const input = {
-        events: events.map(event => ({
-          event_id: event.event_id,
-          genre: event.genre,
-          ticket_price: event.ticket_price,
-          marketing_spend: event.marketing_spend,
-          sold_tickets: event.sold_tickets,
-          revenue: event.revenue,
-          capacity: event.capacity,
-          city: event.city
+        customerData: events.slice(0, 1000).map((event, index) => ({
+          customerId: `customer_${index}`,
+          age: Math.floor(Math.random() * 40) + 18,
+          gender: Math.random() > 0.5 ? 'F' : 'M',
+          city: event.city,
+          state: event.city === 'São Paulo' ? 'SP' : event.city === 'Rio de Janeiro' ? 'RJ' : 'BA',
+          previousVisits: Math.floor(Math.random() * 10) + 1,
+          lifetimeValue: Math.floor(Math.random() * 2000) + 200,
+          avgBarTicket: Math.floor(Math.random() * 200) + 50,
+          favoriteDrinks: ['Cerveja', 'Caipirinha', 'Gin'].slice(Math.floor(Math.random() * 2)),
+          checkInHistory: [{ eventId: event.event_id.toString(), date: event.date }],
+          totalEventsAttended: Math.floor(Math.random() * 20) + 1
         }))
       }
       return await mlService.runSegmentation(input)
@@ -78,15 +83,20 @@ const MLRunner = ({ events, onResults }: MLRunnerProps) => {
           venue: sampleEvent.venue,
           capacity: sampleEvent.capacity,
           date: sampleEvent.date,
-          marketing_spend: sampleEvent.marketing_spend
+          dayOfWeek: sampleEvent.day_of_week,
+          weather: { temp: sampleEvent.temp_c || 25, precipitation: sampleEvent.precip_mm || 0 }
         },
-        historicalData: events.filter(e => e.sold_tickets && e.revenue).map(e => ({
-          ticket_price: e.ticket_price,
-          sold_tickets: e.sold_tickets,
-          revenue: e.revenue,
-          genre: e.genre,
-          city: e.city,
-          capacity: e.capacity
+        historicalSales: events.slice(0, 100).map(e => ({
+          ticketType: (Math.random() > 0.7 ? 'vip' : Math.random() > 0.3 ? 'pista' : 'camarote') as 'pista' | 'vip' | 'camarote',
+          price: Number(e.ticket_price),
+          soldTickets: Number(e.sold_tickets) || Math.floor(e.capacity * 0.8),
+          demandCurve: [
+            { price: Number(e.ticket_price) * 0.8, demand: e.capacity * 0.95 },
+            { price: Number(e.ticket_price), demand: e.capacity * 0.75 },
+            { price: Number(e.ticket_price) * 1.2, demand: e.capacity * 0.50 }
+          ],
+          date: e.date,
+          dayOfWeek: e.day_of_week
         }))
       }
       return await mlService.runPricing(input)
@@ -107,16 +117,44 @@ const MLRunner = ({ events, onResults }: MLRunnerProps) => {
     })
   }
 
-  const runBriefingAnalysis = () => {
-    runTask('briefing', async () => {
+  const runTargetAudienceAnalysis = () => {
+    runTask('targetaudience', async () => {
+      const sampleEvent = events[0] || { genre: 'Eletrônica', city: 'São Paulo', ticket_price: 120 }
       const input = {
         eventDescription: 'Festival de música eletrônica com DJs internacionais, experiência premium com open bar',
-        genre: 'Eletrônica',
-        city: 'São Paulo',
-        targetAudience: 'Jovens 18-35 anos',
-        budget: 100000
+        genre: sampleEvent.genre,
+        averagePrice: sampleEvent.ticket_price,
+        region: sampleEvent.city,
+        existingClusters: [
+          { id: 'premium', name: 'Premium VIP', size: 1200, characteristics: {} },
+          { id: 'universitarios', name: 'Universitários', size: 3500, characteristics: {} }
+        ]
       }
-      return await mlService.runBriefingAnalysis(input)
+      return await mlService.runTargetAudienceAnalysis(input)
+    })
+  }
+
+  const runRecommendationEngine = () => {
+    runTask('recommendations', async () => {
+      const input = {
+        customerId: 'demo_customer_1',
+        eventHistory: events.slice(0, 5).map(e => ({
+          eventId: e.event_id.toString(),
+          genre: e.genre,
+          date: e.date,
+          ticketType: 'pista',
+          spent: e.ticket_price + Math.floor(Math.random() * 100)
+        })),
+        consumptionHistory: [
+          { product: 'Cerveja Long Neck', category: 'Bebidas', quantity: 3, value: 45, date: '2024-01-15' },
+          { product: 'Gin Tônica', category: 'Drinks', quantity: 2, value: 60, date: '2024-01-15' }
+        ],
+        navigationHistory: [
+          { page: '/eventos/rock-festival', eventViewed: 'rock_fest_2024', timeSpent: 120, date: '2024-01-20' },
+          { page: '/eventos/eletronica-night', eventViewed: 'eletro_night', timeSpent: 85, date: '2024-01-22' }
+        ]
+      }
+      return await mlService.runRecommendationEngine(input)
     })
   }
 
@@ -214,18 +252,23 @@ const MLRunner = ({ events, onResults }: MLRunnerProps) => {
         <TaskCard
           taskId="segmentation"
           title="Customer Segmentation"
-          description="Identify distinct customer groups based on behavior patterns"
+          description="Criar segmentos baseados em dados demográficos, socioeconômicos e comportamentais"
           icon={Users}
           onRun={runSegmentation}
           resultComponent={(result) => (
             <div className="space-y-2">
-              <p className="font-medium">Found {result.segments?.length || 0} segments:</p>
-              {result.segments?.slice(0, 3).map((segment: any, index: number) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Badge variant="outline">{segment.name}</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {segment.size} customers
-                  </span>
+              <p className="font-medium">Encontrados {result.segments?.length || 0} segmentos:</p>
+              {result.segments?.map((segment: any, index: number) => (
+                <div key={index} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{segment.name}</Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {segment.size} clientes ({segment.percentage}%)
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Gasto médio: R$ {segment.dominantCharacteristics?.avgSpending}
+                  </p>
                 </div>
               ))}
             </div>
@@ -234,21 +277,21 @@ const MLRunner = ({ events, onResults }: MLRunnerProps) => {
 
         <TaskCard
           taskId="pricing"
-          title="Dynamic Pricing"
-          description="Optimize ticket prices based on demand and market conditions"
+          title="Dynamic Pricing" 
+          description="Sugerir ajustes de preço para maximizar receita e ocupação"
           icon={DollarSign}
           onRun={runPricing}
           resultComponent={(result) => (
             <div className="space-y-2">
-              <p className="font-medium">Suggested Prices:</p>
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div>Basic: R$ {result.suggestedPrices?.basic}</div>
-                <div>Premium: R$ {result.suggestedPrices?.premium}</div>
-                <div>VIP: R$ {result.suggestedPrices?.vip}</div>
+              <p className="font-medium">Preços Recomendados:</p>
+              <div className="space-y-1 text-sm">
+                <div>Pista: R$ {result.recommendedPrices?.pista?.optimal}</div>
+                <div>VIP: R$ {result.recommendedPrices?.vip?.optimal}</div>
+                <div>Camarote: R$ {result.recommendedPrices?.camarote?.optimal}</div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Expected sales: {result.demandForecast?.expectedSales} tickets
-              </p>
+              <Badge variant={result.confidence === 'alta' ? 'default' : result.confidence === 'média' ? 'secondary' : 'outline'}>
+                Confiança {result.confidence}
+              </Badge>
             </div>
           )}
         />
@@ -256,7 +299,7 @@ const MLRunner = ({ events, onResults }: MLRunnerProps) => {
         <TaskCard
           taskId="churn"
           title="Churn Prediction"
-          description="Identify customers at risk of not returning"
+          description="Identificar clientes com risco de não retornar"
           icon={TrendingDown}
           onRun={runChurnPrediction}
           resultComponent={(result) => (
@@ -266,10 +309,10 @@ const MLRunner = ({ events, onResults }: MLRunnerProps) => {
                   variant={result.riskLevel === 'high' ? 'destructive' : 
                           result.riskLevel === 'medium' ? 'secondary' : 'outline'}
                 >
-                  {result.riskLevel?.toUpperCase()} RISK
+                  RISCO {result.riskLevel?.toUpperCase()}
                 </Badge>
                 <span className="text-sm">
-                  {(result.churnProbability * 100).toFixed(1)}% probability
+                  {(result.churnProbability * 100).toFixed(1)}% probabilidade
                 </span>
               </div>
             </div>
@@ -277,24 +320,43 @@ const MLRunner = ({ events, onResults }: MLRunnerProps) => {
         />
 
         <TaskCard
-          taskId="briefing"
+          taskId="targetaudience"
           title="Target Audience"
-          description="Analyze event briefing to suggest optimal target segments"
+          description="Recomendar público para campanhas e patrocínios"
           icon={Target}
-          onRun={runBriefingAnalysis}
+          onRun={runTargetAudienceAnalysis}
           resultComponent={(result) => (
             <div className="space-y-2">
-              <p className="font-medium">Target Segments:</p>
-              <div className="flex flex-wrap gap-1">
-                {result.targetSegments?.map((segment: string, index: number) => (
-                  <Badge key={index} variant="outline">
-                    {segment.replace('_', ' ')}
-                  </Badge>
-                ))}
+              <p className="font-medium">Perfil Ideal:</p>
+              <div className="text-sm space-y-1">
+                <div>{result.idealProfile?.ageRange} - {result.idealProfile?.gender}</div>
+                <div>Bebida: {result.idealProfile?.favoriteDrink}</div>
+                <div>Audiência: {result.audienceSize?.withinDatabase?.toLocaleString()} pessoas</div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Estimated reach: {result.estimatedReach?.toLocaleString()} people
-              </p>
+            </div>
+          )}
+        />
+
+        <TaskCard
+          taskId="recommendations"
+          title="Recommendation Engine"
+          description="Recomendar eventos, produtos e bebidas baseado no histórico"
+          icon={ShoppingCart}
+          onRun={runRecommendationEngine}
+          resultComponent={(result) => (
+            <div className="space-y-2">
+              <p className="font-medium">Recomendações:</p>
+              {result.eventRecommendations?.slice(0, 2).map((rec: any, index: number) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Badge variant="outline">{rec.title}</Badge>
+                  <Badge 
+                    variant={rec.conversionProbability === 'alta' ? 'default' : 
+                            rec.conversionProbability === 'média' ? 'secondary' : 'outline'}
+                  >
+                    {rec.conversionProbability}
+                  </Badge>
+                </div>
+              ))}
             </div>
           )}
         />

@@ -48,18 +48,21 @@ const Events = () => {
     
     setLoading(true)
     try {
-      const result = await mlService.runBriefingAnalysis({
+      const result = await mlService.runTargetAudienceAnalysis({
         eventDescription: briefingText,
         genre: selectedEvent.genre,
-        city: selectedEvent.city,
-        targetAudience: 'Jovens 18-35 anos',
-        budget: selectedEvent.marketing_spend
+        averagePrice: selectedEvent.ticket_price,
+        region: selectedEvent.city,
+        existingClusters: [
+          { id: 'premium', name: 'Premium VIP', size: 1200, characteristics: {} },
+          { id: 'universitarios', name: 'Universitários', size: 3500, characteristics: {} }
+        ]
       })
       
       setSuggestedTarget({
-        filters: [`Gênero: ${selectedEvent.genre}`, `Cidade: ${selectedEvent.city}`, "Jovens 18-35 anos"],
-        segments: result.targetSegments,
-        estimatedReach: result.estimatedReach,
+        filters: [`Gênero: ${selectedEvent.genre}`, `Cidade: ${selectedEvent.city}`, result.idealProfile?.ageRange || "Jovens 18-35 anos"],
+        segments: result.recommendations?.map(r => r.sponsor) || ['mainstream_audience'],
+        estimatedReach: result.audienceSize?.withinDatabase || 15000,
         confidence: 0.85
       })
     } catch (error) {
