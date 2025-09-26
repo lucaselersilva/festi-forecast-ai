@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,23 +15,58 @@ import {
   Music,
   Plus
 } from "lucide-react"
-import { mockEvents } from "@/lib/mockData"
+import { dataService } from "@/lib/dataService"
+import { mlService } from "@/lib/mlService"
+import { useEffect, useState } from "react"
 
 const Events = () => {
-  const [selectedEvent, setSelectedEvent] = useState(mockEvents[0])
+  const [events, setEvents] = useState<any[]>([])
+  const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [briefingText, setBriefingText] = useState("")
   const [suggestedTarget, setSuggestedTarget] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  const handleBriefingSubmit = () => {
-    // Simulate AI processing
-    setTimeout(() => {
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const data = await dataService.getAllEvents()
+        setEvents(data)
+        if (data.length > 0) {
+          setSelectedEvent(data[0])
+        }
+      } catch (error) {
+        console.error('Error loading events:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadEvents()
+  }, [])
+
+  const handleBriefingSubmit = async () => {
+    if (!briefingText.trim() || !selectedEvent) return
+    
+    setLoading(true)
+    try {
+      const result = await mlService.runBriefingAnalysis({
+        eventDescription: briefingText,
+        genre: selectedEvent.genre,
+        city: selectedEvent.city,
+        targetAudience: 'Jovens 18-35 anos',
+        budget: selectedEvent.marketing_spend
+      })
+      
       setSuggestedTarget({
-        filters: ["Age 22-30", "High consumption nights", "São Paulo region"],
-        segments: ["Party Goers", "Weekend Warriors"],
-        estimatedReach: 1247,
+        filters: [`Gênero: ${selectedEvent.genre}`, `Cidade: ${selectedEvent.city}`, "Jovens 18-35 anos"],
+        segments: result.targetSegments,
+        estimatedReach: result.estimatedReach,
         confidence: 0.85
       })
-    }, 1500)
+    } catch (error) {
+      console.error('Error generating target audience:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -58,11 +92,11 @@ const Events = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {mockEvents.map((event) => (
+            {events.map((event) => (
               <div 
                 key={event.id}
                 className={`p-4 rounded-lg border cursor-pointer transition-all hover:border-primary/50 ${
-                  selectedEvent.id === event.id 
+                  selectedEvent?.id === event.id 
                     ? 'border-primary bg-primary/5' 
                     : 'border-border/20 bg-accent/10'
                 }`}
@@ -70,7 +104,7 @@ const Events = () => {
               >
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <h3 className="font-semibold">{event.name}</h3>
+                    <h3 className="font-semibold">{event.artist} - {event.venue}</h3>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
@@ -82,21 +116,19 @@ const Events = () => {
                       </span>
                       <span className="flex items-center gap-1">
                         <Users className="w-3 h-3" />
-                        {event.soldTickets}/{event.capacity}
+                        {event.sold_tickets || 0}/{event.capacity}
                       </span>
                     </div>
                     <div className="flex gap-2 mt-2">
-                      {event.genreTags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
+                      <Badge variant="outline" className="text-xs">
+                        {event.genre}
+                      </Badge>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold">R$ {event.revenue.toLocaleString()}</p>
+                    <p className="text-lg font-bold">R$ {(event.revenue || 0).toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground">
-                      {((event.soldTickets / event.capacity) * 100).toFixed(1)}% sold
+                      {(((event.sold_tickets || 0) / event.capacity) * 100).toFixed(1)}% sold
                     </p>
                   </div>
                 </div>
@@ -125,23 +157,23 @@ const Events = () => {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <p className="text-sm text-muted-foreground">Event Name</p>
-                  <p className="font-medium">{selectedEvent.name}</p>
+                  <p className="text-sm text-muted-foreground">Artist</p>
+                  <p className="font-medium">{selectedEvent?.artist}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Date & Venue</p>
                   <p className="font-medium">
-                    {new Date(selectedEvent.date).toLocaleDateString('pt-BR')}
+                    {selectedEvent && new Date(selectedEvent.date).toLocaleDateString('pt-BR')}
                   </p>
-                  <p className="text-sm">{selectedEvent.venue}, {selectedEvent.city}</p>
+                  <p className="text-sm">{selectedEvent?.venue}, {selectedEvent?.city}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Capacity</p>
-                  <p className="font-medium">{selectedEvent.capacity.toLocaleString()} people</p>
+                  <p className="font-medium">{selectedEvent?.capacity?.toLocaleString()} people</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Description</p>
-                  <p className="text-sm">{selectedEvent.description}</p>
+                  <p className="text-sm text-muted-foreground">Genre</p>
+                  <p className="text-sm">{selectedEvent?.genre}</p>
                 </div>
               </CardContent>
             </Card>
@@ -156,24 +188,24 @@ const Events = () => {
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-sm text-muted-foreground">Pista Price</p>
-                    <p className="font-bold text-lg">R$ {selectedEvent.basePrice}</p>
+                    <p className="text-sm text-muted-foreground">Ticket Price</p>
+                    <p className="font-bold text-lg">R$ {selectedEvent?.ticket_price}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">VIP Price</p>
-                    <p className="font-bold text-lg">R$ {selectedEvent.vipBasePrice}</p>
+                    <p className="text-sm text-muted-foreground">Marketing Spend</p>
+                    <p className="font-bold text-lg">R$ {selectedEvent?.marketing_spend?.toLocaleString()}</p>
                   </div>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <p className="font-bold text-xl">R$ {selectedEvent.revenue.toLocaleString()}</p>
+                  <p className="font-bold text-xl">R$ {(selectedEvent?.revenue || 0).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Tickets Sold</p>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium">{selectedEvent.soldTickets.toLocaleString()}</p>
+                    <p className="font-medium">{(selectedEvent?.sold_tickets || 0).toLocaleString()}</p>
                     <Badge variant="secondary">
-                      {((selectedEvent.soldTickets / selectedEvent.capacity) * 100).toFixed(1)}%
+                      {(((selectedEvent?.sold_tickets || 0) / (selectedEvent?.capacity || 1)) * 100).toFixed(1)}%
                     </Badge>
                   </div>
                 </div>
@@ -191,13 +223,13 @@ const Events = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Avg. Ticket Value</p>
                   <p className="font-bold text-lg">
-                    R$ {Math.floor(selectedEvent.revenue / selectedEvent.soldTickets)}
+                    R$ {selectedEvent?.sold_tickets ? Math.floor((selectedEvent.revenue || 0) / selectedEvent.sold_tickets) : 0}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Revenue per Seat</p>
                   <p className="font-medium">
-                    R$ {Math.floor(selectedEvent.revenue / selectedEvent.capacity)}
+                    R$ {selectedEvent?.capacity ? Math.floor((selectedEvent.revenue || 0) / selectedEvent.capacity) : 0}
                   </p>
                 </div>
                 <div>
@@ -206,11 +238,11 @@ const Events = () => {
                     <div className="flex-1 bg-accent/20 rounded-full h-2">
                       <div 
                         className="bg-gradient-primary h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${(selectedEvent.soldTickets / selectedEvent.capacity) * 100}%` }}
+                        style={{ width: `${((selectedEvent?.sold_tickets || 0) / (selectedEvent?.capacity || 1)) * 100}%` }}
                       />
                     </div>
                     <span className="text-sm font-medium">
-                      {((selectedEvent.soldTickets / selectedEvent.capacity) * 100).toFixed(1)}%
+                      {(((selectedEvent?.sold_tickets || 0) / (selectedEvent?.capacity || 1)) * 100).toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -234,15 +266,15 @@ const Events = () => {
                     <label className="text-sm font-medium">Pista Price (R$)</label>
                     <Input 
                       type="number" 
-                      defaultValue={selectedEvent.basePrice}
+                      defaultValue={selectedEvent?.ticket_price || 0}
                       className="mt-1"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">VIP Price (R$)</label>
+                    <label className="text-sm font-medium">Marketing Budget (R$)</label>
                     <Input 
                       type="number" 
-                      defaultValue={selectedEvent.vipBasePrice}
+                      defaultValue={selectedEvent?.marketing_spend || 0}
                       className="mt-1"
                     />
                   </div>

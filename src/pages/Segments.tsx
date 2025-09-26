@@ -11,9 +11,46 @@ import {
   Eye,
   BarChart3
 } from "lucide-react"
-import { mockSegments } from "@/lib/mockData"
+import { useEffect, useState } from "react"
+import { dataService } from "@/lib/dataService"
 
 const Segments = () => {
+  const [segments] = useState([
+    {
+      id: 'premium_seekers',
+      name: 'Premium Seekers',
+      description: 'High-value customers who prefer premium experiences',
+      size: 150,
+      avgLifetimeValue: 2500,
+      avgAge: 28,
+      topCity: 'São Paulo',
+      preferredItems: ['Rock', 'Eletrônica', 'VIP'],
+      color: '#9333EA'
+    },
+    {
+      id: 'mainstream_audience',
+      name: 'Mainstream Audience', 
+      description: 'General audience with diverse preferences',
+      size: 600,
+      avgLifetimeValue: 1200,
+      avgAge: 25,
+      topCity: 'Rio de Janeiro',
+      preferredItems: ['Pop', 'Sertanejo', 'MPB'],
+      color: '#3B82F6'
+    },
+    {
+      id: 'budget_conscious',
+      name: 'Budget Conscious',
+      description: 'Price-sensitive audience looking for value', 
+      size: 250,
+      avgLifetimeValue: 800,
+      avgAge: 23,
+      topCity: 'Belo Horizonte',
+      preferredItems: ['Forró', 'Funk', 'Pagode'],
+      color: '#10B981'
+    }
+  ])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -38,7 +75,7 @@ const Segments = () => {
 
       {/* Segments Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
-        {mockSegments.map((segment) => (
+        {segments.map((segment) => (
           <Card key={segment.id} className="glass border-border/50 hover:border-primary/20 transition-all hover:shadow-glow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -121,7 +158,7 @@ const Segments = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockSegments.map((segment) => (
+              {segments.map((segment) => (
                 <div key={segment.id} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
@@ -132,7 +169,7 @@ const Segments = () => {
                       <span className="font-medium">{segment.name}</span>
                     </div>
                     <span className="text-muted-foreground">
-                      {((segment.size / mockSegments.reduce((acc, s) => acc + s.size, 0)) * 100).toFixed(1)}%
+                      {((segment.size / segments.reduce((acc, s) => acc + s.size, 0)) * 100).toFixed(1)}%
                     </span>
                   </div>
                   <div className="w-full bg-accent/20 rounded-full h-2">
@@ -140,7 +177,7 @@ const Segments = () => {
                       className="h-2 rounded-full transition-all duration-300" 
                       style={{ 
                         backgroundColor: segment.color,
-                        width: `${(segment.size / mockSegments.reduce((acc, s) => acc + s.size, 0)) * 100}%`
+                        width: `${(segment.size / segments.reduce((acc, s) => acc + s.size, 0)) * 100}%`
                       }}
                     />
                   </div>
@@ -159,7 +196,7 @@ const Segments = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockSegments.map((segment) => (
+              {segments.map((segment) => (
                 <div key={segment.id} className="p-3 rounded-lg bg-accent/10 border border-border/20">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">

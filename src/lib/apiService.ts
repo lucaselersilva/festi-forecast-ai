@@ -22,9 +22,14 @@ class ApiService {
     this.config = { ...this.config, ...newConfig }
   }
 
-  // Set OpenAI API Key
+  // Set OpenAI API Key (will be loaded from environment)
   setOpenAIKey(apiKey: string) {
     this.config.openaiApiKey = apiKey
+  }
+
+  // Get OpenAI API Key from environment
+  private getOpenAIKey(): string | undefined {
+    return process.env.OPENAI_API_KEY
   }
 
   // Set ML Service URL
@@ -103,20 +108,21 @@ class ApiService {
 
   // OpenAI API Call (for enhanced text processing)
   async callOpenAI(prompt: string, model: string = 'gpt-4o-mini') {
-    if (!this.config.openaiApiKey) {
-      throw new Error('OpenAI API key not configured')
+    const apiKey = this.getOpenAIKey()
+    if (!apiKey) {
+      throw new Error('OpenAI API key not configured. Please add your API key in the settings.')
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.config.openaiApiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: 'You are an expert in event marketing and audience analysis.' },
+          { role: 'system', content: 'You are an expert in event marketing and audience analysis for the Brazilian market.' },
           { role: 'user', content: prompt }
         ],
         max_tokens: 1000,

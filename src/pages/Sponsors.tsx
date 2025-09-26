@@ -29,7 +29,32 @@ import {
   PolarRadiusAxis,
   Radar
 } from "recharts"
-import { mockSponsors } from "@/lib/mockData"
+const mockSponsors = [
+  {
+    id: '1',
+    name: 'Brahma',
+    category: 'Bebidas',
+    affinity: 85,
+    budget: 50000,
+    brandKeywords: ['Cerveja', 'Premium', 'Festa']
+  },
+  {
+    id: '2', 
+    name: 'Red Bull',
+    category: 'Energético',
+    affinity: 78,
+    budget: 35000,
+    brandKeywords: ['Energia', 'Adrenalina', 'Jovem']
+  },
+  {
+    id: '3',
+    name: 'Nubank',
+    category: 'Fintech', 
+    affinity: 72,
+    budget: 40000,
+    brandKeywords: ['Digital', 'Moderno', 'Inovação']
+  }
+]
 
 const Sponsors = () => {
   const affinityData = [
