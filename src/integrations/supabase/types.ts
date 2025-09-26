@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      consumptions: {
+        Row: {
+          customerid: number
+          eventid: number
+          id: number
+          item: string
+          quantity: number
+          timestamp: string
+          totalvalue: number
+        }
+        Insert: {
+          customerid: number
+          eventid: number
+          id?: number
+          item: string
+          quantity: number
+          timestamp?: string
+          totalvalue: number
+        }
+        Update: {
+          customerid?: number
+          eventid?: number
+          id?: number
+          item?: string
+          quantity?: number
+          timestamp?: string
+          totalvalue?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumptions_customerid_fkey"
+            columns: ["customerid"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          birthdate: string
+          city: string
+          email: string
+          gender: string
+          id: number
+          name: string
+          phone: string
+        }
+        Insert: {
+          birthdate: string
+          city: string
+          email: string
+          gender: string
+          id?: number
+          name: string
+          phone: string
+        }
+        Update: {
+          birthdate?: string
+          city?: string
+          email?: string
+          gender?: string
+          id?: number
+          name?: string
+          phone?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           artist: string
@@ -83,12 +151,137 @@ export type Database = {
         }
         Relationships: []
       }
+      interactions: {
+        Row: {
+          created_at: string
+          customer_id: number
+          event_id: string | null
+          id: string
+          interaction_type: string
+          item_id: string | null
+          metadata: Json | null
+          value: number | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id: number
+          event_id?: string | null
+          id?: string
+          interaction_type: string
+          item_id?: string | null
+          metadata?: Json | null
+          value?: number | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: number
+          event_id?: string | null
+          id?: string
+          interaction_type?: string
+          item_id?: string | null
+          metadata?: Json | null
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_event"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scoring_snapshots: {
+        Row: {
+          created_at: string
+          customer_id: number
+          event_id: string | null
+          frequency_score: number | null
+          id: string
+          monetary_value: number | null
+          predicted_ltv: number | null
+          propensity_score: number
+          recency_days: number | null
+          segment: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id: number
+          event_id?: string | null
+          frequency_score?: number | null
+          id?: string
+          monetary_value?: number | null
+          predicted_ltv?: number | null
+          propensity_score: number
+          recency_days?: number | null
+          segment?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: number
+          event_id?: string | null
+          frequency_score?: number | null
+          id?: string
+          monetary_value?: number | null
+          predicted_ltv?: number | null
+          propensity_score?: number
+          recency_days?: number | null
+          segment?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_scoring_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_scoring_event"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      citext: {
+        Args: { "": boolean } | { "": string } | { "": unknown }
+        Returns: string
+      }
+      citext_hash: {
+        Args: { "": string }
+        Returns: number
+      }
+      citextin: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      citextout: {
+        Args: { "": string }
+        Returns: unknown
+      }
+      citextrecv: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      citextsend: {
+        Args: { "": string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
