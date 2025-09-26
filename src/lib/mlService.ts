@@ -221,6 +221,10 @@ class MLService {
 
       if (consumptionError) throw consumptionError
 
+      if (!segments?.length || !consumption?.length) {
+        throw new Error('No segmentation data available - check that views are populated')
+      }
+
       // Map real segments to the expected format
       const mappedSegments = segments?.map((segment, index) => ({
         id: segment.segment?.toLowerCase().replace(/\s+/g, '_') || `segment_${index}`,
@@ -229,7 +233,7 @@ class MLService {
         size: Number(segment.total_customers) || 0,
         percentage: Math.round((Number(segment.total_customers) / segments.reduce((sum, s) => sum + Number(s.total_customers || 0), 0)) * 100),
         dominantCharacteristics: {
-          ageRange: `${segment.avg_age || 25}-${(segment.avg_age || 25) + 10} anos`,
+          ageRange: `${Math.round(segment.avg_age || 25)}-${Math.round((segment.avg_age || 25) + 10)} anos`,
           avgSpending: consumption?.find(c => c.segment === segment.segment)?.avg_monetary_total || 0,
           favoriteDrink: this.getFavoriteDrink(segment.segment),
           frequency: consumption?.find(c => c.segment === segment.segment)?.avg_frequency ? 
@@ -256,7 +260,7 @@ class MLService {
       }
     } catch (error) {
       console.error('Segmentation error:', error)
-      throw new Error('Failed to run segmentation analysis with real data')
+      throw new Error(`Failed to run segmentation analysis with real data: ${error.message}`)
     }
   }
 
@@ -337,11 +341,17 @@ class MLService {
   // Churn Prediction using real interaction data
   async runChurnPrediction(input: ChurnInput): Promise<ChurnOutput> {
     try {
+      const customerId = parseInt(input.customerId)
+      
+      if (isNaN(customerId)) {
+        throw new Error('Invalid customer ID provided')
+      }
+
       // Get real customer interaction data
       const { data: interactions, error } = await supabase
         .from('interactions')
         .select('*')
-        .eq('customer_id', parseInt(input.customerId))
+        .eq('customer_id', customerId)
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -351,7 +361,7 @@ class MLService {
       const { data: latestScoring, error: scoringError } = await supabase
         .from('scoring_snapshots')
         .select('*')
-        .eq('customer_id', parseInt(input.customerId))
+        .eq('customer_id', customerId)
         .order('created_at', { ascending: false })
         .limit(1)
 
@@ -400,21 +410,19 @@ class MLService {
       }
     } catch (error) {
       console.error('Churn prediction error:', error)
-      throw new Error('Failed to run churn prediction with real data')
+      throw new Error(`Failed to run churn prediction with real data: ${error.message}`)
     }
   }
 
   // Target Audience Analysis using real customer segments
   async runTargetAudienceAnalysis(input: TargetAudienceInput): Promise<TargetAudienceOutput> {
     try {
-      // Get real segment data for the region/genre
-      const { data: segmentForecast, error } = await supabase
-        .from('vw_segment_forecast')
+      // Get real customer and demographic data
+      const { data: customers, error: customersError } = await supabase
+        .from('customers')
         .select('*')
-        .eq('city', input.region)
-        .eq('genre', input.genre)
 
-      if (error) throw error
+      if (customersError) throw customersError
 
       const { data: demographics, error: demoError } = await supabase
         .from('vw_segment_demographics')
@@ -422,25 +430,50 @@ class MLService {
 
       if (demoError) throw demoError
 
-      // Calculate ideal profile based on real data
-      const totalCustomers = segmentForecast?.reduce((sum, s) => sum + Number(s.customers || 0), 0) || 0
-      const avgSpending = segmentForecast?.reduce((sum, s) => sum + Number(s.avg_monetary_total || 0), 0) / (segmentForecast?.length || 1) || 0
-      
-      const bestSegment = segmentForecast?.reduce((best, current) => 
+      const { data: consumption, error: consumptionError } = await supabase
+        .from('vw_segment_consumption')
+        .select('*')
+
+      if (consumptionError) throw consumptionError
+
+      if (!customers?.length || !demographics?.length || !consumption?.length) {
+        throw new Error('Insufficient data for target audience analysis')
+      }
+
+      // Calculate demographics for the region
+      const regionCustomers = customers.filter(c => 
+        c.city?.toLowerCase().includes(input.region?.toLowerCase() || '') || input.region === 'all'
+      )
+
+      const totalCustomers = regionCustomers.length
+      const averageAge = regionCustomers.reduce((sum, c) => {
+        const age = new Date().getFullYear() - new Date(c.birthdate).getFullYear()
+        return sum + age
+      }, 0) / totalCustomers
+
+      const genderDistribution = regionCustomers.reduce((acc, c) => {
+        acc[c.gender] = (acc[c.gender] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+
+      // Get best performing segment
+      const bestSegment = consumption?.reduce((best, current) => 
         Number(current.avg_monetary_total || 0) > Number(best.avg_monetary_total || 0) ? current : best
       )
 
       const matchingDemo = demographics?.find(d => d.segment === bestSegment?.segment)
+      const avgSpending = bestSegment?.avg_monetary_total || 0
 
       return {
         objective: 'Análise de público-alvo baseada em segmentos reais e dados comportamentais',
-        dataUsed: ['Segment forecast', 'Customer demographics', 'Regional consumption patterns', 'Genre preferences'],
+        dataUsed: ['Customer demographics', 'Regional data', 'Segment consumption', 'Behavioral patterns'],
         idealProfile: {
-          ageRange: matchingDemo?.avg_age ? `${matchingDemo.avg_age - 5}-${matchingDemo.avg_age + 5} anos` : '25-35 anos',
-          gender: matchingDemo ? `${(matchingDemo.female_pct || 50).toFixed(0)}% feminino, ${(matchingDemo.male_pct || 50).toFixed(0)}% masculino` : 'Misto',
+          ageRange: `${Math.max(18, Math.round(averageAge - 5))}-${Math.round(averageAge + 5)} anos`,
+          gender: Object.keys(genderDistribution).reduce((a, b) => 
+            genderDistribution[a] > genderDistribution[b] ? a : b),
           location: [input.region, 'Região metropolitana'],
           favoriteDrink: this.getFavoriteDrink(bestSegment?.segment),
-          spendingProfile: avgSpending > 200 ? 'Alto' : avgSpending > 100 ? 'Médio' : 'Baixo'
+          spendingProfile: avgSpending > 800 ? 'Alto' : avgSpending > 400 ? 'Médio' : 'Baixo'
         },
         audienceSize: {
           potential: Math.round(totalCustomers * 2.5), // Estimate market potential
@@ -448,42 +481,48 @@ class MLService {
           percentage: Math.round((totalCustomers / (totalCustomers * 2.5)) * 100)
         },
         sponsorAffinity: [
-          { category: 'Bebidas Alcoólicas', affinity: 85, description: `Público gasta em média R$ ${(segmentForecast?.[0]?.avg_bar_spend || 0).toFixed(0)} em bebidas por evento` },
+          { category: 'Bebidas Alcoólicas', affinity: 85, description: `Público gasta em média R$ ${(bestSegment?.avg_bar_spend || 0).toFixed(0)} em bebidas por evento` },
           { category: 'Lifestyle/Moda', affinity: 72, description: 'Alto engajamento digital do público-alvo' },
           { category: 'Tecnologia', affinity: 68, description: 'Público jovem com alta afinidade digital' }
         ],
         analysis: [
           `${totalCustomers} clientes identificados no target para ${input.genre} em ${input.region}`,
           `Gasto médio por cliente: R$ ${avgSpending.toFixed(0)}`,
-          `Melhor segmento: ${bestSegment?.segment || 'Champions'} com conversão estimada de ${(Number(bestSegment?.estimated_conversion_rate || 0) * 100).toFixed(0)}%`
+          `Melhor segmento: ${bestSegment?.segment || 'Heavy'} com ${bestSegment?.customers || 0} clientes`
         ],
         recommendations: [
           {
             sponsor: 'Marca de Cerveja Premium', 
-            argument: `Público gasta R$ ${(segmentForecast?.[0]?.avg_bar_spend || 50).toFixed(0)} por evento em bebidas`,
+            argument: `Público gasta R$ ${(bestSegment?.avg_bar_spend || 50).toFixed(0)} por evento em bebidas`,
             audienceMatch: '87% match com perfil premium'
           },
           {
             sponsor: 'App de Delivery/Lifestyle',
-            argument: `${(matchingDemo?.avg_age || 28)} anos é a idade média - alta adoção de apps`,
+            argument: `${Math.round(averageAge)} anos é a idade média - alta adoção de apps`,
             audienceMatch: '78% match com target digital'
           }
         ]
       }
     } catch (error) {
       console.error('Target audience analysis error:', error)
-      throw new Error('Failed to run target audience analysis with real data')
+      throw new Error(`Failed to run target audience analysis with real data: ${error.message}`)
     }
   }
 
   // Recommendation Engine using real consumption and interaction data
   async runRecommendationEngine(input: RecommendationInput): Promise<RecommendationOutput> {
     try {
+      const customerId = parseInt(input.customerId)
+      
+      if (isNaN(customerId)) {
+        throw new Error('Invalid customer ID provided')
+      }
+
       // Get real customer consumption data
       const { data: consumptions, error: consError } = await supabase
         .from('consumptions')
         .select('*')
-        .eq('customerid', parseInt(input.customerId))
+        .eq('customerid', customerId)
         .order('timestamp', { ascending: false })
         .limit(20)
 
@@ -493,7 +532,7 @@ class MLService {
       const { data: interactions, error: intError } = await supabase
         .from('interactions')
         .select('*')
-        .eq('customer_id', parseInt(input.customerId))
+        .eq('customer_id', customerId)
         .order('created_at', { ascending: false })
         .limit(30)
 
@@ -508,23 +547,27 @@ class MLService {
 
       if (eventsError) throw eventsError
 
+      if (!futureEvents?.length) {
+        throw new Error('No upcoming events available for recommendations')
+      }
+
       // Analyze consumption patterns
       const avgSpent = consumptions?.reduce((sum, c) => sum + Number(c.totalvalue || 0), 0) / (consumptions?.length || 1) || 0
       const favoriteItems = this.getMostFrequentItems(consumptions || [])
-      const interactionGenres = this.extractGenresFromInteractions(interactions || [])
+      const totalInteractions = interactions?.length || 0
 
       // Generate event recommendations based on real data
-      const eventRecommendations = futureEvents?.slice(0, 3).map(event => ({
+      const eventRecommendations = futureEvents.slice(0, 3).map(event => ({
         eventId: event.id,
         title: `${event.artist} - ${event.venue}`,
         genre: event.genre,
-        conversionProbability: this.calculateConversionProbability(event, interactionGenres, avgSpent),
+        conversionProbability: this.calculateConversionProbability(event, avgSpent),
         reasons: [
-          interactionGenres.includes(event.genre) ? `Histórico em eventos de ${event.genre}` : 'Diversificação de gêneros',
-          avgSpent >= Number(event.ticket_price || 0) ? 'Perfil de gasto compatível' : 'Oportunidade de upgrade',
-          `Local familiar: ${event.city}`
+          avgSpent >= Number(event.ticket_price || 0) ? 'Perfil de gasto compatível' : 'Evento acessível',
+          totalInteractions > 5 ? 'Cliente ativo' : 'Oportunidade de engajamento',
+          `Local: ${event.city} - ${event.venue}`
         ]
-      })) || []
+      }))
 
       // Generate product recommendations based on consumption history
       const productRecommendations = this.generateProductRecommendations(consumptions || [], avgSpent)
@@ -537,30 +580,26 @@ class MLService {
         analysis: [
           `Cliente tem gasto médio de R$ ${avgSpent.toFixed(0)} por evento`,
           `Itens mais consumidos: ${favoriteItems.slice(0, 3).join(', ')}`,
-          `${interactions?.length || 0} interações analisadas nos últimos meses`,
-          `Preferência por: ${interactionGenres.join(', ') || 'eventos diversos'}`
+          `${totalInteractions} interações analisadas nos últimos meses`
         ],
-        crossSellInsights: [
-          {
-            fromCluster: avgSpent > 150 ? 'Premium' : avgSpent > 80 ? 'Standard' : 'Economy',
-            toProduct: avgSpent > 100 ? 'VIP Experience' : 'Premium Upgrade',
-            strategy: 'Upgrade baseado em histórico de gastos',
-            expectedUplift: Math.round(avgSpent * 0.3)
-          }
-        ],
+        crossSellInsights: [{
+          fromCluster: avgSpent > 150 ? 'Premium' : avgSpent > 80 ? 'Standard' : 'Economy',
+          toProduct: avgSpent > 100 ? 'VIP Experience' : 'Premium Upgrade',
+          strategy: 'Upgrade baseado em histórico de gastos',
+          expectedUplift: Math.round(avgSpent * 0.3)
+        }],
         recommendations: [
           'Personalizar ofertas baseadas no histórico de consumo real',
-          `Focar em produtos similares a: ${favoriteItems.slice(0, 2).join(', ')}`,
+          `Focar em produtos similares aos consumidos: ${favoriteItems.slice(0, 2).join(', ')}`,
           consumptions && consumptions.length > 5 ? 'Cliente ativo - oferecer programa de fidelidade' : 'Cliente em desenvolvimento - incentivar frequência'
         ]
       }
     } catch (error) {
       console.error('Recommendation engine error:', error)
-      throw new Error('Failed to run recommendation engine with real data')
+      throw new Error(`Failed to run recommendation engine with real data: ${error.message}`)
     }
   }
 
-  // Helper methods
   private getSegmentDescription(segment: string | null): string {
     const descriptions: { [key: string]: string } = {
       'Champions': 'Clientes de alto valor que compram frequentemente',
@@ -662,12 +701,14 @@ class MLService {
 }
 
 export const mlService = new MLService()
-export type { 
-  SegmentationInput, 
-  SegmentationOutput, 
-  PricingInput, 
-  PricingOutput, 
-  ChurnInput, 
+
+export type {
+  MLConfig,
+  SegmentationInput,
+  SegmentationOutput,
+  PricingInput,
+  PricingOutput,
+  ChurnInput,
   ChurnOutput,
   TargetAudienceInput,
   TargetAudienceOutput,
