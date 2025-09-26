@@ -27,16 +27,16 @@ serve(async (req) => {
       });
     }
 
-    if (format === 'pdf') {
-      const pdfBuffer = await generatePDF(data);
-      return new Response(pdfBuffer, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="insights-report-${Date.now()}.pdf"`
-        },
-      });
-    }
+      if (format === 'pdf') {
+        const pdfBuffer = await generatePDF(data);
+        return new Response(new Uint8Array(pdfBuffer), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="insights-report-${Date.now()}.pdf"`
+          },
+        });
+      }
 
     throw new Error('Unsupported export format');
 
@@ -139,20 +139,176 @@ function generateCSV(data: any): string {
   return csv;
 }
 
-async function generatePDF(data: any): Promise<ArrayBuffer> {
+async function generatePDF(data: any): Promise<Uint8Array> {
   const { eventInfo, revenueData, sponsorshipData, segments } = data;
   
-  // Simple PDF generation - creating a structured text-based PDF
-  const content = generatePDFContent(data);
+  // Import jsPDF dynamically
+  const { jsPDF } = await import('https://esm.sh/jspdf@2.5.1');
+  const doc = new jsPDF();
   
-  // For now, return a simple PDF-like structure as bytes
-  // In a real implementation, you'd use a proper PDF library
-  const encoder = new TextEncoder();
-  const pdfHeader = "%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n\n";
-  const pdfContent = `2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n/Contents 4 0 R\n>>\nendobj\n\n4 0 obj\n<<\n/Length ${content.length}\n>>\nstream\nBT\n/F1 12 Tf\n50 750 Td\n(${content.replace(/\n/g, ') Tj T* (')}) Tj\nET\nendstream\nendobj\n\nxref\n0 5\n0000000000 65535 f \n0000000010 00000 n \n0000000053 00000 n \n0000000125 00000 n \n0000000200 00000 n \ntrailer\n<<\n/Size 5\n/Root 1 0 R\n>>\nstartxref\n${400 + content.length}\n%%EOF`;
+  let yPosition = 20;
   
-  const fullPdf = encoder.encode(pdfHeader + pdfContent);
-  return fullPdf.buffer;
+  // Header
+  doc.setFontSize(20);
+  doc.setFont(undefined, 'bold');
+  doc.text('RELATÓRIO DE INSIGHTS - EVENTO', 20, yPosition);
+  yPosition += 15;
+  
+  // Event Info
+  doc.setFontSize(14);
+  doc.setFont(undefined, 'bold');
+  doc.text('INFORMAÇÕES DO EVENTO', 20, yPosition);
+  yPosition += 10;
+  
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'normal');
+  doc.text(`Gênero: ${eventInfo.genre}`, 20, yPosition);
+  yPosition += 6;
+  doc.text(`Cidade: ${eventInfo.city}`, 20, yPosition);
+  yPosition += 6;
+  doc.text(`Data: ${eventInfo.date}`, 20, yPosition);
+  yPosition += 6;
+  doc.text(`Capacidade: ${eventInfo.capacity?.toLocaleString('pt-BR') || 'N/A'} pessoas`, 20, yPosition);
+  yPosition += 15;
+  
+  // Revenue Analysis
+  if (revenueData) {
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('ANÁLISE DE RECEITA', 20, yPosition);
+    yPosition += 10;
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Receita Total Projetada: R$ ${revenueData.revenueProjection.totalRevenue.toLocaleString('pt-BR')}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Ingressos Vendidos: ${revenueData.revenueProjection.totalSales.toLocaleString('pt-BR')}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Preço Médio: R$ ${revenueData.revenueProjection.avgTicketPrice.toLocaleString('pt-BR')}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Taxa de Ocupação: ${(revenueData.revenueProjection.occupancyRate * 100).toFixed(1)}%`, 20, yPosition);
+    yPosition += 15;
+    
+    // Marketing ROI
+    if (revenueData.marketingROI) {
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('ESTRATÉGIA DE MARKETING E ROI', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Orçamento Recomendado: R$ ${revenueData.marketingROI.recommendedBudget.toLocaleString('pt-BR')}`, 20, yPosition);
+      yPosition += 5;
+      doc.text(`CPA Esperado: R$ ${revenueData.marketingROI.expectedCPA}`, 20, yPosition);
+      yPosition += 5;
+      doc.text(`Ponto de Equilíbrio: ${revenueData.marketingROI.breakeven} ingressos`, 20, yPosition);
+      yPosition += 5;
+      
+      const channelMix = Object.entries(revenueData.marketingROI.channelMix)
+        .map(([channel, percentage]) => `${channel}: ${percentage}%`)
+        .join(', ');
+      doc.text(`Mix de Canais: ${channelMix}`, 20, yPosition);
+      yPosition += 10;
+    }
+    
+    // Top Customer Prospects (if segments available)
+    if (segments && segments.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('CLIENTES MAIS PROVÁVEIS', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      segments.slice(0, 3).forEach((segment: any, index: number) => {
+        const topChannel = Object.entries(segment.marketingChannels || {})
+          .sort(([,a], [,b]) => (b as number) - (a as number))[0]?.[0] || 'digital';
+        doc.text(`${index + 1}. ${segment.name}: ${(segment.conversionRate * 100).toFixed(0)}% probabilidade`, 20, yPosition);
+        yPosition += 4;
+        doc.text(`   Gasto Esperado: R$ ${(segment.avgTicketSpend + segment.avgBarSpend).toLocaleString('pt-BR')}`, 25, yPosition);
+        yPosition += 4;
+        doc.text(`   Canal Preferido: ${topChannel}`, 25, yPosition);
+        yPosition += 6;
+      });
+    }
+  }
+  
+  // Check if we need a new page
+  if (yPosition > 250) {
+    doc.addPage();
+    yPosition = 20;
+  }
+  
+  // Sponsorship Analysis
+  if (sponsorshipData) {
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('ANÁLISE DE PATROCÍNIO', 20, yPosition);
+    yPosition += 10;
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Alcance Esperado: ${sponsorshipData.expectedReach.toLocaleString('pt-BR')} pessoas`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Gasto no Local: R$ ${sponsorshipData.expectedOnsiteSpend.toLocaleString('pt-BR')}`, 20, yPosition);
+    yPosition += 15;
+    
+    // Sponsor Packages
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('PACOTES DE PATROCÍNIO', 20, yPosition);
+    yPosition += 8;
+    
+    sponsorshipData.sponsorPackages.forEach((pkg: any) => {
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text(`${pkg.tier}: R$ ${pkg.price.toLocaleString('pt-BR')} - ROI: ${pkg.expectedROI}`, 20, yPosition);
+      yPosition += 5;
+      doc.setFont(undefined, 'normal');
+      doc.text(`Benefícios: ${pkg.benefits.join(', ')}`, 25, yPosition);
+      yPosition += 8;
+    });
+  }
+  
+  // Segments Detail
+  if (segments && segments.length > 0) {
+    if (yPosition > 200) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('SEGMENTAÇÃO AVANÇADA', 20, yPosition);
+    yPosition += 10;
+    
+    segments.forEach((segment: any) => {
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'bold');
+      doc.text(`${segment.name}`, 20, yPosition);
+      yPosition += 6;
+      
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Participação: ${(segment.marketShare * 100).toFixed(1)}% | Preço Médio: R$ ${segment.avgTicketSpend}`, 25, yPosition);
+      yPosition += 4;
+      doc.text(`Gasto Bar: R$ ${segment.avgBarSpend} | Conversão: ${(segment.conversionRate * 100).toFixed(1)}%`, 25, yPosition);
+      yPosition += 4;
+      const channels = Object.entries(segment.marketingChannels || {})
+        .map(([channel, percentage]) => `${channel}: ${percentage}%`)
+        .join(', ');
+      doc.text(`Canais: ${channels}`, 25, yPosition);
+      yPosition += 8;
+      
+      if (yPosition > 270) {
+        doc.addPage();
+        yPosition = 20;
+      }
+    });
+  }
+  
+  return doc.output('arraybuffer');
 }
 
 function generatePDFContent(data: any): string {

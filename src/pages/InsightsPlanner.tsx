@@ -267,8 +267,9 @@ export default function InsightsPlanner() {
         a.click();
         window.URL.revokeObjectURL(url);
       } else if (format === "pdf" && response.data) {
-        // Handle PDF download
-        const blob = new Blob([response.data], { type: "application/pdf" });
+        // Handle PDF download - response.data is already an ArrayBuffer
+        const uint8Array = new Uint8Array(response.data);
+        const blob = new Blob([uint8Array], { type: "application/pdf" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -868,8 +869,8 @@ export default function InsightsPlanner() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {revenueData.pricingTiers.map((tier) => (
-                      <Card key={tier.tier} className="bg-gradient-to-br from-background to-muted/30">
+                    {revenueData.pricingTiers.map((tier, index) => (
+                      <Card key={`tier-${tier.tier}-${index}`} className="bg-gradient-to-br from-background to-muted/30">
                         <CardHeader className="pb-3">
                           <CardTitle className="text-lg flex items-center justify-between">
                             {tier.tier}
