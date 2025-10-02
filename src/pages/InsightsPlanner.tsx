@@ -109,8 +109,14 @@ interface AdvancedSegment {
   messaging: string[];
 }
 
-function InsightsPlanner() {
-  // Main component
+/**
+ * Insights Planner Component
+ * Handles event planning with revenue and sponsorship analysis
+ */
+export default function InsightsPlanner() {
+  const { toast } = useToast();
+  
+  // Main component state
   const [activeTab, setActiveTab] = useState("revenue");
   const [loading, setLoading] = useState(false);
   const [revenueData, setRevenueData] = useState<RevenueAnalysis | null>(null);
@@ -146,8 +152,6 @@ function InsightsPlanner() {
     consumptionLevels: true,
     genderSegments: false,
   });
-
-  const { toast } = useToast();
 
   // Opções para os selects
   const genres = ["Rock", "Eletrônica", "Funk", "Sertanejo", "Pop", "Forró", "MPB", "Rap", "Indie", "Pagode"];
@@ -1448,15 +1452,12 @@ function InsightsPlanner() {
             </Card>
           )}
         </TabsContent>
-
-        {/* Clustering Tab */}
+        
         <TabsContent value="clustering" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Segmentação de Clientes</CardTitle>
-              <CardDescription>
-                Análise de clustering em desenvolvimento
-              </CardDescription>
+              <CardDescription>Análise de clustering em desenvolvimento</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">Funcionalidade em construção</p>
@@ -1467,6 +1468,4 @@ function InsightsPlanner() {
     </div>
   );
 }
-
-// Export component
-export default InsightsPlanner;
+export {};
