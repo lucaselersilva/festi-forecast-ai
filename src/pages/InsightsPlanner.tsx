@@ -354,7 +354,6 @@ export default function InsightsPlanner() {
       setClusteringLoading(false);
     }
   };
-  };
 
   const generateEnhancedRevenueData = (requestData: any, segments: AdvancedSegment[]): RevenueAnalysis => {
     const baseRevenue = requestData.targetRevenue;
@@ -1468,4 +1467,3 @@ export default function InsightsPlanner() {
     </div>
   );
 }
-export {};
