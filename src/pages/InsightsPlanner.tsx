@@ -320,10 +320,16 @@ export default function InsightsPlanner() {
     try {
       console.log("🔬 Running clustering with method:", clusteringMethod);
       
-      const response = await axios.post("http://localhost:3001/api/segmentation/run", {
-        method: clusteringMethod,
-        params: clusteringParams,
+      const response = await supabase.functions.invoke('clustering', {
+        body: {
+          method: clusteringMethod,
+          params: clusteringParams,
+        }
       });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Erro ao executar clustering");
+      }
 
       if (response.data.success) {
         setClusteringResult(response.data);
