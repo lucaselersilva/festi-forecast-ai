@@ -557,11 +557,13 @@ class MLService {
       const totalInteractions = interactions?.length || 0
 
       // Generate event recommendations based on real data
+      const userGenres = this.extractGenresFromInteractions(interactions.data || [])
+      
       const eventRecommendations = futureEvents.slice(0, 3).map(event => ({
         eventId: event.id,
         title: `${event.artist} - ${event.venue}`,
         genre: event.genre,
-        conversionProbability: this.calculateConversionProbability(event, avgSpent),
+        conversionProbability: this.calculateConversionProbability(event, userGenres, avgSpent),
         reasons: [
           avgSpent >= Number(event.ticket_price || 0) ? 'Perfil de gasto compatível' : 'Evento acessível',
           totalInteractions > 5 ? 'Cliente ativo' : 'Oportunidade de engajamento',
