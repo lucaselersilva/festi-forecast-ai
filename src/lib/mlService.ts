@@ -557,7 +557,7 @@ class MLService {
       const totalInteractions = interactions?.length || 0
 
       // Generate event recommendations based on real data
-      const userGenres = this.extractGenresFromInteractions(interactions.data || [])
+      const userGenres = this.extractGenresFromInteractions(interactions || [])
       
       const eventRecommendations = futureEvents.slice(0, 3).map(event => ({
         eventId: event.id,

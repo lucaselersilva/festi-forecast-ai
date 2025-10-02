@@ -319,7 +319,7 @@ async function generatePDF(data: any): Promise<string> {
     return doc.output('datauristring').split(',')[1]; // Return base64 string without data:application/pdf;base64, prefix
   } catch (error) {
     console.error('PDF generation error:', error);
-    throw new Error(`Failed to generate PDF: ${error.message}`);
+    throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

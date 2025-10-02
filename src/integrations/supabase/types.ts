@@ -54,6 +54,13 @@ export type Database = {
             foreignKeyName: "consumptions_customerid_fkey"
             columns: ["customerid"]
             isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "consumptions_customerid_fkey"
+            columns: ["customerid"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -62,6 +69,13 @@ export type Database = {
             columns: ["customerid"]
             isOneToOne: false
             referencedRelation: "vw_multi_segment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "consumptions_customerid_fkey"
+            columns: ["customerid"]
+            isOneToOne: false
+            referencedRelation: "vw_rfm_customer"
             referencedColumns: ["customer_id"]
           },
           {
@@ -215,6 +229,13 @@ export type Database = {
             foreignKeyName: "fk_interactions_customer"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -223,6 +244,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "vw_multi_segment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_rfm_customer"
             referencedColumns: ["customer_id"]
           },
           {
@@ -243,6 +271,13 @@ export type Database = {
             foreignKeyName: "fk_interactions_event"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_event"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "vw_event_analogs"
             referencedColumns: ["event_id"]
           },
@@ -251,6 +286,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "vw_event_context"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_event"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_perf"
             referencedColumns: ["event_id"]
           },
         ]
@@ -304,6 +346,13 @@ export type Database = {
             foreignKeyName: "fk_scoring_customer"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_scoring_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -312,6 +361,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "vw_multi_segment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_scoring_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_rfm_customer"
             referencedColumns: ["customer_id"]
           },
           {
@@ -332,6 +388,13 @@ export type Database = {
             foreignKeyName: "fk_scoring_event"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "fk_scoring_event"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "vw_event_analogs"
             referencedColumns: ["event_id"]
           },
@@ -340,6 +403,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "vw_event_context"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "fk_scoring_event"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_perf"
             referencedColumns: ["event_id"]
           },
         ]
@@ -353,6 +423,18 @@ export type Database = {
           dominant_category_pct: number | null
           total_quantity: number | null
           total_value: number | null
+        }
+        Relationships: []
+      }
+      vw_customer_event_features: {
+        Row: {
+          avg_days_before_event: number | null
+          avg_spend_last_90d: number | null
+          city_match: number | null
+          customer_id: number | null
+          days_since_last_event: number | null
+          event_id: string | null
+          prev_attendance_count: number | null
         }
         Relationships: []
       }
@@ -381,6 +463,13 @@ export type Database = {
             foreignKeyName: "fk_interactions_customer"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -389,6 +478,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "vw_multi_segment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_rfm_customer"
             referencedColumns: ["customer_id"]
           },
           {
@@ -448,6 +544,13 @@ export type Database = {
             foreignKeyName: "fk_interactions_customer"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -456,6 +559,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "vw_multi_segment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_rfm_customer"
             referencedColumns: ["customer_id"]
           },
           {
@@ -551,6 +661,45 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_event_perf: {
+        Row: {
+          avg_basket_value: number | null
+          avg_ticket_price: number | null
+          capacity: number | null
+          city: string | null
+          conversion_rate: number | null
+          date: string | null
+          event_id: string | null
+          genre: string | null
+          revenue: number | null
+          sold_tickets: number | null
+        }
+        Insert: {
+          avg_basket_value?: never
+          avg_ticket_price?: never
+          capacity?: number | null
+          city?: string | null
+          conversion_rate?: never
+          date?: string | null
+          event_id?: string | null
+          genre?: string | null
+          revenue?: number | null
+          sold_tickets?: number | null
+        }
+        Update: {
+          avg_basket_value?: never
+          avg_ticket_price?: never
+          capacity?: number | null
+          city?: string | null
+          conversion_rate?: never
+          date?: string | null
+          event_id?: string | null
+          genre?: string | null
+          revenue?: number | null
+          sold_tickets?: number | null
+        }
+        Relationships: []
+      }
       vw_multi_segment: {
         Row: {
           age: number | null
@@ -599,6 +748,13 @@ export type Database = {
             foreignKeyName: "fk_interactions_customer"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -613,10 +769,31 @@ export type Database = {
             foreignKeyName: "fk_interactions_customer"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "vw_rfm_customer"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "vw_sponsorship_potential"
             referencedColumns: ["customer_id"]
           },
         ]
+      }
+      vw_rfm_customer: {
+        Row: {
+          customer_id: number | null
+          f: number | null
+          frequency_interactions: number | null
+          last_interaction_at: string | null
+          m: number | null
+          monetary_total: number | null
+          r: number | null
+          recency_days: number | null
+          rfm_score: number | null
+        }
+        Relationships: []
       }
       vw_segment_consumption: {
         Row: {

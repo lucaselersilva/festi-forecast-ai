@@ -89,9 +89,9 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
         <TabsContent value="consumption" className="space-y-4 mt-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {Object.entries(consumptionStats)
-              .sort(([, a], [, b]) => b - a)
+              .sort(([, a], [, b]) => (Number(b) || 0) - (Number(a) || 0))
               .map(([type, count]) => {
-                const percentage = ((count / totalCustomers) * 100).toFixed(1)
+                const percentage = ((Number(count) / totalCustomers) * 100).toFixed(1)
                 const icon = type === 'Beer Lovers' ? Beer : type === 'Energy Seekers' ? Zap : DollarSign
                 const IconComponent = icon
                 
@@ -102,7 +102,7 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
                       <IconComponent className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-2xl font-bold">{Number(count)}</div>
                       <p className="text-xs text-muted-foreground">
                         {percentage}% do total
                       </p>
@@ -119,9 +119,9 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
         <TabsContent value="age" className="space-y-4 mt-6">
           <div className="grid gap-4 md:grid-cols-3">
             {Object.entries(ageStats)
-              .sort(([, a], [, b]) => b - a)
+              .sort(([, a], [, b]) => (Number(b) || 0) - (Number(a) || 0))
               .map(([age, count]) => {
-                const percentage = ((count / totalCustomers) * 100).toFixed(1)
+                const percentage = ((Number(count) / totalCustomers) * 100).toFixed(1)
                 
                 return (
                   <Card key={age}>
@@ -130,12 +130,12 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
                       <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-2xl font-bold">{Number(count)}</div>
                       <p className="text-xs text-muted-foreground">
                         {percentage}% do total
                       </p>
                       <div className="mt-2">
-                        <Badge variant="secondary">{getAgeInsight(age)}</Badge>
+                        <Badge variant="secondary">{getAgeInsight(age as string)}</Badge>
                       </div>
                     </CardContent>
                   </Card>
@@ -147,9 +147,9 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
         <TabsContent value="engagement" className="space-y-4 mt-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {Object.entries(engagementStats)
-              .sort(([, a], [, b]) => b - a)
+              .sort(([, a], [, b]) => (Number(b) || 0) - (Number(a) || 0))
               .map(([type, count]) => {
-                const percentage = ((count / totalCustomers) * 100).toFixed(1)
+                const percentage = ((Number(count) / totalCustomers) * 100).toFixed(1)
                 
                 return (
                   <Card key={type}>
@@ -158,12 +158,12 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-2xl font-bold">{Number(count)}</div>
                       <p className="text-xs text-muted-foreground">
                         {percentage}% do total
                       </p>
                       <div className="mt-2">
-                        <Badge variant="secondary">{getEngagementInsight(type)}</Badge>
+                        <Badge variant="secondary">{getEngagementInsight(type as string)}</Badge>
                       </div>
                     </CardContent>
                   </Card>
@@ -175,10 +175,10 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
         <TabsContent value="genre" className="space-y-4 mt-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {Object.entries(genreStats)
-              .sort(([, a], [, b]) => b - a)
+              .sort(([, a], [, b]) => (Number(b) || 0) - (Number(a) || 0))
               .slice(0, 6)
               .map(([genre, count]) => {
-                const percentage = ((count / totalCustomers) * 100).toFixed(1)
+                const percentage = ((Number(count) / totalCustomers) * 100).toFixed(1)
                 
                 return (
                   <Card key={genre}>
@@ -187,7 +187,7 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
                       <Music className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-2xl font-bold">{Number(count)}</div>
                       <p className="text-xs text-muted-foreground">
                         {percentage}% preferem este gênero
                       </p>
@@ -201,9 +201,9 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
         <TabsContent value="sponsorship" className="space-y-4 mt-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {Object.entries(sponsorshipStats)
-              .sort(([, a], [, b]) => b - a)
+              .sort(([, a], [, b]) => (Number(b) || 0) - (Number(a) || 0))
               .map(([cluster, count]) => {
-                const percentage = ((count / totalCustomers) * 100).toFixed(1)
+                const percentage = ((Number(count) / totalCustomers) * 100).toFixed(1)
                 
                 return (
                   <Card key={cluster}>
@@ -212,12 +212,12 @@ export function MultiSegmentAnalysis({ segments }: MultiSegmentAnalysisProps) {
                       <Award className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-2xl font-bold">{Number(count)}</div>
                       <p className="text-xs text-muted-foreground">
                         {percentage}% do total
                       </p>
                       <div className="mt-2">
-                        <Badge variant="secondary">{getSponsorshipInsight(cluster)}</Badge>
+                        <Badge variant="secondary">{getSponsorshipInsight(cluster as string)}</Badge>
                       </div>
                     </CardContent>
                   </Card>
