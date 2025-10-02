@@ -3,10 +3,17 @@ const cors = require("cors");
 const { spawn } = require("child_process");
 const path = require("path");
 require("dotenv").config();
+require("tsx/register");
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
+
+// Import TypeScript routes
+const segmentationRouter = require("./routes/segmentation").default;
+
+// Mount routes
+app.use("/api/segmentation", segmentationRouter);
 
 // POST /api/forecast
 app.post("/api/forecast", async (req, res) => {

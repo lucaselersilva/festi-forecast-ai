@@ -12,6 +12,10 @@ import { Calendar, TrendingUp, Users, DollarSign, Target, FileText, Download, Ba
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { ClusteringConfig } from "@/components/ClusteringConfig";
+import { ClusterQuality } from "@/components/ClusterQuality";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import axios from "axios";
 
 interface RevenueAnalysis {
   revenueProjection: {
@@ -111,6 +115,19 @@ export default function InsightsPlanner() {
   const [revenueData, setRevenueData] = useState<RevenueAnalysis | null>(null);
   const [sponsorshipData, setSponsorshipData] = useState<SponsorshipForecast | null>(null);
   const [advancedSegments, setAdvancedSegments] = useState<AdvancedSegment[]>([]);
+  
+  // Clustering state
+  const [clusteringMethod, setClusteringMethod] = useState<'kmeans' | 'dbscan' | 'gmm'>('kmeans');
+  const [clusteringParams, setClusteringParams] = useState({
+    k: 4,
+    eps: 0.6,
+    minSamples: 10,
+    nComponents: 4,
+    standardize: true,
+    randomState: 42,
+  });
+  const [clusteringLoading, setClusteringLoading] = useState(false);
+  const [clusteringResult, setClusteringResult] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     genre: "",
@@ -295,6 +312,35 @@ export default function InsightsPlanner() {
         description: error instanceof Error ? error.message : "Tente novamente em alguns instantes",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleRunClustering = async () => {
+    setClusteringLoading(true);
+    try {
+      console.log("🔬 Running clustering with method:", clusteringMethod);
+      
+      const response = await axios.post("http://localhost:3001/api/segmentation/run", {
+        method: clusteringMethod,
+        params: clusteringParams,
+      });
+
+      if (response.data.success) {
+        setClusteringResult(response.data);
+        toast({
+          title: "Clustering concluído!",
+          description: `${response.data.clusters.length} clusters identificados com ${response.data.totalCustomers} clientes`,
+        });
+      }
+    } catch (error) {
+      console.error("Clustering error:", error);
+      toast({
+        title: "Erro no clustering",
+        description: error instanceof Error ? error.message : "Falha ao executar algoritmo",
+        variant: "destructive",
+      });
+    } finally {
+      setClusteringLoading(false);
     }
   };
 
@@ -527,7 +573,7 @@ export default function InsightsPlanner() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="revenue" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Plano de Receita
@@ -535,6 +581,10 @@ export default function InsightsPlanner() {
           <TabsTrigger value="sponsorship" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             Patrocínio
+          </TabsTrigger>
+          <TabsTrigger value="clustering" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Clustering
           </TabsTrigger>
         </TabsList>
 
@@ -1386,6 +1436,88 @@ export default function InsightsPlanner() {
                 >
                   Ir para Configuração
                 </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Clustering Tab */}
+        <TabsContent value="clustering" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ClusteringConfig
+              method={clusteringMethod}
+              params={clusteringParams}
+              onMethodChange={setClusteringMethod}
+              onParamChange={(key, value) => 
+                setClusteringParams(prev => ({ ...prev, [key]: value }))
+              }
+              onRun={handleRunClustering}
+              isLoading={clusteringLoading}
+            />
+
+            {clusteringResult && (
+              <ClusterQuality
+                silhouetteScore={clusteringResult.metrics.silhouetteScore}
+                daviesBouldinScore={clusteringResult.metrics.daviesBouldinScore}
+                clusterSizes={clusteringResult.metrics.clusterSizes}
+                method={clusteringMethod}
+              />
+            )}
+          </div>
+
+          {clusteringResult && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Clusters Identificados
+                </CardTitle>
+                <CardDescription>
+                  Segmentos de clientes baseados em RFM (Recência, Frequência, Monetário)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cluster</TableHead>
+                      <TableHead>Tamanho</TableHead>
+                      <TableHead>% Total</TableHead>
+                      <TableHead>Recência Média (dias)</TableHead>
+                      <TableHead>Frequência Média</TableHead>
+                      <TableHead>Monetário Médio (R$)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clusteringResult.clusters.map((cluster: any) => (
+                      <TableRow key={cluster.cluster}>
+                        <TableCell>
+                          <Badge 
+                            variant={cluster.cluster === -1 ? "outline" : "default"}
+                            className="font-mono"
+                          >
+                            {cluster.cluster === -1 ? "Ruído" : `Cluster ${cluster.cluster}`}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{cluster.size}</TableCell>
+                        <TableCell>{cluster.percentage.toFixed(1)}%</TableCell>
+                        <TableCell>{cluster.avgRecency.toFixed(0)}</TableCell>
+                        <TableCell>{cluster.avgFrequency.toFixed(1)}</TableCell>
+                        <TableCell>R$ {cluster.avgMonetary.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                  <h4 className="font-semibold mb-2">Como interpretar:</h4>
+                  <ul className="text-sm space-y-1 text-muted-foreground">
+                    <li>• <strong>Recência:</strong> Dias desde a última interação (menor = mais ativo)</li>
+                    <li>• <strong>Frequência:</strong> Número de interações/compras (maior = mais engajado)</li>
+                    <li>• <strong>Monetário:</strong> Valor total gasto (maior = mais valioso)</li>
+                    <li>• <strong>Ruído:</strong> Pontos que não se encaixam bem em nenhum cluster (apenas DBSCAN)</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           )}
