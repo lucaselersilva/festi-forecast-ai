@@ -15,6 +15,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { ClusteringConfig } from "@/components/ClusteringConfig";
 import { ClusterQuality } from "@/components/ClusterQuality";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SegmentationTypeSelector } from "@/components/SegmentationTypeSelector";
+import { SegmentInsightCard } from "@/components/SegmentInsightCard";
+import { ClusterVisualization } from "@/components/ClusterVisualization";
+import { getRFMSegmentName, getDemographicInsight, getBehavioralInsight, getMusicalInsight } from "@/lib/segmentationHelpers";
+import type { SegmentationType } from "@/components/SegmentationTypeSelector";
 import axios from "axios";
 
 interface RevenueAnalysis {
@@ -128,6 +133,7 @@ export default function InsightsPlanner() {
   });
   const [clusteringLoading, setClusteringLoading] = useState(false);
   const [clusteringResult, setClusteringResult] = useState<any>(null);
+  const [segmentationType, setSegmentationType] = useState<SegmentationType>('rfm');
   
   const [formData, setFormData] = useState({
     genre: "",
@@ -318,12 +324,13 @@ export default function InsightsPlanner() {
   const handleRunClustering = async () => {
     setClusteringLoading(true);
     try {
-      console.log("🔬 Running clustering with method:", clusteringMethod);
+      console.log("🔬 Running clustering with method:", clusteringMethod, "type:", segmentationType);
       
       const response = await supabase.functions.invoke('clustering', {
         body: {
           method: clusteringMethod,
           params: clusteringParams,
+          segmentationType
         }
       });
 
@@ -334,20 +341,21 @@ export default function InsightsPlanner() {
       if (response.data.success) {
         setClusteringResult(response.data);
         toast({
-          title: "Clustering concluído!",
-          description: `${response.data.clusters.length} clusters identificados com ${response.data.totalCustomers} clientes`,
+          title: "Segmentação concluída!",
+          description: `${response.data.clusters.length} segmentos identificados com ${response.data.totalCustomers} clientes`,
         });
       }
     } catch (error) {
       console.error("Clustering error:", error);
       toast({
-        title: "Erro no clustering",
+        title: "Erro na segmentação",
         description: error instanceof Error ? error.message : "Falha ao executar algoritmo",
         variant: "destructive",
       });
     } finally {
       setClusteringLoading(false);
     }
+  };
   };
 
   const generateEnhancedRevenueData = (requestData: any, segments: AdvancedSegment[]): RevenueAnalysis => {
@@ -1449,83 +1457,173 @@ export default function InsightsPlanner() {
 
         {/* Clustering Tab */}
         <TabsContent value="clustering" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ClusteringConfig
-              method={clusteringMethod}
-              params={clusteringParams}
-              onMethodChange={setClusteringMethod}
-              onParamChange={(key, value) => 
-                setClusteringParams(prev => ({ ...prev, [key]: value }))
-              }
-              onRun={handleRunClustering}
-              isLoading={clusteringLoading}
-            />
-
-            {clusteringResult && (
-              <ClusterQuality
-                silhouetteScore={clusteringResult.metrics.silhouetteScore}
-                daviesBouldinScore={clusteringResult.metrics.daviesBouldinScore}
-                clusterSizes={clusteringResult.metrics.clusterSizes}
-                method={clusteringMethod}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Segmentação Inteligente de Clientes
+              </CardTitle>
+              <CardDescription>
+                Identifique e analise grupos de clientes com características similares
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <SegmentationTypeSelector 
+                value={segmentationType}
+                onChange={setSegmentationType}
               />
-            )}
-          </div>
+
+              <ClusteringConfig
+                method={clusteringMethod}
+                params={clusteringParams}
+                onMethodChange={setClusteringMethod}
+                onParamChange={(key, value) => 
+                  setClusteringParams(prev => ({ ...prev, [key]: value }))
+                }
+                onRun={handleRunClustering}
+                isLoading={clusteringLoading}
+              />
+            </CardContent>
+          </Card>
 
           {clusteringResult && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Clusters Identificados
-                </CardTitle>
-                <CardDescription>
-                  Segmentos de clientes baseados em RFM (Recência, Frequência, Monetário)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Cluster</TableHead>
-                      <TableHead>Tamanho</TableHead>
-                      <TableHead>% Total</TableHead>
-                      <TableHead>Recência Média (dias)</TableHead>
-                      <TableHead>Frequência Média</TableHead>
-                      <TableHead>Monetário Médio (R$)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {clusteringResult.clusters.map((cluster: any) => (
-                      <TableRow key={cluster.cluster}>
-                        <TableCell>
-                          <Badge 
-                            variant={cluster.cluster === -1 ? "outline" : "default"}
-                            className="font-mono"
-                          >
-                            {cluster.cluster === -1 ? "Ruído" : `Cluster ${cluster.cluster}`}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">{cluster.size}</TableCell>
-                        <TableCell>{cluster.percentage.toFixed(1)}%</TableCell>
-                        <TableCell>{cluster.avgRecency.toFixed(0)}</TableCell>
-                        <TableCell>{cluster.avgFrequency.toFixed(1)}</TableCell>
-                        <TableCell>R$ {cluster.avgMonetary.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+            <>
+              {/* Clustering Quality Metrics */}
+              <ClusterQuality
+                silhouetteScore={clusteringResult.metrics?.silhouetteScore}
+                daviesBouldinScore={clusteringResult.metrics?.daviesBouldinScore}
+                clusterSizes={clusteringResult.metrics?.clusterSizes || []}
+                method={clusteringMethod}
+              />
 
-                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                  <h4 className="font-semibold mb-2">Como interpretar:</h4>
-                  <ul className="text-sm space-y-1 text-muted-foreground">
-                    <li>• <strong>Recência:</strong> Dias desde a última interação (menor = mais ativo)</li>
-                    <li>• <strong>Frequência:</strong> Número de interações/compras (maior = mais engajado)</li>
-                    <li>• <strong>Monetário:</strong> Valor total gasto (maior = mais valioso)</li>
-                    <li>• <strong>Ruído:</strong> Pontos que não se encaixam bem em nenhum cluster (apenas DBSCAN)</li>
-                  </ul>
+              {/* Visualizations */}
+              <ClusterVisualization
+                clusters={clusteringResult.clusters.map((cluster: any) => {
+                  const insight = segmentationType === 'rfm' 
+                    ? getRFMSegmentName({
+                        avgRecency: cluster.avgRecency || 0,
+                        avgFrequency: cluster.avgFrequency || 0,
+                        avgMonetary: cluster.avgMonetary || 0
+                      })
+                    : { name: `Cluster ${cluster.cluster}`, color: 'hsl(var(--primary))' };
+                  
+                  return {
+                    cluster: cluster.cluster,
+                    name: insight.name,
+                    size: cluster.size,
+                    percentage: cluster.percentage,
+                    avgRecency: cluster.avgRecency,
+                    avgFrequency: cluster.avgFrequency,
+                    avgMonetary: cluster.avgMonetary,
+                    color: insight.color
+                  };
+                })}
+                type={segmentationType}
+              />
+
+              {/* Segment Insights */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Insights dos Segmentos</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Análise detalhada de cada segmento com estratégias recomendadas
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {clusteringResult.clusters
+                    .filter((cluster: any) => cluster.cluster !== -1)
+                    .map((cluster: any) => {
+                      const insight = segmentationType === 'rfm' 
+                        ? getRFMSegmentName({
+                            avgRecency: cluster.avgRecency || 0,
+                            avgFrequency: cluster.avgFrequency || 0,
+                            avgMonetary: cluster.avgMonetary || 0
+                          })
+                        : segmentationType === 'demographic'
+                        ? getDemographicInsight('26-35', 'M', 'São Paulo')
+                        : segmentationType === 'behavioral'
+                        ? getBehavioralInsight(30, 15)
+                        : getMusicalInsight('pop');
+                      
+                      return (
+                        <SegmentInsightCard
+                          key={cluster.cluster}
+                          insight={insight}
+                          size={cluster.size}
+                          percentage={cluster.percentage}
+                          totalValue={cluster.avgMonetary ? cluster.avgMonetary * cluster.size : undefined}
+                        />
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Summary Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resumo da Segmentação</CardTitle>
+                  <CardDescription>
+                    Visão geral dos segmentos identificados
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Segmento</TableHead>
+                        <TableHead>Tamanho</TableHead>
+                        <TableHead>Percentual</TableHead>
+                        {segmentationType === 'rfm' && (
+                          <>
+                            <TableHead>Recência Média</TableHead>
+                            <TableHead>Frequência Média</TableHead>
+                            <TableHead>Valor Médio</TableHead>
+                          </>
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clusteringResult.clusters.map((cluster: any) => {
+                        const insight = segmentationType === 'rfm' 
+                          ? getRFMSegmentName({
+                              avgRecency: cluster.avgRecency || 0,
+                              avgFrequency: cluster.avgFrequency || 0,
+                              avgMonetary: cluster.avgMonetary || 0
+                            })
+                          : { name: cluster.cluster === -1 ? 'Ruído' : `Cluster ${cluster.cluster}` };
+                        
+                        return (
+                          <TableRow key={cluster.cluster}>
+                            <TableCell className="font-medium">
+                              {cluster.cluster === -1 ? (
+                                <Badge variant="outline">Ruído</Badge>
+                              ) : (
+                                insight.name
+                              )}
+                            </TableCell>
+                            <TableCell>{cluster.size}</TableCell>
+                            <TableCell>{cluster.percentage.toFixed(1)}%</TableCell>
+                            {segmentationType === 'rfm' && (
+                              <>
+                                <TableCell>{cluster.avgRecency?.toFixed(0)} dias</TableCell>
+                                <TableCell>{cluster.avgFrequency?.toFixed(1)}</TableCell>
+                                <TableCell>
+                                  {new Intl.NumberFormat('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL'
+                                  }).format(cluster.avgMonetary || 0)}
+                                </TableCell>
+                              </>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
       </Tabs>
