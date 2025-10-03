@@ -14,6 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      analysis_runs: {
+        Row: {
+          constraints_json: Json | null
+          created_at: string | null
+          event_id: string | null
+          goal: string
+          id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          constraints_json?: Json | null
+          created_at?: string | null
+          event_id?: string | null
+          goal: string
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          constraints_json?: Json | null
+          created_at?: string | null
+          event_id?: string | null
+          goal?: string
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_runs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analysis_runs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "analysis_runs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_analogs"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "analysis_runs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_context"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "analysis_runs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_perf"
+            referencedColumns: ["event_id"]
+          },
+        ]
+      }
+      benchmarks: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string | null
+          value: number
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string | null
+          value: number
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
       consumptions: {
         Row: {
           customerid: number
@@ -117,6 +204,35 @@ export type Database = {
         }
         Relationships: []
       }
+      data_profiles: {
+        Row: {
+          created_at: string | null
+          id: string
+          payload_json: Json
+          run_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          payload_json: Json
+          run_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          payload_json?: Json
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_profiles_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           artist: string
@@ -185,6 +301,35 @@ export type Database = {
           venue?: string
         }
         Relationships: []
+      }
+      findings: {
+        Row: {
+          created_at: string | null
+          id: string
+          payload_json: Json
+          run_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          payload_json: Json
+          run_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          payload_json?: Json
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "findings_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       interactions: {
         Row: {
@@ -411,6 +556,73 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_event_perf"
             referencedColumns: ["event_id"]
+          },
+        ]
+      }
+      strategies: {
+        Row: {
+          created_at: string | null
+          id: string
+          payload_json: Json
+          run_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          payload_json: Json
+          run_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          payload_json?: Json
+          run_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategies_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategy_validations: {
+        Row: {
+          created_at: string | null
+          id: string
+          ok: boolean
+          reasons_json: Json | null
+          strategy_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          ok: boolean
+          reasons_json?: Json | null
+          strategy_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          ok?: boolean
+          reasons_json?: Json | null
+          strategy_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_validations_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
           },
         ]
       }
