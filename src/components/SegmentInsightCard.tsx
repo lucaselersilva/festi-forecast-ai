@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Users, TrendingUp, Target, Lightbulb } from "lucide-react";
 import { SegmentInsight } from "@/lib/segmentationHelpers";
 
@@ -8,13 +9,15 @@ interface SegmentInsightCardProps {
   size: number;
   percentage: number;
   totalValue?: number;
+  isLoading?: boolean;
 }
 
 export function SegmentInsightCard({ 
   insight, 
   size, 
   percentage,
-  totalValue 
+  totalValue,
+  isLoading = false
 }: SegmentInsightCardProps) {
   const priorityVariant = {
     high: 'destructive' as const,
@@ -27,6 +30,50 @@ export function SegmentInsightCard({
     medium: 'Média Prioridade',
     low: 'Baixa Prioridade'
   };
+
+  if (isLoading) {
+    return (
+      <Card className="overflow-hidden border-l-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+            <Skeleton className="h-6 w-24" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+            {totalValue !== undefined && (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="overflow-hidden border-l-4" style={{ borderLeftColor: insight.color }}>

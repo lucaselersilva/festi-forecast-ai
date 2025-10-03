@@ -150,6 +150,8 @@ export default function InsightsPlanner() {
   });
   const [clusteringLoading, setClusteringLoading] = useState(false);
   const [clusteringResult, setClusteringResult] = useState<any>(null);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [generatedInsights, setGeneratedInsights] = useState<Map<number, any>>(new Map());
   
   const [formData, setFormData] = useState({
     genre: "",
@@ -359,6 +361,9 @@ export default function InsightsPlanner() {
           title: "Clustering concluído!",
           description: `${response.data.clusters.length} clusters identificados com ${response.data.totalCustomers} clientes`,
         });
+        
+        // Generate AI insights after successful clustering
+        await generateInsightsForAllClusters(response.data);
       }
     } catch (error) {
       console.error("Clustering error:", error);
@@ -369,6 +374,72 @@ export default function InsightsPlanner() {
       });
     } finally {
       setClusteringLoading(false);
+    }
+  };
+
+  const generateInsightsForAllClusters = async (clusteringData: any) => {
+    setIsGeneratingInsights(true);
+    
+    try {
+      console.log(`🤖 Generating AI insights for ${clusteringData.clusters.length} clusters...`);
+      
+      const clustersData = clusteringData.clusters
+        .filter((c: any) => c.cluster !== -1)
+        .map((cluster: any, idx: number) => ({
+          id: cluster.cluster,
+          name: getClusterName(cluster, segmentationType),
+          size: cluster.size,
+          percentage: (cluster.size / clusteringData.totalCustomers) * 100,
+          avgFeatures: cluster.avgFeatures || [],
+          dominantGender: cluster.dominantGender,
+          dominantCity: cluster.dominantCity,
+          dominantGenre: cluster.dominantGenre
+        }));
+      
+      const { data, error } = await supabase.functions.invoke('generate-segment-insights', {
+        body: {
+          segmentationType: segmentationType,
+          clusters: clustersData,
+          percentiles: clusteringData.percentiles,
+          totalCustomers: clusteringData.totalCustomers
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data.success) {
+        const insightsMap = new Map();
+        data.insights.forEach((insight: any) => {
+          insightsMap.set(insight.clusterId, insight);
+        });
+        
+        setGeneratedInsights(insightsMap);
+        
+        if (data.failed > 0) {
+          toast({ 
+            title: "Insights gerados parcialmente", 
+            description: `${data.insights.length} de ${data.total} segmentos analisados pela IA`,
+            variant: "default"
+          });
+        } else {
+          toast({ 
+            title: "Insights gerados com sucesso!", 
+            description: `${data.insights.length} segmentos analisados pela IA` 
+          });
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error generating insights:', error);
+      toast({ 
+        title: "Erro ao gerar insights", 
+        description: "Usando insights padrão. Verifique os logs.",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsGeneratingInsights(false);
     }
   };
 
@@ -1808,28 +1879,94 @@ export default function InsightsPlanner() {
           </div>
 
           {/* Semantic Insights Section */}
-          {clusteringResult && segmentationType === 'rfm' && (
+          {clusteringResult && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold">Insights Semânticos por Segmento</h3>
                   <p className="text-sm text-muted-foreground">
-                    Perfis de negócio e estratégias recomendadas para cada cluster
+                    {isGeneratingInsights 
+                      ? 'Gerando insights com IA...' 
+                      : 'Perfis de negócio e estratégias recomendadas para cada cluster'}
                   </p>
                 </div>
+                {isGeneratingInsights && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Activity className="h-4 w-4 animate-spin" />
+                    Analisando {clusteringResult.clusters.filter((c: any) => c.cluster !== -1).length} segmentos...
+                  </div>
+                )}
               </div>
               
               <div className="grid gap-4 md:grid-cols-2">
                 {clusteringResult.clusters
                   .filter((cluster: any) => cluster.cluster !== -1)
                   .map((cluster: any) => {
-                    const insight = getRFMSegmentName({
-                      avgRecency: cluster.avgFeatures?.[0] || 0,
-                      avgFrequency: cluster.avgFeatures?.[1] || 0,
-                      avgMonetary: cluster.avgFeatures?.[2] || 0,
-                    });
+                    // Get AI-generated insight if available
+                    const aiInsight = generatedInsights.get(cluster.cluster);
                     
-                    const totalValue = cluster.avgFeatures?.[2] ? cluster.size * cluster.avgFeatures[2] : 0;
+                    // Fallback to static insights if AI insight not available
+                    let fallbackInsight;
+                    const percentiles = clusteringResult?.percentiles;
+                    
+                    if (segmentationType === 'rfm') {
+                      fallbackInsight = percentiles && percentiles.recency && percentiles.frequency && percentiles.monetary
+                        ? getRFMSegmentNameDynamic({
+                            avgRecency: cluster.avgFeatures?.[0] || 0,
+                            avgFrequency: cluster.avgFeatures?.[1] || 0,
+                            avgMonetary: cluster.avgFeatures?.[2] || 0,
+                          }, percentiles)
+                        : getRFMSegmentName({
+                            avgRecency: cluster.avgFeatures?.[0] || 0,
+                            avgFrequency: cluster.avgFeatures?.[1] || 0,
+                            avgMonetary: cluster.avgFeatures?.[2] || 0,
+                          });
+                    } else if (segmentationType === 'demographic') {
+                      fallbackInsight = percentiles && percentiles.age
+                        ? getDemographicInsightDynamic(
+                            cluster.avgAge || cluster.avgFeatures?.[0] || 0,
+                            cluster.dominantGender || 'M',
+                            cluster.dominantCity || '',
+                            percentiles
+                          )
+                        : getDemographicInsight(
+                            cluster.avgAge < 25 ? '18-24' : cluster.avgAge < 35 ? '25-34' : cluster.avgAge < 50 ? '35-49' : '50+',
+                            cluster.dominantGender || 'M',
+                            cluster.dominantCity || ''
+                          );
+                    } else if (segmentationType === 'behavioral') {
+                      fallbackInsight = percentiles && percentiles.purchases && percentiles.daysBetween && percentiles.purchaseValue
+                        ? getBehavioralInsightDynamic(
+                            cluster.avgPurchases || 0,
+                            cluster.avgDaysBetween || 0,
+                            cluster.avgPurchaseValue || 0,
+                            percentiles
+                          )
+                        : getBehavioralInsight(
+                            cluster.avgDaysBetween || 0,
+                            cluster.avgPurchaseValue > 150 ? 14 : cluster.avgPurchaseValue > 80 ? 7 : 1
+                          );
+                    } else if (segmentationType === 'musical') {
+                      fallbackInsight = percentiles && percentiles.interactions && percentiles.spent
+                        ? getMusicalInsightDynamic(
+                            cluster.dominantGenre || '',
+                            cluster.avgInteractions || 0,
+                            cluster.avgSpent || 0,
+                            percentiles
+                          )
+                        : getMusicalInsight(cluster.dominantGenre || '');
+                    }
+                    
+                    const insight = aiInsight ? {
+                      name: getClusterName(cluster, segmentationType),
+                      description: aiInsight.description,
+                      characteristics: aiInsight.characteristics,
+                      strategies: aiInsight.strategies,
+                      priority: aiInsight.priority,
+                      color: `hsl(${(cluster.cluster * 360) / clusteringResult.clusters.filter((c: any) => c.cluster !== -1).length}, 70%, 50%)`
+                    } : fallbackInsight;
+                    
+                    const totalValue = cluster.avgFeatures?.[2] ? cluster.size * cluster.avgFeatures[2] : undefined;
                     
                     return (
                       <SegmentInsightCard
@@ -1838,6 +1975,7 @@ export default function InsightsPlanner() {
                         size={cluster.size}
                         percentage={(cluster.size / clusteringResult.totalCustomers) * 100}
                         totalValue={totalValue}
+                        isLoading={isGeneratingInsights && !aiInsight}
                       />
                     );
                   })}
