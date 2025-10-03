@@ -10,6 +10,7 @@ interface ClusterQualityProps {
   noiseRatio?: number;
   clusterSizes: Record<number, number>;
   method: string;
+  clusterNames?: Map<number, string>;
 }
 
 export function ClusterQuality({ 
@@ -17,7 +18,8 @@ export function ClusterQuality({
   daviesBouldinScore, 
   noiseRatio,
   clusterSizes,
-  method 
+  method,
+  clusterNames
 }: ClusterQualityProps) {
   const totalPoints = Object.values(clusterSizes).reduce((a, b) => a + b, 0);
   
@@ -146,7 +148,10 @@ export function ClusterQuality({
               <div key={clusterId} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">
-                    Cluster {parseInt(clusterId) === -1 ? 'Ruído' : parseInt(clusterId) + 1}
+                    {parseInt(clusterId) === -1 
+                      ? 'Ruído' 
+                      : clusterNames?.get(parseInt(clusterId)) || `Cluster ${parseInt(clusterId) + 1}`
+                    }
                   </span>
                   <span className="text-muted-foreground">
                     {size} ({((size / totalPoints) * 100).toFixed(1)}%)

@@ -377,14 +377,25 @@ export default function InsightsPlanner() {
         description: "Buscando dados dos clientes",
       });
 
-      // Buscar dados completos dos clientes
+      // Buscar dados completos dos clientes através da view vw_rfm_customer
       const allCustomerIds = clusteringResult.clusters
         .flatMap((cluster: any) => cluster.customerIds);
       
+      // Primeiro verificar quais IDs existem na view RFM
+      const { data: rfmData, error: rfmError } = await supabase
+        .from('vw_rfm_customer')
+        .select('customer_id')
+        .in('customer_id', allCustomerIds);
+
+      if (rfmError) throw rfmError;
+
+      const validCustomerIds = (rfmData || []).map(r => r.customer_id);
+      
+      // Buscar dados dos clientes válidos
       const { data: customers, error } = await supabase
         .from('customers')
         .select('id, name, phone, email')
-        .in('id', allCustomerIds);
+        .in('id', validCustomerIds);
 
       if (error) throw error;
 
@@ -1625,6 +1636,12 @@ export default function InsightsPlanner() {
                     noiseRatio={clusteringResult.metrics?.noiseRatio}
                     clusterSizes={clusteringResult.metrics?.clusterSizes || []}
                     method={clusteringMethod}
+                    clusterNames={new Map(
+                      clusteringResult.clusters.map((cluster: any) => [
+                        cluster.cluster,
+                        getClusterName(cluster, segmentationType)
+                      ])
+                    )}
                   />
 
                   <Card>
