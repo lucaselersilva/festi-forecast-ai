@@ -163,19 +163,10 @@ export default function Clustering() {
       const allCustomerIds = clusteringResult.clusters
         .flatMap((cluster: any) => cluster.customerIds);
       
-      const { data: rfmData, error: rfmError } = await supabase
-        .from('vw_rfm_customer')
-        .select('customer_id')
-        .in('customer_id', allCustomerIds);
-
-      if (rfmError) throw rfmError;
-
-      const validCustomerIds = (rfmData || []).map(r => r.customer_id);
-      
       const { data: customers, error } = await supabase
         .from('customers')
         .select('id, name, phone, email')
-        .in('id', validCustomerIds);
+        .in('id', allCustomerIds);
 
       if (error) throw error;
 
