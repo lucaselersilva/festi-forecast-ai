@@ -24,7 +24,7 @@ const STEPS = [
 export default function Orchestrator() {
   const [currentStep, setCurrentStep] = useState(0);
   const [runId, setRunId] = useState<string | null>(null);
-  const [eventId, setEventId] = useState<string>("");
+  const [newEvent, setNewEvent] = useState<any>({});
   const [goal, setGoal] = useState<string>("boost_revenue");
   const [constraints, setConstraints] = useState<any>({});
   const [plan, setPlan] = useState<any>(null);
@@ -44,7 +44,7 @@ export default function Orchestrator() {
       const { data, error } = await supabase.functions.invoke('orchestrator', {
         body: {
           action: 'plan',
-          payload: { eventId, goal, constraints }
+          payload: { newEvent, goal, constraints }
         }
       });
 
@@ -264,8 +264,8 @@ export default function Orchestrator() {
       {/* Step Content */}
       {currentStep === 0 && (
         <ObjectiveForm
-          eventId={eventId}
-          setEventId={setEventId}
+          newEvent={newEvent}
+          setNewEvent={setNewEvent}
           goal={goal}
           setGoal={setGoal}
           constraints={constraints}
@@ -322,7 +322,7 @@ export default function Orchestrator() {
               key={idx}
               strategy={strategy}
               runId={runId!}
-              eventId={eventId}
+              eventId={null}
               constraints={constraints}
             />
           ))}
@@ -342,6 +342,7 @@ export default function Orchestrator() {
             <Button variant="outline" onClick={() => {
               setCurrentStep(0);
               setRunId(null);
+              setNewEvent({});
               setPlan(null);
               setDataProfile(null);
               setHypotheses([]);

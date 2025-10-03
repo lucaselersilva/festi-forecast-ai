@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           constraints_json: Json | null
           created_at: string | null
+          event_context_json: Json | null
           event_id: string | null
           goal: string
           id: string
@@ -27,6 +28,7 @@ export type Database = {
         Insert: {
           constraints_json?: Json | null
           created_at?: string | null
+          event_context_json?: Json | null
           event_id?: string | null
           goal: string
           id?: string
@@ -36,6 +38,7 @@ export type Database = {
         Update: {
           constraints_json?: Json | null
           created_at?: string | null
+          event_context_json?: Json | null
           event_id?: string | null
           goal?: string
           id?: string

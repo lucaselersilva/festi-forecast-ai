@@ -113,14 +113,15 @@ serve(async (req) => {
 
     switch (action) {
       case 'plan': {
-        // Step 1: Planner generates data plan
-        const { eventId, goal, constraints } = payload;
+        // Step 1: Planner generates data plan for NEW event
+        const { newEvent, goal, constraints } = payload;
         
-        // Create analysis run
+        // Create analysis run with new event context
         const { data: run, error: runError } = await supabase
           .from('analysis_runs')
           .insert({
-            event_id: eventId,
+            event_id: null,
+            event_context_json: newEvent,
             goal,
             constraints_json: constraints,
             status: 'planning'
@@ -130,14 +131,63 @@ serve(async (req) => {
 
         if (runError) throw runError;
 
-        // Get event context
-        const { data: event } = await supabase
-          .from('events')
+        // Find analogous events based on genre and city
+        const { data: analogEvents } = await supabase
+          .from('vw_event_analogs')
           .select('*')
-          .eq('id', eventId)
-          .single();
+          .eq('genre', newEvent.genre)
+          .eq('city', newEvent.city)
+          .order('month_bucket', { ascending: false })
+          .limit(10);
 
-        // Call Planner LLM
+        console.log(`📊 Found ${analogEvents?.length || 0} analogous events for ${newEvent.genre} in ${newEvent.city}`);
+
+        // Get market statistics
+        const { data: marketStats } = await supabase
+          .from('vw_segment_forecast')
+          .select('*')
+          .eq('genre', newEvent.genre)
+          .eq('city', newEvent.city)
+          .limit(5);
+
+        const analogContext = analogEvents && analogEvents.length > 0 
+          ? {
+              count: analogEvents.length,
+              avg_occupancy: analogEvents.reduce((acc, e) => acc + (e.occupancy_rate || 0), 0) / analogEvents.length,
+              avg_revenue: analogEvents.reduce((acc, e) => acc + (e.revenue || 0), 0) / analogEvents.length,
+              avg_price: analogEvents.reduce((acc, e) => acc + (e.avg_price || 0), 0) / analogEvents.length
+            }
+          : null;
+
+        const enrichedContext = `
+NEW EVENT:
+- Artist: ${newEvent.artist}
+- Genre: ${newEvent.genre}
+- City: ${newEvent.city}
+- Capacity: ${newEvent.capacity}
+- Expected Avg Price: R$${newEvent.avgPrice || 'N/A'}
+
+ANALOGOUS EVENTS (${analogEvents?.length || 0} found):
+${analogContext ? `
+- Avg Occupancy: ${(analogContext.avg_occupancy * 100).toFixed(1)}%
+- Avg Revenue: R$${analogContext.avg_revenue.toFixed(0)}
+- Avg Price: R$${analogContext.avg_price.toFixed(0)}
+` : 'No sufficient data for this genre/city combination'}
+
+MARKET SEGMENTS:
+${marketStats?.map(s => `- ${s.segment}: ${s.customers} customers, avg spend R$${s.avg_monetary_total}`).join('\n') || 'No segment data'}
+
+GOAL: ${goal}
+CONSTRAINTS: ${JSON.stringify(constraints)}
+
+Generate SQL queries to:
+1. Find customers in ${newEvent.city} who like ${newEvent.genre}
+2. Identify high-value segments (RFM analysis)
+3. Analyze past consumption patterns
+4. Find at-risk customers if goal is reactivation
+`;
+
+        // Call Planner LLM with enriched context
         const plannerResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -148,7 +198,7 @@ serve(async (req) => {
             model: 'gpt-4o-mini',
             messages: [
               { role: 'system', content: PLANNER_PROMPT },
-              { role: 'user', content: `Goal: ${goal}\nEvent: ${JSON.stringify(event)}\nConstraints: ${JSON.stringify(constraints)}` }
+              { role: 'user', content: enrichedContext }
             ],
             response_format: { type: 'json_object' },
             temperature: 0.7,

@@ -9,8 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Target } from "lucide-react";
 
 interface Props {
-  eventId: string;
-  setEventId: (id: string) => void;
+  newEvent: any;
+  setNewEvent: (event: any) => void;
   goal: string;
   setGoal: (goal: string) => void;
   constraints: any;
@@ -20,8 +20,8 @@ interface Props {
 }
 
 export default function ObjectiveForm({
-  eventId,
-  setEventId,
+  newEvent,
+  setNewEvent,
   goal,
   setGoal,
   constraints,
@@ -29,21 +29,23 @@ export default function ObjectiveForm({
   onGenerate,
   loading
 }: Props) {
-  const [events, setEvents] = useState<any[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
 
   useEffect(() => {
-    loadEvents();
+    loadCities();
   }, []);
 
-  const loadEvents = async () => {
+  const loadCities = async () => {
     const { data } = await supabase
       .from('events')
-      .select('id, artist, date, city, genre')
-      .order('date', { ascending: false })
-      .limit(50);
+      .select('city')
+      .order('city');
     
-    if (data) setEvents(data);
+    if (data) {
+      const uniqueCities = [...new Set(data.map(e => e.city))];
+      setCities(uniqueCities);
+    }
   };
 
   const toggleChannel = (channel: string) => {
@@ -63,25 +65,73 @@ export default function ObjectiveForm({
         <h2 className="text-2xl font-bold">Passo 1: Objetivo & Contexto</h2>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label>Evento</Label>
-          <Select value={eventId} onValueChange={setEventId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione um evento" />
-            </SelectTrigger>
-            <SelectContent>
-              {events.map(event => (
-                <SelectItem key={event.id} value={event.id}>
-                  {event.artist} - {event.city} ({new Date(event.date).toLocaleDateString()})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Nome do Artista/Evento</Label>
+            <Input
+              placeholder="Ex: Jorge & Mateus"
+              value={newEvent.artist || ''}
+              onChange={(e) => setNewEvent({ ...newEvent, artist: e.target.value })}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Gênero Musical</Label>
+            <Select value={newEvent.genre || ''} onValueChange={(val) => setNewEvent({ ...newEvent, genre: val })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o gênero" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Sertanejo">Sertanejo</SelectItem>
+                <SelectItem value="Rock">Rock</SelectItem>
+                <SelectItem value="Pop">Pop</SelectItem>
+                <SelectItem value="Eletrônica">Eletrônica</SelectItem>
+                <SelectItem value="Pagode">Pagode</SelectItem>
+                <SelectItem value="Funk">Funk</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Cidade</Label>
+            <Select value={newEvent.city || ''} onValueChange={(val) => setNewEvent({ ...newEvent, city: val })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a cidade" />
+              </SelectTrigger>
+              <SelectContent>
+                {cities.map(city => (
+                  <SelectItem key={city} value={city}>{city}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Capacidade do Evento</Label>
+            <Input
+              type="number"
+              placeholder="Ex: 5000"
+              value={newEvent.capacity || ''}
+              onChange={(e) => setNewEvent({ ...newEvent, capacity: parseInt(e.target.value) })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Preço Médio do Ingresso (R$)</Label>
+            <Input
+              type="number"
+              placeholder="Ex: 150"
+              value={newEvent.avgPrice || ''}
+              onChange={(e) => setNewEvent({ ...newEvent, avgPrice: parseInt(e.target.value) })}
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
-          <Label>Objetivo</Label>
+          <Label>Objetivo da Campanha</Label>
           <Select value={goal} onValueChange={setGoal}>
             <SelectTrigger>
               <SelectValue />
@@ -147,7 +197,7 @@ export default function ObjectiveForm({
 
       <Button
         onClick={onGenerate}
-        disabled={!eventId || loading}
+        disabled={!newEvent.artist || !newEvent.genre || !newEvent.city || loading}
         className="w-full"
         size="lg"
       >
