@@ -156,7 +156,11 @@ serve(async (req) => {
         });
 
         const plannerData = await plannerResponse.json();
-        const plan = JSON.parse(plannerData.choices[0].message.content);
+        const parsedPlan = JSON.parse(plannerData.choices[0].message.content);
+        
+        // Extract inner 'plan' if it exists (avoiding double-nesting)
+        const plan = parsedPlan.plan || parsedPlan;
+        console.log('📋 Generated plan:', JSON.stringify(plan, null, 2));
 
         return new Response(JSON.stringify({ success: true, runId: run.id, plan }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
