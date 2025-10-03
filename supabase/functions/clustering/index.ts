@@ -318,20 +318,20 @@ serve(async (req) => {
     // Prepare feature matrix based on segmentation type
     let data: number[][];
     
-    if (config.encodeFields && config.encodeFields.length > 0) {
+    if ('encodeFields' in config && config.encodeFields && config.encodeFields.length > 0) {
       // For segmentations with categorical fields
-      const numericFeatures = config.featureFields.map(field => 
+      const numericFeatures = config.featureFields.map((field: string) => 
         features.map((f: any) => f[field] || 0)
       );
       
-      const encodedFeatures = config.encodeFields.map(field =>
+      const encodedFeatures = config.encodeFields.map((field: string) =>
         encodeCategorical(features.map((f: any) => f[field] || ''))
       );
       
       // Transpose to get rows per customer
       data = features.map((_, idx) => [
-        ...numericFeatures.map(feat => feat[idx]),
-        ...encodedFeatures.map(feat => feat[idx])
+        ...numericFeatures.map((feat: number[]) => feat[idx]),
+        ...encodedFeatures.map((feat: number[]) => feat[idx])
       ]);
     } else {
       // For purely numeric segmentations
@@ -397,7 +397,7 @@ serve(async (req) => {
         customerIds: members.map(m => m.customer_id),
       };
 
-      // Add named average features based on segmentation type
+      // Add named average features based on segmentation type with decoded values
       if (segmentationType === 'rfm') {
         clusterObj.avgRecency = avgFeatures[0];
         clusterObj.avgFrequency = avgFeatures[1];
@@ -406,6 +406,23 @@ serve(async (req) => {
         clusterObj.avgAge = avgFeatures[0];
         clusterObj.avgGenderCode = avgFeatures[1];
         clusterObj.avgCityCode = avgFeatures[2];
+        
+        // Decode gender (M=0, F=1)
+        clusterObj.dominantGender = avgFeatures[1] > 0.5 ? 'F' : 'M';
+        
+        // Decode city - find most common city in cluster
+        const cityCounts: Record<string, number> = {};
+        members.forEach(member => {
+          const row = features.find((r: any) => r.customer_id === member.customer_id);
+          if (row && row.city) {
+            cityCounts[row.city] = (cityCounts[row.city] || 0) + 1;
+          }
+        });
+        if (Object.keys(cityCounts).length > 0) {
+          clusterObj.dominantCity = Object.keys(cityCounts).reduce((a, b) => 
+            cityCounts[a] > cityCounts[b] ? a : b
+          );
+        }
       } else if (segmentationType === 'behavioral') {
         clusterObj.avgPurchases = avgFeatures[0];
         clusterObj.avgDaysBetween = avgFeatures[1];
@@ -414,6 +431,20 @@ serve(async (req) => {
         clusterObj.avgInteractions = avgFeatures[0];
         clusterObj.avgSpent = avgFeatures[1];
         clusterObj.avgGenreCode = avgFeatures[2];
+        
+        // Decode genre - find most common genre in cluster
+        const genreCounts: Record<string, number> = {};
+        members.forEach(member => {
+          const row = features.find((r: any) => r.customer_id === member.customer_id);
+          if (row && row.preferred_genre) {
+            genreCounts[row.preferred_genre] = (genreCounts[row.preferred_genre] || 0) + 1;
+          }
+        });
+        if (Object.keys(genreCounts).length > 0) {
+          clusterObj.dominantGenre = Object.keys(genreCounts).reduce((a, b) => 
+            genreCounts[a] > genreCounts[b] ? a : b
+          );
+        }
       }
 
       // Store all average features for generic access
