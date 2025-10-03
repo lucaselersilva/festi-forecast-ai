@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Forecast from "./pages/Forecast";
 import InsightsPlanner from "./pages/InsightsPlanner";
+import Clustering from "./pages/Clustering";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/import" element={<Import />} />
             <Route path="/insights-planner" element={<InsightsPlanner />} />
+            <Route path="/clustering" element={<Clustering />} />
             <Route path="/events" element={<Events />} />
             <Route path="/sponsors" element={<Sponsors />} />
             <Route path="/sponsors" element={<Forecast />} />
