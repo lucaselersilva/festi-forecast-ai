@@ -14,7 +14,7 @@ interface ClusterData {
 
 interface ClusterVisualizationProps {
   clusters: ClusterData[];
-  type: 'rfm' | 'demographic' | 'behavioral' | 'musical';
+  type: 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
 }
 
 export function ClusterVisualization({ clusters, type }: ClusterVisualizationProps) {

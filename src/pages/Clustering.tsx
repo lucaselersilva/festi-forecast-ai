@@ -298,6 +298,11 @@ export default function Clustering() {
       }
       const insight = getMusicalInsight(cluster.dominantGenre);
       return insight.name;
+    } else if (type === 'multi-dimensional') {
+      const rfmSegment = cluster.dominantRfmSegment || 'Segmento';
+      const ageSegment = cluster.dominantAgeSegment || '';
+      const genre = cluster.dominantGenre || '';
+      return `${rfmSegment}${ageSegment ? ' ' + ageSegment : ''}${genre ? ' - ' + genre : ''}`;
     }
     
     return `Cluster ${cluster.cluster}`;

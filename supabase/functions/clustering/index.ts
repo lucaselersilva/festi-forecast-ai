@@ -315,6 +315,13 @@ serve(async (req) => {
         featureFields: ['interaction_count', 'total_spent'],
         featureNames: ['Interações', 'Valor Total', 'Gênero Preferido'],
         encodeFields: ['preferred_genre']
+      },
+      'multi-dimensional': {
+        view: 'vw_multi_segment',
+        idField: 'customer_id',
+        featureFields: ['recency_days', 'frequency', 'monetary_total', 'age', 'total_purchases', 'avg_days_between_purchases', 'genre_interaction_count'],
+        featureNames: ['Recência', 'Frequência', 'Monetary', 'Idade', 'Compras', 'Intervalo', 'Interações Gênero'],
+        encodeFields: ['gender', 'city', 'preferred_genre', 'age_segment', 'rfm_segment', 'engagement_segment']
       }
     };
 
@@ -396,6 +403,14 @@ serve(async (req) => {
     } else if (segmentationType === 'musical') {
       percentiles.interactions = rawPercentiles.feature_0;
       percentiles.spent = rawPercentiles.feature_1;
+    } else if (segmentationType === 'multi-dimensional') {
+      percentiles.recency = rawPercentiles.feature_0;
+      percentiles.frequency = rawPercentiles.feature_1;
+      percentiles.monetary = rawPercentiles.feature_2;
+      percentiles.age = rawPercentiles.feature_3;
+      percentiles.total_purchases = rawPercentiles.feature_4;
+      percentiles.avg_days_between_purchases = rawPercentiles.feature_5;
+      percentiles.genre_interaction_count = rawPercentiles.feature_6;
     }
     
     console.log(`📊 Calculated percentiles:`, percentiles);
@@ -503,6 +518,50 @@ serve(async (req) => {
             genreCounts[a] > genreCounts[b] ? a : b
           );
         }
+      } else if (segmentationType === 'multi-dimensional') {
+        // RFM features
+        clusterObj.avgRecency = avgFeatures[0];
+        clusterObj.avgFrequency = avgFeatures[1];
+        clusterObj.avgMonetary = avgFeatures[2];
+        // Demographic features
+        clusterObj.avgAge = avgFeatures[3];
+        // Behavioral features
+        clusterObj.avgPurchases = avgFeatures[4];
+        clusterObj.avgDaysBetween = avgFeatures[5];
+        // Musical features
+        clusterObj.avgGenreInteractions = avgFeatures[6];
+        
+        // Decode categorical fields
+        const genderCounts: Record<string, number> = {};
+        const cityCounts: Record<string, number> = {};
+        const genreCounts: Record<string, number> = {};
+        const ageSegmentCounts: Record<string, number> = {};
+        const rfmSegmentCounts: Record<string, number> = {};
+        const engagementSegmentCounts: Record<string, number> = {};
+        
+        members.forEach(member => {
+          const row = features.find((r: any) => r.customer_id === member.customer_id);
+          if (row) {
+            if (row.gender) genderCounts[row.gender] = (genderCounts[row.gender] || 0) + 1;
+            if (row.city) cityCounts[row.city] = (cityCounts[row.city] || 0) + 1;
+            if (row.preferred_genre) genreCounts[row.preferred_genre] = (genreCounts[row.preferred_genre] || 0) + 1;
+            if (row.age_segment) ageSegmentCounts[row.age_segment] = (ageSegmentCounts[row.age_segment] || 0) + 1;
+            if (row.rfm_segment) rfmSegmentCounts[row.rfm_segment] = (rfmSegmentCounts[row.rfm_segment] || 0) + 1;
+            if (row.engagement_segment) engagementSegmentCounts[row.engagement_segment] = (engagementSegmentCounts[row.engagement_segment] || 0) + 1;
+          }
+        });
+        
+        const getDominant = (counts: Record<string, number>) => {
+          if (Object.keys(counts).length === 0) return undefined;
+          return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        };
+        
+        clusterObj.dominantGender = getDominant(genderCounts);
+        clusterObj.dominantCity = getDominant(cityCounts);
+        clusterObj.dominantGenre = getDominant(genreCounts);
+        clusterObj.dominantAgeSegment = getDominant(ageSegmentCounts);
+        clusterObj.dominantRfmSegment = getDominant(rfmSegmentCounts);
+        clusterObj.dominantEngagementSegment = getDominant(engagementSegmentCounts);
       }
 
       // Store all average features for generic access

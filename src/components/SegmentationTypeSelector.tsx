@@ -1,9 +1,9 @@
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, TrendingUp, Activity, Music } from "lucide-react";
+import { Users, TrendingUp, Activity, Music, Target } from "lucide-react";
 
-export type SegmentationType = 'rfm' | 'demographic' | 'behavioral' | 'musical';
+export type SegmentationType = 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
 
 interface SegmentationTypeSelectorProps {
   value: SegmentationType;
@@ -39,6 +39,13 @@ export function SegmentationTypeSelector({ value, onChange }: SegmentationTypeSe
       description: 'Preferências de gênero',
       icon: Music,
       features: ['Gênero preferido', 'Diversidade', 'Frequência por gênero']
+    },
+    {
+      value: 'multi-dimensional' as const,
+      label: 'Multi-Dimensional',
+      description: 'Análise combinada RFM + Demografia + Comportamento + Música',
+      icon: Target,
+      features: ['RFM completo', 'Perfil demográfico', 'Padrão comportamental', 'Preferência musical']
     }
   ];
 
