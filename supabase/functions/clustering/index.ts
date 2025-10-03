@@ -245,19 +245,51 @@ serve(async (req) => {
   }
 
   try {
-    const { method, params } = await req.json();
+    const { method, params, segmentationType = 'rfm' } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log(`🔬 Running ${method} clustering...`);
+    console.log(`🔬 Running ${method} clustering for ${segmentationType} segmentation...`);
 
-    // Fetch RFM features
+    // Select view and fields based on segmentation type
+    const viewConfig = {
+      rfm: {
+        view: 'vw_rfm_customer',
+        idField: 'customer_id',
+        featureFields: ['recency_days', 'frequency_interactions', 'monetary_total'],
+        featureNames: ['Recência', 'Frequência', 'Valor Monetário']
+      },
+      demographic: {
+        view: 'vw_demographic_profile',
+        idField: 'customer_id',
+        featureFields: ['age'],
+        featureNames: ['Idade', 'Gênero', 'Cidade'],
+        encodeFields: ['gender', 'city']
+      },
+      behavioral: {
+        view: 'vw_digital_engagement',
+        idField: 'customer_id',
+        featureFields: ['total_purchases', 'avg_days_between_purchases', 'avg_purchase_value'],
+        featureNames: ['Total de Compras', 'Dias Entre Compras', 'Valor Médio']
+      },
+      musical: {
+        view: 'vw_musical_preference',
+        idField: 'customer_id',
+        featureFields: ['interaction_count', 'total_spent'],
+        featureNames: ['Interações', 'Valor Total', 'Gênero Preferido'],
+        encodeFields: ['preferred_genre']
+      }
+    };
+
+    const config = viewConfig[segmentationType as keyof typeof viewConfig] || viewConfig.rfm;
+
+    // Fetch features from selected view
     const { data: features, error: fetchError } = await supabase
-      .from('vw_rfm_customer')
+      .from(config.view)
       .select('*')
-      .order('customer_id');
+      .order(config.idField);
 
     if (fetchError) {
       throw new Error(`Failed to fetch features: ${fetchError.message}`);
@@ -276,14 +308,39 @@ serve(async (req) => {
 
     console.log(`📊 Extracted features for ${features.length} customers`);
 
-    // Prepare feature matrix
-    const data = features.map((f: any) => [
-      f.recency_days || 0,
-      f.frequency_interactions || 0,
-      f.monetary_total || 0,
-    ]);
+    // Helper function to encode categorical variables
+    const encodeCategorical = (values: string[]): number[] => {
+      const unique = [...new Set(values)];
+      const mapping = Object.fromEntries(unique.map((val, idx) => [val, idx]));
+      return values.map(val => mapping[val]);
+    };
 
-    const customerIds = features.map((f: any) => f.customer_id);
+    // Prepare feature matrix based on segmentation type
+    let data: number[][];
+    
+    if (config.encodeFields && config.encodeFields.length > 0) {
+      // For segmentations with categorical fields
+      const numericFeatures = config.featureFields.map(field => 
+        features.map((f: any) => f[field] || 0)
+      );
+      
+      const encodedFeatures = config.encodeFields.map(field =>
+        encodeCategorical(features.map((f: any) => f[field] || ''))
+      );
+      
+      // Transpose to get rows per customer
+      data = features.map((_, idx) => [
+        ...numericFeatures.map(feat => feat[idx]),
+        ...encodedFeatures.map(feat => feat[idx])
+      ]);
+    } else {
+      // For purely numeric segmentations
+      data = features.map((f: any) => 
+        config.featureFields.map(field => f[field] || 0)
+      );
+    }
+
+    const customerIds = features.map((f: any) => f[config.idField]);
 
     // Standardize if requested
     let processedData = data;
@@ -321,22 +378,48 @@ serve(async (req) => {
 
     const clusters = Object.entries(clusterMap).map(([cluster, members]) => {
       const clusterNum = parseInt(cluster);
-      const featureSums = [0, 0, 0];
+      const numFeatures = data[0].length;
+      const featureSums = new Array(numFeatures).fill(0);
+      
       members.forEach(m => {
         m.features.forEach((val: number, idx: number) => {
           featureSums[idx] += val;
         });
       });
       
-      return {
+      const avgFeatures = featureSums.map(sum => sum / members.length);
+      
+      // Build cluster object with dynamic features
+      const clusterObj: any = {
         cluster: clusterNum,
         size: members.length,
         percentage: (members.length / features.length) * 100,
-        avgRecency: featureSums[0] / members.length,
-        avgFrequency: featureSums[1] / members.length,
-        avgMonetary: featureSums[2] / members.length,
         customerIds: members.map(m => m.customer_id),
       };
+
+      // Add named average features based on segmentation type
+      if (segmentationType === 'rfm') {
+        clusterObj.avgRecency = avgFeatures[0];
+        clusterObj.avgFrequency = avgFeatures[1];
+        clusterObj.avgMonetary = avgFeatures[2];
+      } else if (segmentationType === 'demographic') {
+        clusterObj.avgAge = avgFeatures[0];
+        clusterObj.avgGenderCode = avgFeatures[1];
+        clusterObj.avgCityCode = avgFeatures[2];
+      } else if (segmentationType === 'behavioral') {
+        clusterObj.avgPurchases = avgFeatures[0];
+        clusterObj.avgDaysBetween = avgFeatures[1];
+        clusterObj.avgPurchaseValue = avgFeatures[2];
+      } else if (segmentationType === 'musical') {
+        clusterObj.avgInteractions = avgFeatures[0];
+        clusterObj.avgSpent = avgFeatures[1];
+        clusterObj.avgGenreCode = avgFeatures[2];
+      }
+
+      // Store all average features for generic access
+      clusterObj.avgFeatures = avgFeatures;
+      
+      return clusterObj;
     });
 
     console.log(`✅ Clustering complete: ${clusters.length} clusters found`);

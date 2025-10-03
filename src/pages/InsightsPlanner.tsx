@@ -335,6 +335,7 @@ export default function InsightsPlanner() {
         body: {
           method: clusteringMethod,
           params: clusteringParams,
+          segmentationType: segmentationType
         }
       });
 
