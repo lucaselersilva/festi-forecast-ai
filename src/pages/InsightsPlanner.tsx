@@ -14,7 +14,11 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { ClusteringConfig } from "@/components/ClusteringConfig";
 import { ClusterQuality } from "@/components/ClusterQuality";
+import { ClusterVisualization } from "@/components/ClusterVisualization";
+import { SegmentationTypeSelector, SegmentationType } from "@/components/SegmentationTypeSelector";
+import { SegmentInsightCard } from "@/components/SegmentInsightCard";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getRFMSegmentName } from "@/lib/segmentationHelpers";
 import axios from "axios";
 
 interface RevenueAnalysis {
@@ -124,6 +128,7 @@ export default function InsightsPlanner() {
   const [advancedSegments, setAdvancedSegments] = useState<AdvancedSegment[]>([]);
   
   // Clustering state
+  const [segmentationType, setSegmentationType] = useState<SegmentationType>('rfm');
   const [clusteringMethod, setClusteringMethod] = useState<'kmeans' | 'dbscan' | 'gmm'>('kmeans');
   const [clusteringParams, setClusteringParams] = useState({
     k: 4,
@@ -324,6 +329,7 @@ export default function InsightsPlanner() {
     setClusteringLoading(true);
     try {
       console.log("🔬 Running clustering with method:", clusteringMethod);
+      console.log("📊 Segmentation type:", segmentationType);
       
       const response = await supabase.functions.invoke('clustering', {
         body: {
@@ -352,6 +358,58 @@ export default function InsightsPlanner() {
       });
     } finally {
       setClusteringLoading(false);
+    }
+  };
+
+  const handleExportClusters = (format: 'csv' | 'json') => {
+    if (!clusteringResult) {
+      toast({
+        title: "Nenhum cluster para exportar",
+        description: "Execute a segmentação primeiro",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      let content = '';
+      let filename = '';
+      let mimeType = '';
+
+      if (format === 'csv') {
+        // CSV format: cluster,customer_ids
+        const lines = clusteringResult.clusters.map((cluster: any) => 
+          `${cluster.cluster},${cluster.size},"${cluster.customerIds.join(',')}"`
+        );
+        content = 'cluster,size,customer_ids\n' + lines.join('\n');
+        filename = `clusters-${Date.now()}.csv`;
+        mimeType = 'text/csv';
+      } else {
+        // JSON format
+        content = JSON.stringify(clusteringResult, null, 2);
+        filename = `clusters-${Date.now()}.json`;
+        mimeType = 'application/json';
+      }
+
+      const blob = new Blob([content], { type: mimeType });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Exportação concluída!",
+        description: `Arquivo ${filename} baixado com sucesso`,
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Erro na exportação",
+        description: "Falha ao exportar clusters",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1453,15 +1511,189 @@ export default function InsightsPlanner() {
         </TabsContent>
         
         <TabsContent value="clustering" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Segmentação de Clientes</CardTitle>
-              <CardDescription>Análise de clustering em desenvolvimento</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Funcionalidade em construção</p>
-            </CardContent>
-          </Card>
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Configuration Panel */}
+            <div className="space-y-6">
+              <SegmentationTypeSelector
+                value={segmentationType}
+                onChange={setSegmentationType}
+              />
+              
+              <ClusteringConfig
+                method={clusteringMethod}
+                params={clusteringParams}
+                onMethodChange={setClusteringMethod}
+                onParamChange={(key, value) => 
+                  setClusteringParams(prev => ({ ...prev, [key]: value }))
+                }
+                onRun={handleRunClustering}
+                isLoading={clusteringLoading}
+              />
+
+              {clusteringResult && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Download className="h-5 w-5" />
+                      Exportar Resultados
+                    </CardTitle>
+                    <CardDescription>
+                      Baixe os customer IDs por cluster
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button 
+                      onClick={() => handleExportClusters('csv')} 
+                      variant="outline" 
+                      className="w-full"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Exportar CSV
+                    </Button>
+                    <Button 
+                      onClick={() => handleExportClusters('json')} 
+                      variant="outline" 
+                      className="w-full"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Exportar JSON
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Results Panel */}
+            <div className="space-y-6">
+              {clusteringResult ? (
+                <>
+                  <ClusterQuality
+                    silhouetteScore={clusteringResult.metrics?.silhouetteScore}
+                    daviesBouldinScore={clusteringResult.metrics?.daviesBouldinScore}
+                    noiseRatio={clusteringResult.metrics?.noiseRatio}
+                    clusterSizes={clusteringResult.metrics?.clusterSizes || []}
+                    method={clusteringMethod}
+                  />
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5" />
+                        Visualização dos Clusters
+                      </CardTitle>
+                      <CardDescription>
+                        Distribuição e características dos segmentos
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ClusterVisualization
+                        clusters={clusteringResult.clusters.map((cluster: any) => ({
+                          name: `Cluster ${cluster.cluster}`,
+                          size: cluster.size,
+                          percentage: (cluster.size / clusteringResult.totalCustomers) * 100,
+                          recency: cluster.avgFeatures?.[0],
+                          frequency: cluster.avgFeatures?.[1],
+                          monetary: cluster.avgFeatures?.[2],
+                          color: `hsl(${(cluster.cluster * 360) / clusteringResult.clusters.length}, 70%, 50%)`
+                        }))}
+                        type={segmentationType}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5" />
+                        Detalhes dos Clusters
+                      </CardTitle>
+                      <CardDescription>
+                        Clique para expandir e ver customer IDs
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Cluster</TableHead>
+                            <TableHead>Tamanho</TableHead>
+                            <TableHead>% Total</TableHead>
+                            <TableHead>Recency</TableHead>
+                            <TableHead>Frequency</TableHead>
+                            <TableHead>Monetary</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {clusteringResult.clusters.map((cluster: any) => (
+                            <TableRow key={cluster.cluster}>
+                              <TableCell>
+                                <Badge>{cluster.cluster === -1 ? 'Ruído' : `Cluster ${cluster.cluster}`}</Badge>
+                              </TableCell>
+                              <TableCell>{cluster.size}</TableCell>
+                              <TableCell>{((cluster.size / clusteringResult.totalCustomers) * 100).toFixed(1)}%</TableCell>
+                              <TableCell>{cluster.avgFeatures?.[0]?.toFixed(1) || '-'}</TableCell>
+                              <TableCell>{cluster.avgFeatures?.[1]?.toFixed(1) || '-'}</TableCell>
+                              <TableCell>R$ {cluster.avgFeatures?.[2]?.toFixed(0) || '-'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-muted-foreground mb-2">
+                      Configure os parâmetros e execute a segmentação
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Análise baseada em dados RFM de {segmentationType === 'rfm' ? 'Recency, Frequency, Monetary' : 'características comportamentais'}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+
+          {/* Semantic Insights Section */}
+          {clusteringResult && segmentationType === 'rfm' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Insights Semânticos por Segmento</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Perfis de negócio e estratégias recomendadas para cada cluster
+                  </p>
+                </div>
+              </div>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                {clusteringResult.clusters
+                  .filter((cluster: any) => cluster.cluster !== -1)
+                  .map((cluster: any) => {
+                    const insight = getRFMSegmentName({
+                      avgRecency: cluster.avgFeatures?.[0] || 0,
+                      avgFrequency: cluster.avgFeatures?.[1] || 0,
+                      avgMonetary: cluster.avgFeatures?.[2] || 0,
+                    });
+                    
+                    const totalValue = cluster.avgFeatures?.[2] ? cluster.size * cluster.avgFeatures[2] : 0;
+                    
+                    return (
+                      <SegmentInsightCard
+                        key={cluster.cluster}
+                        insight={insight}
+                        size={cluster.size}
+                        percentage={(cluster.size / clusteringResult.totalCustomers) * 100}
+                        totalValue={totalValue}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
