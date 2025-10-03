@@ -75,7 +75,7 @@ export default function Orchestrator() {
       const { data, error } = await supabase.functions.invoke('orchestrator', {
         body: {
           action: 'execute',
-          payload: { runId, queries: plan.queries }
+          payload: { runId, plan }
         }
       });
 

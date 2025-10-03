@@ -14,20 +14,16 @@ const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 // System Prompts for 3 agents
 const PLANNER_PROMPT = `You are a DATA PLANNER for event marketing analysis. When given a goal and event context:
 
-1. DO NOT generate strategies or recommendations yet.
-2. Define what data is needed (SQL queries, features, segments).
-3. List the SQL queries that should be run to gather context.
-4. Return a structured plan with data requirements.
+1. DO NOT generate SQL queries - data will be collected from pre-defined segments.
+2. Analyze the analogous events data and market segments provided.
+3. Suggest which customer segments to target based on the goal.
+4. Return a structured plan with segment recommendations.
 
 Output JSON format:
 {
-  "plan": {
-    "queries": [
-      {"name": "event_context", "sql": "SELECT * FROM events WHERE id = $1"},
-      {"name": "customer_segments", "sql": "SELECT * FROM vw_multi_segment LIMIT 1000"}
-    ],
-    "features_needed": ["rfm_percentiles", "behavior_metrics", "music_preferences"]
-  }
+  "segments_to_query": ["attended_similar", "high_value", "at_risk", "high_bar_spenders"],
+  "rationale": "Based on analogous events showing 82% occupancy and goal to boost revenue, focus on customers who attended similar genre events and high-value segments",
+  "expected_reach": 1000
 }`;
 
 const ANALYST_PROMPT = `You are a DATA ANALYST for event marketing. Given DataProfile and initial hypotheses:
@@ -180,11 +176,13 @@ ${marketStats?.map(s => `- ${s.segment}: ${s.customers} customers, avg spend R$$
 GOAL: ${goal}
 CONSTRAINTS: ${JSON.stringify(constraints)}
 
-Generate SQL queries to:
-1. Find customers in ${newEvent.city} who like ${newEvent.genre}
-2. Identify high-value segments (RFM analysis)
-3. Analyze past consumption patterns
-4. Find at-risk customers if goal is reactivation
+Available segments to target:
+- attended_similar: Customers who previously attended ${newEvent.genre} events
+- high_value: Champions and Loyal customers (high RFM)
+- at_risk: Customers needing reactivation (high recency, low frequency)
+- high_bar_spenders: Premium consumption segment
+
+Based on the goal and analogous data, which segments should we target?
 `;
 
         // Call Planner LLM with enriched context
@@ -218,30 +216,86 @@ Generate SQL queries to:
       }
 
       case 'execute': {
-        // Step 2: Execute queries and compute DataProfile
-        const { runId, queries } = payload;
+        // Step 2: Execute prepared queries and compute DataProfile
+        const { runId, plan } = payload;
 
-        const queryResults: any = {};
-        
-        // Execute SQL queries
-        for (const query of queries) {
-          console.log(`🔍 Executing query: ${query.name}`);
-          const { data, error } = await supabase.rpc('run_query', { query_text: query.sql });
-          if (error) {
-            console.error(`Error in query ${query.name}:`, error);
-            queryResults[query.name] = { error: error.message };
-          } else {
-            queryResults[query.name] = data;
-          }
-        }
+        // Get event context from run
+        const { data: run } = await supabase
+          .from('analysis_runs')
+          .select('event_context_json')
+          .eq('id', runId)
+          .single();
 
-        // Get RFM percentiles
+        const newEvent = run?.event_context_json;
+        const targetGenre = newEvent?.genre;
+
+        console.log(`🎯 Executing data collection for genre: ${targetGenre}`);
+
+        // Query 1: Customers who attended similar genre events
+        const { data: attendedSimilar } = await supabase
+          .from('vw_multi_segment')
+          .select('customer_id, name, email, city, preferred_genre, monetary_total, recency_days, frequency')
+          .eq('preferred_genre', targetGenre)
+          .order('monetary_total', { ascending: false })
+          .limit(500);
+
+        console.log(`✅ Found ${attendedSimilar?.length || 0} customers who attended ${targetGenre} events`);
+
+        // Query 2: High-value customers (Champions, Loyal)
+        const { data: highValue } = await supabase
+          .from('vw_customer_rfm')
+          .select('customer_id, segment, monetary_total, frequency, recency_days')
+          .in('segment', ['Champions', 'Loyal', 'Potential Loyalist'])
+          .order('monetary_total', { ascending: false })
+          .limit(500);
+
+        console.log(`✅ Found ${highValue?.length || 0} high-value customers`);
+
+        // Query 3: At-risk customers needing reactivation
+        const { data: atRisk } = await supabase
+          .from('vw_customer_rfm')
+          .select('customer_id, segment, recency_days, monetary_total, frequency')
+          .in('segment', ['At Risk', 'Need Attention'])
+          .gt('recency_days', 90)
+          .order('monetary_total', { ascending: false })
+          .limit(300);
+
+        console.log(`✅ Found ${atRisk?.length || 0} at-risk customers`);
+
+        // Query 4: High bar spenders
+        const { data: highBarSpenders } = await supabase
+          .from('vw_consumption_profile')
+          .select('customer_id, consumption_segment, total_value, total_quantity')
+          .in('consumption_segment', ['High Spender', 'Premium'])
+          .order('total_value', { ascending: false })
+          .limit(200);
+
+        console.log(`✅ Found ${highBarSpenders?.length || 0} high bar spenders`);
+
+        // Get analogous events data
+        const { data: analogEvents } = await supabase
+          .from('vw_event_analogs')
+          .select('*')
+          .eq('genre', targetGenre)
+          .eq('city', newEvent?.city)
+          .order('month_bucket', { ascending: false })
+          .limit(10);
+
+        const analogContext = analogEvents && analogEvents.length > 0 
+          ? {
+              count: analogEvents.length,
+              avg_occupancy: analogEvents.reduce((acc, e) => acc + (e.occupancy_rate || 0), 0) / analogEvents.length,
+              avg_revenue: analogEvents.reduce((acc, e) => acc + (e.revenue || 0), 0) / analogEvents.length,
+              avg_price: analogEvents.reduce((acc, e) => acc + (e.avg_price || 0), 0) / analogEvents.length
+            }
+          : null;
+
+        // Get RFM percentiles for context
         const { data: rfmData } = await supabase
           .from('vw_customer_rfm')
           .select('recency_days, frequency, monetary_total')
           .order('recency_days');
 
-        // Calculate percentiles
         const calculatePercentiles = (arr: number[]) => {
           const sorted = arr.sort((a, b) => a - b);
           return {
@@ -257,36 +311,47 @@ Generate SQL queries to:
           M: calculatePercentiles(rfmData.map(r => r.monetary_total || 0))
         } : null;
 
-        // Get music preferences
-        const { data: musicData } = await supabase
-          .from('vw_musical_preference')
-          .select('preferred_genre, total_spent')
-          .order('total_spent', { ascending: false })
-          .limit(10);
-
+        // Build comprehensive DataProfile
         const dataProfile = {
-          population: {
-            n_customers: rfmData?.length || 0,
-            period_days: 365
+          segments: {
+            attended_similar: {
+              count: attendedSimilar?.length || 0,
+              avg_monetary: (attendedSimilar || []).reduce((acc, c) => acc + (c.monetary_total || 0), 0) / (attendedSimilar?.length || 1),
+              avg_recency: (attendedSimilar || []).reduce((acc, c) => acc + (c.recency_days || 0), 0) / (attendedSimilar?.length || 1),
+              top_customers: attendedSimilar?.slice(0, 10) || []
+            },
+            high_value: {
+              count: highValue?.length || 0,
+              avg_monetary: (highValue || []).reduce((acc, c) => acc + (c.monetary_total || 0), 0) / (highValue?.length || 1),
+              segments_breakdown: (highValue || []).reduce((acc: any, c) => {
+                acc[c.segment] = (acc[c.segment] || 0) + 1;
+                return acc;
+              }, {})
+            },
+            at_risk: {
+              count: atRisk?.length || 0,
+              avg_recency: (atRisk || []).reduce((acc, c) => acc + (c.recency_days || 0), 0) / (atRisk?.length || 1),
+              avg_past_monetary: (atRisk || []).reduce((acc, c) => acc + (c.monetary_total || 0), 0) / (atRisk?.length || 1)
+            },
+            high_bar_spenders: {
+              count: highBarSpenders?.length || 0,
+              avg_spend: (highBarSpenders || []).reduce((acc, c) => acc + (c.total_value || 0), 0) / (highBarSpenders?.length || 1)
+            }
           },
-          quality: {
-            missing_pct: 0,
-            outliers_pct: 0
-          },
+          analogous_events: analogContext ? {
+            total_found: analogContext.count,
+            avg_occupancy: analogContext.avg_occupancy,
+            avg_revenue: analogContext.avg_revenue,
+            avg_ticket_price: analogContext.avg_price
+          } : null,
           rfm_percentiles: rfmPercentiles,
-          behavior: {
-            avg_days_between: null,
-            seasonality_hint: "event_driven"
-          },
-          music: {
-            top_genres: musicData?.map(m => ({
-              name: m.preferred_genre,
-              share_pct: 0
-            })) || [],
-            cross_affinities: []
-          },
-          raw_queries: queryResults
+          population: {
+            total_customers: rfmData?.length || 0,
+            period_days: 365
+          }
         };
+
+        console.log(`📊 DataProfile built with ${Object.keys(dataProfile.segments).length} segments`);
 
         // Save DataProfile
         const { error: profileError } = await supabase
