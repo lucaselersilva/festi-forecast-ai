@@ -9,7 +9,8 @@ import {
   TrendingUp,
   FileText,
   Target,
-  Activity
+  Activity,
+  Workflow
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 
@@ -31,6 +32,7 @@ const mainItems = [
   { title: "Import Data", url: "/import", icon: Upload },
   { title: "Insights Planner", url: "/insights-planner", icon: Target },
   { title: "Clustering", url: "/clustering", icon: Activity },
+  { title: "Orquestrador", url: "/orchestrator", icon: Workflow },
   { title: "Events", url: "/events", icon: Calendar },
   { title: "Sponsors", url: "/sponsors", icon: Briefcase },
 ]
