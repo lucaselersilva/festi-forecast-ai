@@ -18,7 +18,17 @@ import { ClusterVisualization } from "@/components/ClusterVisualization";
 import { SegmentationTypeSelector, SegmentationType } from "@/components/SegmentationTypeSelector";
 import { SegmentInsightCard } from "@/components/SegmentInsightCard";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getRFMSegmentName, getDemographicInsight, getBehavioralInsight, getMusicalInsight } from "@/lib/segmentationHelpers";
+import { 
+  getRFMSegmentName, 
+  getDemographicInsight, 
+  getBehavioralInsight, 
+  getMusicalInsight,
+  getRFMSegmentNameDynamic,
+  getDemographicInsightDynamic,
+  getBehavioralInsightDynamic,
+  getMusicalInsightDynamic,
+  Percentiles
+} from "@/lib/segmentationHelpers";
 import axios from "axios";
 
 interface RevenueAnalysis {
@@ -465,7 +475,20 @@ export default function InsightsPlanner() {
   const getClusterName = (cluster: any, type: SegmentationType): string => {
     if (cluster.cluster === -1) return 'Ruído';
     
+    // Check if we have percentiles from clustering result
+    const percentiles: Percentiles | undefined = clusteringResult?.percentiles;
+    
     if (type === 'rfm' && cluster.avgRecency !== undefined) {
+      // Use dynamic naming if percentiles available
+      if (percentiles && percentiles.recency && percentiles.frequency && percentiles.monetary) {
+        const insight = getRFMSegmentNameDynamic({
+          avgRecency: cluster.avgRecency,
+          avgFrequency: cluster.avgFrequency,
+          avgMonetary: cluster.avgMonetary,
+        }, percentiles);
+        return insight.name;
+      }
+      // Fallback to static naming
       const insight = getRFMSegmentName({
         avgRecency: cluster.avgRecency,
         avgFrequency: cluster.avgFrequency,
@@ -473,6 +496,17 @@ export default function InsightsPlanner() {
       });
       return insight.name;
     } else if (type === 'demographic' && cluster.avgAge !== undefined) {
+      // Use dynamic naming if percentiles available
+      if (percentiles && percentiles.age) {
+        const insight = getDemographicInsightDynamic(
+          cluster.avgAge,
+          cluster.dominantGender || 'M',
+          cluster.dominantCity || '',
+          percentiles
+        );
+        return insight.name;
+      }
+      // Fallback to static naming
       const ageSegment = cluster.avgAge < 25 ? '18-24' : 
                         cluster.avgAge < 35 ? '25-34' : 
                         cluster.avgAge < 50 ? '35-49' : '50+';
@@ -483,7 +517,17 @@ export default function InsightsPlanner() {
       );
       return insight.name;
     } else if (type === 'behavioral' && cluster.avgDaysBetween !== undefined) {
-      // Estimate days before event based on purchase value (higher value = more planning)
+      // Use dynamic naming if percentiles available
+      if (percentiles && percentiles.purchases && percentiles.daysBetween && percentiles.purchaseValue) {
+        const insight = getBehavioralInsightDynamic(
+          cluster.avgPurchases || 0,
+          cluster.avgDaysBetween,
+          cluster.avgPurchaseValue || 0,
+          percentiles
+        );
+        return insight.name;
+      }
+      // Fallback to static naming
       const estimatedDaysBefore = cluster.avgPurchaseValue > 150 ? 14 : 
                                   cluster.avgPurchaseValue > 80 ? 7 : 1;
       const insight = getBehavioralInsight(
@@ -492,6 +536,17 @@ export default function InsightsPlanner() {
       );
       return insight.name;
     } else if (type === 'musical' && cluster.dominantGenre) {
+      // Use dynamic naming if percentiles available
+      if (percentiles && percentiles.interactions && percentiles.spent) {
+        const insight = getMusicalInsightDynamic(
+          cluster.dominantGenre,
+          cluster.avgInteractions || 0,
+          cluster.avgSpent || 0,
+          percentiles
+        );
+        return insight.name;
+      }
+      // Fallback to static naming
       const insight = getMusicalInsight(cluster.dominantGenre);
       return insight.name;
     }

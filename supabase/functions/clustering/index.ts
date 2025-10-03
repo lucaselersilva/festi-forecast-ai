@@ -239,6 +239,41 @@ function mulberry32(seed: number) {
   };
 }
 
+// Calculate percentile from sorted array
+function calculatePercentile(values: number[], percentile: number): number {
+  if (values.length === 0) return 0;
+  
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = (percentile / 100) * (sorted.length - 1);
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  const weight = index - lower;
+  
+  if (upper >= sorted.length) return sorted[sorted.length - 1];
+  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+}
+
+// Calculate percentiles for multiple features
+function calculateFeaturePercentiles(data: number[][], featureIndices: number[]): any {
+  const percentiles: any = {};
+  
+  featureIndices.forEach((idx, featureName) => {
+    const values = data.map(row => row[idx]).filter(v => v !== null && v !== undefined && !isNaN(v));
+    
+    if (values.length > 0) {
+      percentiles[`feature_${idx}`] = {
+        p25: calculatePercentile(values, 25),
+        p50: calculatePercentile(values, 50),
+        p75: calculatePercentile(values, 75),
+        min: Math.min(...values),
+        max: Math.max(...values),
+      };
+    }
+  });
+  
+  return percentiles;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -341,6 +376,29 @@ serve(async (req) => {
     }
 
     const customerIds = features.map((f: any) => f[config.idField]);
+
+    // Calculate percentiles BEFORE standardization (on original data)
+    const featureIndices = config.featureFields.map((_, idx) => idx);
+    const rawPercentiles = calculateFeaturePercentiles(data, featureIndices);
+    
+    // Build named percentiles based on segmentation type
+    const percentiles: any = {};
+    if (segmentationType === 'rfm') {
+      percentiles.recency = rawPercentiles.feature_0;
+      percentiles.frequency = rawPercentiles.feature_1;
+      percentiles.monetary = rawPercentiles.feature_2;
+    } else if (segmentationType === 'demographic') {
+      percentiles.age = rawPercentiles.feature_0;
+    } else if (segmentationType === 'behavioral') {
+      percentiles.purchases = rawPercentiles.feature_0;
+      percentiles.daysBetween = rawPercentiles.feature_1;
+      percentiles.purchaseValue = rawPercentiles.feature_2;
+    } else if (segmentationType === 'musical') {
+      percentiles.interactions = rawPercentiles.feature_0;
+      percentiles.spent = rawPercentiles.feature_1;
+    }
+    
+    console.log(`📊 Calculated percentiles:`, percentiles);
 
     // Standardize if requested
     let processedData = data;
@@ -465,6 +523,7 @@ serve(async (req) => {
           clusterSizes: result.clusterSizes,
         },
         clusters,
+        percentiles,
         totalCustomers: features.length,
         timestamp: new Date().toISOString(),
       }),
