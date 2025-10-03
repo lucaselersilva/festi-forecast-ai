@@ -361,7 +361,7 @@ export default function InsightsPlanner() {
     }
   };
 
-  const handleExportClusters = (format: 'csv' | 'json') => {
+  const handleExportClusters = async (format: 'csv' | 'json') => {
     if (!clusteringResult) {
       toast({
         title: "Nenhum cluster para exportar",
@@ -372,21 +372,58 @@ export default function InsightsPlanner() {
     }
 
     try {
+      toast({
+        title: "Preparando exportação...",
+        description: "Buscando dados dos clientes",
+      });
+
+      // Buscar dados completos dos clientes
+      const allCustomerIds = clusteringResult.clusters
+        .flatMap((cluster: any) => cluster.customerIds);
+      
+      const { data: customers, error } = await supabase
+        .from('customers')
+        .select('id, name, phone, email')
+        .in('id', allCustomerIds);
+
+      if (error) throw error;
+
+      // Mapear customers por ID para fácil acesso
+      const customerMap = new Map(customers?.map(c => [c.id, c]) || []);
+
+      // Preparar dados estruturados
+      const structuredData = clusteringResult.clusters.flatMap((cluster: any) => {
+        const clusterName = getClusterName(cluster, segmentationType);
+        
+        return cluster.customerIds.map((customerId: number) => {
+          const customer = customerMap.get(customerId);
+          return {
+            cluster: clusterName,
+            customer_id: customerId,
+            name: customer?.name || 'N/A',
+            phone: customer?.phone || 'N/A',
+            email: customer?.email || 'N/A',
+            avg_recency: cluster.avgFeatures?.[0]?.toFixed(1) || 'N/A',
+            avg_frequency: cluster.avgFeatures?.[1]?.toFixed(1) || 'N/A',
+            avg_monetary: cluster.avgFeatures?.[2]?.toFixed(2) || 'N/A',
+          };
+        });
+      });
+
       let content = '';
       let filename = '';
       let mimeType = '';
 
       if (format === 'csv') {
-        // CSV format: cluster,customer_ids
-        const lines = clusteringResult.clusters.map((cluster: any) => 
-          `${cluster.cluster},${cluster.size},"${cluster.customerIds.join(',')}"`
+        const headers = 'cluster,customer_id,name,phone,email,avg_recency,avg_frequency,avg_monetary';
+        const lines = structuredData.map(row => 
+          `"${row.cluster}",${row.customer_id},"${row.name}","${row.phone}","${row.email}",${row.avg_recency},${row.avg_frequency},${row.avg_monetary}`
         );
-        content = 'cluster,size,customer_ids\n' + lines.join('\n');
+        content = headers + '\n' + lines.join('\n');
         filename = `clusters-${Date.now()}.csv`;
-        mimeType = 'text/csv';
+        mimeType = 'text/csv;charset=utf-8;';
       } else {
-        // JSON format
-        content = JSON.stringify(clusteringResult, null, 2);
+        content = JSON.stringify(structuredData, null, 2);
         filename = `clusters-${Date.now()}.json`;
         mimeType = 'application/json';
       }
@@ -401,16 +438,31 @@ export default function InsightsPlanner() {
 
       toast({
         title: "Exportação concluída!",
-        description: `Arquivo ${filename} baixado com sucesso`,
+        description: `${structuredData.length} clientes exportados em ${filename}`,
       });
     } catch (error) {
       console.error("Export error:", error);
       toast({
         title: "Erro na exportação",
-        description: "Falha ao exportar clusters",
+        description: error instanceof Error ? error.message : "Falha ao exportar clusters",
         variant: "destructive",
       });
     }
+  };
+
+  const getClusterName = (cluster: any, type: SegmentationType): string => {
+    if (cluster.cluster === -1) return 'Ruído';
+    
+    if (type === 'rfm' && cluster.avgFeatures) {
+      const insight = getRFMSegmentName({
+        avgRecency: cluster.avgFeatures[0] || 0,
+        avgFrequency: cluster.avgFeatures[1] || 0,
+        avgMonetary: cluster.avgFeatures[2] || 0,
+      });
+      return insight.name;
+    }
+    
+    return `Cluster ${cluster.cluster}`;
   };
 
   const generateEnhancedRevenueData = (requestData: any, segments: AdvancedSegment[]): RevenueAnalysis => {
@@ -1624,18 +1676,21 @@ export default function InsightsPlanner() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {clusteringResult.clusters.map((cluster: any) => (
-                            <TableRow key={cluster.cluster}>
-                              <TableCell>
-                                <Badge>{cluster.cluster === -1 ? 'Ruído' : `Cluster ${cluster.cluster}`}</Badge>
-                              </TableCell>
-                              <TableCell>{cluster.size}</TableCell>
-                              <TableCell>{((cluster.size / clusteringResult.totalCustomers) * 100).toFixed(1)}%</TableCell>
-                              <TableCell>{cluster.avgFeatures?.[0]?.toFixed(1) || '-'}</TableCell>
-                              <TableCell>{cluster.avgFeatures?.[1]?.toFixed(1) || '-'}</TableCell>
-                              <TableCell>R$ {cluster.avgFeatures?.[2]?.toFixed(0) || '-'}</TableCell>
-                            </TableRow>
-                          ))}
+                          {clusteringResult.clusters.map((cluster: any) => {
+                            const clusterName = getClusterName(cluster, segmentationType);
+                            return (
+                              <TableRow key={cluster.cluster}>
+                                <TableCell>
+                                  <Badge>{clusterName}</Badge>
+                                </TableCell>
+                                <TableCell>{cluster.size}</TableCell>
+                                <TableCell>{((cluster.size / clusteringResult.totalCustomers) * 100).toFixed(1)}%</TableCell>
+                                <TableCell>{cluster.avgFeatures?.[0]?.toFixed(1) || '-'}</TableCell>
+                                <TableCell>{cluster.avgFeatures?.[1]?.toFixed(1) || '-'}</TableCell>
+                                <TableCell>R$ {cluster.avgFeatures?.[2]?.toFixed(0) || '-'}</TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </CardContent>
