@@ -18,20 +18,50 @@ export function ZigImport({ onImportComplete }: ZigImportProps) {
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
-  const parseExcelDate = (excelDate: string): string | null => {
+  const parseExcelDate = (excelDate: any): string | null => {
     if (!excelDate) return null;
     
-    // Formato: DD/MM/YYYY HH:MM:SS
-    const parts = excelDate.split(' ');
-    if (parts.length === 0) return null;
-    
-    const dateParts = parts[0].split('/');
-    if (dateParts.length !== 3) return null;
-    
-    const [day, month, year] = dateParts;
-    const timePart = parts[1] || '00:00:00';
-    
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart}`;
+    try {
+      // Se já for uma data do JavaScript
+      if (excelDate instanceof Date) {
+        return excelDate.toISOString();
+      }
+      
+      // Se for um número (serial date do Excel)
+      if (typeof excelDate === 'number') {
+        const date = new Date((excelDate - 25569) * 86400 * 1000);
+        return date.toISOString();
+      }
+      
+      // Se for string no formato DD/MM/YYYY HH:MM:SS
+      const excelDateStr = excelDate.toString().trim();
+      const parts = excelDateStr.split(' ');
+      if (parts.length === 0) return null;
+      
+      const dateParts = parts[0].split('/');
+      if (dateParts.length !== 3) return null;
+      
+      const day = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10);
+      const year = parseInt(dateParts[2], 10);
+      const timePart = parts[1] || '00:00:00';
+      
+      // Validar intervalos
+      if (year < 1900 || year > 2100) return null;
+      if (month < 1 || month > 12) return null;
+      if (day < 1 || day > 31) return null;
+      
+      const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${timePart}`;
+      const testDate = new Date(dateStr);
+      
+      // Verificar se a data é válida
+      if (isNaN(testDate.getTime())) return null;
+      
+      return dateStr;
+    } catch (error) {
+      console.error('Erro ao parsear data:', excelDate, error);
+      return null;
+    }
   };
 
   const parseCurrency = (value: string): number => {
