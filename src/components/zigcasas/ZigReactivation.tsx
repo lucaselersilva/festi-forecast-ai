@@ -5,8 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Mail, MessageSquare, Bell, RefreshCw } from "lucide-react";
+import { Sparkles, Mail, MessageSquare, Bell, RefreshCw, Download, Copy, Users } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { downloadClusterCustomers, copyToClipboard } from "@/lib/exportHelpers";
+import { Separator } from "@/components/ui/separator";
 
 interface Strategy {
   id: string;
@@ -36,11 +38,13 @@ export function ZigReactivation() {
   const [clusters, setClusters] = useState<ClusterData[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [downloadingCluster, setDownloadingCluster] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [refreshKey]);
 
   const loadData = async () => {
     setLoading(true);
@@ -103,6 +107,9 @@ export function ZigReactivation() {
 
       if (loadedData.length === 0) {
         console.warn('No strategies loaded after 3 retries');
+      } else {
+        // Force component re-render
+        setRefreshKey(prev => prev + 1);
       }
     } catch (error) {
       console.error('Error generating strategies:', error);
@@ -113,6 +120,41 @@ export function ZigReactivation() {
       });
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleDownloadCustomers = async (clusterName: string) => {
+    setDownloadingCluster(clusterName);
+    try {
+      const result = await downloadClusterCustomers(clusterName);
+      toast({
+        title: "Lista baixada com sucesso!",
+        description: `${result.count} clientes exportados`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao baixar lista",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingCluster(null);
+    }
+  };
+
+  const handleCopyMessage = async (message: string) => {
+    try {
+      await copyToClipboard(message);
+      toast({
+        title: "Mensagem copiada!",
+        description: "Template copiado para a área de transferência",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar a mensagem",
+        variant: "destructive",
+      });
     }
   };
 
@@ -171,7 +213,7 @@ export function ZigReactivation() {
         </Alert>
       )}
 
-      <div className="space-y-4">
+      <div key={refreshKey} className="space-y-4">
         {strategies.map((strategy) => {
           const ChannelIcon = channelIcons[strategy.recommended_channel] || Mail;
           const clusterSize = getClusterSize(strategy.cluster_comportamental);
@@ -183,7 +225,7 @@ export function ZigReactivation() {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-sm">
                         {strategy.cluster_comportamental}
                       </Badge>
                       <Badge variant="outline" className="flex items-center gap-1">
@@ -197,32 +239,75 @@ export function ZigReactivation() {
                         Conversão: {(strategy.expected_conversion_rate * 100).toFixed(1)}%
                       </Badge>
                     </div>
-                    <CardTitle className="text-lg mt-2">{strategy.strategy_title}</CardTitle>
-                    <CardDescription>{strategy.strategy_description}</CardDescription>
+                    <CardTitle className="text-xl mt-3">{strategy.strategy_title}</CardTitle>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Template de Mensagem
+                {/* Racional da Estratégia */}
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+                    Racional da Estratégia
                   </h4>
-                  <div className="bg-muted p-3 rounded-lg text-sm whitespace-pre-line">
+                  <p className="text-sm leading-relaxed">{strategy.strategy_description}</p>
+                </div>
+
+                <Separator />
+
+                {/* Template de Mensagem */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Mensagem para Envio
+                    </h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyMessage(strategy.message_template)}
+                      className="gap-2"
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copiar
+                    </Button>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-border p-4 rounded-lg text-sm whitespace-pre-line">
                     {strategy.message_template}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t text-sm">
+                <Separator />
+
+                {/* Métricas e Ações */}
+                <div className="grid md:grid-cols-3 gap-4 pt-2">
                   <div className="space-y-1">
-                    <p className="text-muted-foreground">Público-alvo</p>
-                    <p className="font-semibold">{clusterSize.toLocaleString()} clientes</p>
-                  </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-muted-foreground">Alcance estimado</p>
-                    <p className="font-semibold text-green-600">
-                      ~{estimatedReach} reativações
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      Público-alvo
                     </p>
+                    <p className="text-lg font-bold">{clusterSize.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">clientes</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Alcance estimado</p>
+                    <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                      ~{estimatedReach}
+                    </p>
+                    <p className="text-xs text-muted-foreground">reativações esperadas</p>
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleDownloadCustomers(strategy.cluster_comportamental)}
+                      disabled={downloadingCluster === strategy.cluster_comportamental}
+                      className="w-full gap-2"
+                    >
+                      <Download className={`h-4 w-4 ${downloadingCluster === strategy.cluster_comportamental ? 'animate-bounce' : ''}`} />
+                      {downloadingCluster === strategy.cluster_comportamental 
+                        ? 'Baixando...' 
+                        : 'Baixar Lista'}
+                    </Button>
                   </div>
                 </div>
               </CardContent>
