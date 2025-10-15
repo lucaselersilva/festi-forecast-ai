@@ -10,7 +10,8 @@ import {
   FileText,
   Target,
   Activity,
-  Workflow
+  Workflow,
+  Sparkles
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 
@@ -33,6 +34,7 @@ const mainItems = [
   { title: "Insights Planner", url: "/insights-planner", icon: Target },
   { title: "Clustering", url: "/clustering", icon: Activity },
   { title: "Orquestrador", url: "/orchestrator", icon: Workflow },
+  { title: "Zig Casas", url: "/zig-casas", icon: Sparkles },
   { title: "Events", url: "/events", icon: Calendar },
   { title: "Sponsors", url: "/sponsors", icon: Briefcase },
 ]

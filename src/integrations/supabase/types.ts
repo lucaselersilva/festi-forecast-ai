@@ -629,6 +629,105 @@ export type Database = {
           },
         ]
       }
+      valle_clientes: {
+        Row: {
+          aniversario: string | null
+          aplicativo_ativo: boolean | null
+          consumo: number | null
+          cpf: string | null
+          created_at: string | null
+          email: string | null
+          genero: string | null
+          id: string
+          id_evento: string | null
+          nome: string
+          presencas: number | null
+          primeira_entrada: string | null
+          primeira_interacao: string | null
+          primeira_utilizacao: boolean | null
+          telefone: string | null
+          ultima_visita: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          aniversario?: string | null
+          aplicativo_ativo?: boolean | null
+          consumo?: number | null
+          cpf?: string | null
+          created_at?: string | null
+          email?: string | null
+          genero?: string | null
+          id?: string
+          id_evento?: string | null
+          nome: string
+          presencas?: number | null
+          primeira_entrada?: string | null
+          primeira_interacao?: string | null
+          primeira_utilizacao?: boolean | null
+          telefone?: string | null
+          ultima_visita?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          aniversario?: string | null
+          aplicativo_ativo?: boolean | null
+          consumo?: number | null
+          cpf?: string | null
+          created_at?: string | null
+          email?: string | null
+          genero?: string | null
+          id?: string
+          id_evento?: string | null
+          nome?: string
+          presencas?: number | null
+          primeira_entrada?: string | null
+          primeira_interacao?: string | null
+          primeira_utilizacao?: boolean | null
+          telefone?: string | null
+          ultima_visita?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      valle_reactivation_strategies: {
+        Row: {
+          cluster_comportamental: string
+          created_at: string | null
+          expected_conversion_rate: number | null
+          id: string
+          message_template: string | null
+          priority: number | null
+          recommended_channel: string | null
+          strategy_description: string | null
+          strategy_title: string
+          updated_at: string | null
+        }
+        Insert: {
+          cluster_comportamental: string
+          created_at?: string | null
+          expected_conversion_rate?: number | null
+          id?: string
+          message_template?: string | null
+          priority?: number | null
+          recommended_channel?: string | null
+          strategy_description?: string | null
+          strategy_title: string
+          updated_at?: string | null
+        }
+        Update: {
+          cluster_comportamental?: string
+          created_at?: string | null
+          expected_conversion_rate?: number | null
+          id?: string
+          message_template?: string | null
+          priority?: number | null
+          recommended_channel?: string | null
+          strategy_description?: string | null
+          strategy_title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       vw_consumption_profile: {
@@ -1073,6 +1172,92 @@ export type Database = {
           name: string | null
           rfm_segment: string | null
           sponsorship_cluster: string | null
+        }
+        Relationships: []
+      }
+      vw_valle_cluster_analysis: {
+        Row: {
+          cluster_comportamental: string | null
+          com_app_ativo: number | null
+          consumo_medio: number | null
+          faixas_etarias: string[] | null
+          generos: string[] | null
+          presencas_media: number | null
+          propensity_media: number | null
+          recency_media: number | null
+          total_clientes: number | null
+        }
+        Relationships: []
+      }
+      vw_valle_rfm: {
+        Row: {
+          aniversario: string | null
+          aplicativo_ativo: boolean | null
+          cluster_comportamental: string | null
+          cluster_jornada: string | null
+          cluster_valor: string | null
+          consumo: number | null
+          cpf: string | null
+          email: string | null
+          faixa_etaria: string | null
+          frequency: number | null
+          genero: string | null
+          id: string | null
+          idade: number | null
+          monetary: number | null
+          nome: string | null
+          presencas: number | null
+          primeira_entrada: string | null
+          propensity_score: number | null
+          recency_days: number | null
+          telefone: string | null
+          ultima_visita: string | null
+        }
+        Insert: {
+          aniversario?: string | null
+          aplicativo_ativo?: boolean | null
+          cluster_comportamental?: never
+          cluster_jornada?: never
+          cluster_valor?: never
+          consumo?: number | null
+          cpf?: string | null
+          email?: string | null
+          faixa_etaria?: never
+          frequency?: number | null
+          genero?: string | null
+          id?: string | null
+          idade?: never
+          monetary?: number | null
+          nome?: string | null
+          presencas?: number | null
+          primeira_entrada?: string | null
+          propensity_score?: never
+          recency_days?: never
+          telefone?: string | null
+          ultima_visita?: string | null
+        }
+        Update: {
+          aniversario?: string | null
+          aplicativo_ativo?: boolean | null
+          cluster_comportamental?: never
+          cluster_jornada?: never
+          cluster_valor?: never
+          consumo?: number | null
+          cpf?: string | null
+          email?: string | null
+          faixa_etaria?: never
+          frequency?: number | null
+          genero?: string | null
+          id?: string | null
+          idade?: never
+          monetary?: number | null
+          nome?: string | null
+          presencas?: number | null
+          primeira_entrada?: string | null
+          propensity_score?: never
+          recency_days?: never
+          telefone?: string | null
+          ultima_visita?: string | null
         }
         Relationships: []
       }

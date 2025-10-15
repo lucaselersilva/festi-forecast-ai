@@ -16,6 +16,7 @@ import Forecast from "./pages/Forecast";
 import InsightsPlanner from "./pages/InsightsPlanner";
 import Clustering from "./pages/Clustering";
 import Orchestrator from "./pages/Orchestrator";
+import ZigCasas from "./pages/ZigCasas";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/insights-planner" element={<InsightsPlanner />} />
             <Route path="/clustering" element={<Clustering />} />
             <Route path="/orchestrator" element={<Orchestrator />} />
+            <Route path="/zig-casas" element={<ZigCasas />} />
             <Route path="/events" element={<Events />} />
             <Route path="/sponsors" element={<Sponsors />} />
             <Route path="/sponsors" element={<Forecast />} />
