@@ -43,6 +43,7 @@ export function ZigReactivation() {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [strategiesRes, clustersRes] = await Promise.all([
         supabase.from('valle_reactivation_strategies').select('*').order('priority', { ascending: true }),
@@ -52,8 +53,11 @@ export function ZigReactivation() {
       if (strategiesRes.error) throw strategiesRes.error;
       if (clustersRes.error) throw clustersRes.error;
 
+      console.log('Strategies loaded:', strategiesRes.data?.length || 0);
       setStrategies(strategiesRes.data || []);
       setClusters(clustersRes.data || []);
+      
+      return strategiesRes.data || [];
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -61,6 +65,7 @@ export function ZigReactivation() {
         description: error instanceof Error ? error.message : "Erro desconhecido",
         variant: "destructive",
       });
+      return [];
     } finally {
       setLoading(false);
     }
@@ -80,7 +85,25 @@ export function ZigReactivation() {
         description: `${data.strategies_created} estratégias criadas com IA`,
       });
 
-      loadData();
+      // Aguardar commit no banco + retry logic
+      let retries = 0;
+      let loadedData = [];
+      
+      while (retries < 3) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        loadedData = await loadData();
+        
+        if (loadedData.length > 0) {
+          console.log('Strategies successfully loaded after', retries + 1, 'attempts');
+          break;
+        }
+        
+        retries++;
+      }
+
+      if (loadedData.length === 0) {
+        console.warn('No strategies loaded after 3 retries');
+      }
     } catch (error) {
       console.error('Error generating strategies:', error);
       toast({
