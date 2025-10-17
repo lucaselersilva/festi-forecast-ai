@@ -4,7 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ZigImport } from "@/components/zigcasas/ZigImport";
 import { ZigClusters } from "@/components/zigcasas/ZigClusters";
 import { ZigReactivation } from "@/components/zigcasas/ZigReactivation";
-import { Database, Upload, Target } from "lucide-react";
+import { ZigBirthdays } from "@/components/zigcasas/ZigBirthdays";
+import { Database, Upload, Target, Cake } from "lucide-react";
 
 export default function ZigCasas() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -27,7 +28,7 @@ export default function ZigCasas() {
       </div>
 
       <Tabs defaultValue="import" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="import" className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
             Importar Dados
@@ -39,6 +40,10 @@ export default function ZigCasas() {
           <TabsTrigger value="reactivation" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             Reativação
+          </TabsTrigger>
+          <TabsTrigger value="birthdays" className="flex items-center gap-2">
+            <Cake className="h-4 w-4" />
+            Aniversariantes
           </TabsTrigger>
         </TabsList>
 
@@ -52,6 +57,10 @@ export default function ZigCasas() {
 
         <TabsContent value="reactivation" className="mt-6">
           <ZigReactivation key={refreshKey} />
+        </TabsContent>
+
+        <TabsContent value="birthdays" className="mt-6">
+          <ZigBirthdays key={refreshKey} />
         </TabsContent>
       </Tabs>
     </div>
