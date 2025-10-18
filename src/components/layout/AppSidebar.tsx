@@ -11,7 +11,8 @@ import {
   Target,
   Activity,
   Workflow,
-  Sparkles
+  Sparkles,
+  Cake
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 
@@ -35,6 +36,7 @@ const mainItems = [
   { title: "Clustering", url: "/clustering", icon: Activity },
   { title: "Orquestrador", url: "/orchestrator", icon: Workflow },
   { title: "Assistente Marketing", url: "/marketing-assistant", icon: Sparkles },
+  { title: "Aniversariantes", url: "/birthdays", icon: Cake },
   { title: "Zig Casas", url: "/zig-casas", icon: Users },
   { title: "Events", url: "/events", icon: Calendar },
   { title: "Sponsors", url: "/sponsors", icon: Briefcase },

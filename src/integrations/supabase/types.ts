@@ -104,6 +104,39 @@ export type Database = {
         }
         Relationships: []
       }
+      birthday_cluster_actions: {
+        Row: {
+          actions: Json
+          cluster_name: string
+          cluster_size: number
+          created_at: string | null
+          id: string
+          month: number
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          actions: Json
+          cluster_name: string
+          cluster_size: number
+          created_at?: string | null
+          id?: string
+          month: number
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          actions?: Json
+          cluster_name?: string
+          cluster_size?: number
+          created_at?: string | null
+          id?: string
+          month?: number
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       consumptions: {
         Row: {
           customerid: number
@@ -832,6 +865,32 @@ export type Database = {
       }
     }
     Views: {
+      vw_all_customers_birthdays: {
+        Row: {
+          aniversario: string | null
+          aplicativo_ativo: boolean | null
+          cluster_comportamental: string | null
+          cluster_jornada: string | null
+          cluster_valor: string | null
+          consumo: number | null
+          customer_id: string | null
+          email: string | null
+          faixa_etaria: string | null
+          frequency: number | null
+          genero: string | null
+          idade: number | null
+          monetary: number | null
+          nome: string | null
+          presencas: number | null
+          primeira_entrada: string | null
+          propensity_score: number | null
+          recency_days: number | null
+          source_table: string | null
+          telefone: string | null
+          ultima_visita: string | null
+        }
+        Relationships: []
+      }
       vw_consumption_profile: {
         Row: {
           consumption_segment: string | null
@@ -1415,6 +1474,36 @@ export type Database = {
           primeira_entrada: string
           propensity_score: number
           recency_days: number
+          telefone: string
+          ultima_visita: string
+        }[]
+      }
+      get_birthday_customers_unified: {
+        Args: {
+          age_range_filter?: string[]
+          cluster_filter?: string[]
+          target_month: number
+        }
+        Returns: {
+          aniversario: string
+          aplicativo_ativo: boolean
+          cluster_comportamental: string
+          cluster_jornada: string
+          cluster_valor: string
+          consumo: number
+          customer_id: string
+          email: string
+          faixa_etaria: string
+          frequency: number
+          genero: string
+          idade: number
+          monetary: number
+          nome: string
+          presencas: number
+          primeira_entrada: string
+          propensity_score: number
+          recency_days: number
+          source_table: string
           telefone: string
           ultima_visita: string
         }[]

@@ -93,7 +93,7 @@ export function ZigBirthdays() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const result = await exportBirthdayList(customers, rawFilters.month, rawFilters.year);
+      const result = await exportBirthdayList(customers, rawFilters.month);
       toast({
         title: "Lista exportada com sucesso!",
         description: `${result.count} aniversariantes exportados para ${result.fileName}`,

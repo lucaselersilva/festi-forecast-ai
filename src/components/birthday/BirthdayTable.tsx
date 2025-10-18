@@ -112,7 +112,7 @@ export function BirthdayTable({ customers, onViewDetails }: BirthdayTableProps) 
             </TableHeader>
             <TableBody>
               {sortedCustomers.map((customer) => (
-                <TableRow key={customer.id} className="hover:bg-muted/50">
+                <TableRow key={customer.customer_id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{customer.nome}</TableCell>
                   <TableCell>
                     <div className="flex flex-col">
