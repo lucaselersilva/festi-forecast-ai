@@ -60,7 +60,7 @@ export default function ZigCasas() {
         </TabsContent>
 
         <TabsContent value="birthdays" className="mt-6">
-          <ZigBirthdays key={refreshKey} />
+          <ZigBirthdays />
         </TabsContent>
       </Tabs>
     </div>
