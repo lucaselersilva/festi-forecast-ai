@@ -36,8 +36,8 @@ const MONTHS = [
 ];
 
 export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
-  const [month, setMonth] = useState(getCurrentMonth);
-  const [year, setYear] = useState(getCurrentYear);
+  const [month, setMonth] = useState(getCurrentMonth());
+  const [year, setYear] = useState(getCurrentYear());
   const [selectedClusters, setSelectedClusters] = useState<string[]>([]);
   const [selectedAgeRanges, setSelectedAgeRanges] = useState<string[]>([]);
   const [availableClusters, setAvailableClusters] = useState<string[]>([]);

@@ -37,7 +37,7 @@ export function ZigBirthdays() {
   const [exporting, setExporting] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<BirthdayCustomer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [rawFilters, setRawFilters] = useState(getInitialFilters);
+  const [rawFilters, setRawFilters] = useState(getInitialFilters());
 
   // Memoizar o objeto para prevenir re-renders desnecessários
   const currentFilters = useMemo(() => rawFilters, [
