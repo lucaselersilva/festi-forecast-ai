@@ -17,6 +17,14 @@ import {
   exportBirthdayList
 } from "@/lib/birthdayHelpers";
 
+// Função helper para valores iniciais dos filtros
+const getInitialFilters = () => ({
+  month: new Date().getMonth() + 1,
+  year: new Date().getFullYear(),
+  clusters: [] as string[],
+  ageRanges: [] as string[],
+});
+
 export function ZigBirthdays() {
   const [customers, setCustomers] = useState<BirthdayCustomer[]>([]);
   const [metrics, setMetrics] = useState<MetricsType>({
@@ -29,12 +37,7 @@ export function ZigBirthdays() {
   const [exporting, setExporting] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<BirthdayCustomer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [rawFilters, setRawFilters] = useState({
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
-    clusters: [] as string[],
-    ageRanges: [] as string[],
-  });
+  const [rawFilters, setRawFilters] = useState(getInitialFilters);
 
   // Memoizar o objeto para prevenir re-renders desnecessários
   const currentFilters = useMemo(() => rawFilters, [

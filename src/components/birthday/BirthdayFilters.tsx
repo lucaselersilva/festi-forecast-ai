@@ -16,6 +16,10 @@ interface BirthdayFiltersProps {
   }) => void;
 }
 
+// Funções helper para valores iniciais
+const getCurrentMonth = () => new Date().getMonth() + 1;
+const getCurrentYear = () => new Date().getFullYear();
+
 const MONTHS = [
   { value: 1, label: 'Janeiro' },
   { value: 2, label: 'Fevereiro' },
@@ -32,9 +36,8 @@ const MONTHS = [
 ];
 
 export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
-  const currentDate = new Date();
-  const [month, setMonth] = useState(currentDate.getMonth() + 1);
-  const [year, setYear] = useState(currentDate.getFullYear());
+  const [month, setMonth] = useState(getCurrentMonth);
+  const [year, setYear] = useState(getCurrentYear);
   const [selectedClusters, setSelectedClusters] = useState<string[]>([]);
   const [selectedAgeRanges, setSelectedAgeRanges] = useState<string[]>([]);
   const [availableClusters, setAvailableClusters] = useState<string[]>([]);
@@ -45,6 +48,7 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   }, []);
 
   useEffect(() => {
+    console.log('📊 Filtros atualizados:', { month, year, selectedClusters, selectedAgeRanges });
     onFilterChange({ month, year, clusters: selectedClusters, ageRanges: selectedAgeRanges });
   }, [month, year, selectedClusters, selectedAgeRanges]);
 
@@ -81,8 +85,8 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   };
 
   const clearFilters = () => {
-    setMonth(currentDate.getMonth() + 1);
-    setYear(currentDate.getFullYear());
+    setMonth(getCurrentMonth());
+    setYear(getCurrentYear());
     setSelectedClusters([]);
     setSelectedAgeRanges([]);
   };
