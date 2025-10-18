@@ -64,3 +64,6 @@ verify_jwt = false
 
 [functions.valle-reactivation]
 verify_jwt = false
+
+[functions.marketing-assistant]
+verify_jwt = false

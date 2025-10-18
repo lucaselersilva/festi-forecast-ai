@@ -34,7 +34,8 @@ const mainItems = [
   { title: "Insights Planner", url: "/insights-planner", icon: Target },
   { title: "Clustering", url: "/clustering", icon: Activity },
   { title: "Orquestrador", url: "/orchestrator", icon: Workflow },
-  { title: "Zig Casas", url: "/zig-casas", icon: Sparkles },
+  { title: "Assistente Marketing", url: "/marketing-assistant", icon: Sparkles },
+  { title: "Zig Casas", url: "/zig-casas", icon: Users },
   { title: "Events", url: "/events", icon: Calendar },
   { title: "Sponsors", url: "/sponsors", icon: Briefcase },
 ]
