@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -36,12 +36,19 @@ export function ZigBirthdays() {
     ageRanges: [] as string[],
   });
   const { toast } = useToast();
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     loadBirthdayData();
   }, [currentFilters]);
 
   const loadBirthdayData = async () => {
+    if (isLoadingRef.current) {
+      console.log('Load already in progress, skipping...');
+      return;
+    }
+    
+    isLoadingRef.current = true;
     setLoading(true);
     try {
       const data = await getMonthBirthdays(currentFilters);
@@ -58,6 +65,7 @@ export function ZigBirthdays() {
       });
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
@@ -79,6 +87,10 @@ export function ZigBirthdays() {
       setExporting(false);
     }
   };
+
+  const handleFilterChange = useCallback((filters: typeof currentFilters) => {
+    setCurrentFilters(filters);
+  }, []);
 
   const handleViewDetails = (customer: BirthdayCustomer) => {
     setSelectedCustomer(customer);
@@ -135,7 +147,7 @@ export function ZigBirthdays() {
         </CardContent>
       </Card>
 
-      <BirthdayFilters onFilterChange={setCurrentFilters} />
+      <BirthdayFilters onFilterChange={handleFilterChange} />
 
       {customers.length === 0 ? (
         <Alert>
