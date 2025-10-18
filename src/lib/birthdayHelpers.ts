@@ -35,26 +35,11 @@ export interface BirthdayFilters {
 }
 
 export async function getMonthBirthdays(filters: BirthdayFilters): Promise<BirthdayCustomer[]> {
-  let query = supabase
-    .from('vw_valle_rfm')
-    .select('*')
-    .not('aniversario', 'is', null);
-
-  // Filtro de mês
-  query = query.gte('aniversario', `${filters.year}-${String(filters.month).padStart(2, '0')}-01`);
-  query = query.lt('aniversario', `${filters.year}-${String(filters.month + 1).padStart(2, '0')}-01`);
-
-  // Filtro de clusters
-  if (filters.clusters && filters.clusters.length > 0) {
-    query = query.in('cluster_comportamental', filters.clusters);
-  }
-
-  // Filtro de faixa etária
-  if (filters.ageRanges && filters.ageRanges.length > 0) {
-    query = query.in('faixa_etaria', filters.ageRanges);
-  }
-
-  const { data, error } = await query.order('aniversario', { ascending: true });
+  const { data, error } = await supabase.rpc('get_birthday_customers', {
+    target_month: filters.month,
+    cluster_filter: filters.clusters && filters.clusters.length > 0 ? filters.clusters : null,
+    age_range_filter: filters.ageRanges && filters.ageRanges.length > 0 ? filters.ageRanges : null,
+  });
 
   if (error) {
     throw new Error(`Erro ao buscar aniversariantes: ${error.message}`);

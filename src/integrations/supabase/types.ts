@@ -1287,6 +1287,36 @@ export type Database = {
         Args: { "": string }
         Returns: string
       }
+      get_birthday_customers: {
+        Args: {
+          age_range_filter?: string[]
+          cluster_filter?: string[]
+          target_month: number
+        }
+        Returns: {
+          aniversario: string
+          aplicativo_ativo: boolean
+          cluster_comportamental: string
+          cluster_jornada: string
+          cluster_valor: string
+          consumo: number
+          cpf: string
+          email: string
+          faixa_etaria: string
+          frequency: number
+          genero: string
+          id: string
+          idade: number
+          monetary: number
+          nome: string
+          presencas: number
+          primeira_entrada: string
+          propensity_score: number
+          recency_days: number
+          telefone: string
+          ultima_visita: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

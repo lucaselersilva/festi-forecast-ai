@@ -39,7 +39,11 @@ export function ZigBirthdays() {
   const isLoadingRef = useRef(false);
 
   useEffect(() => {
-    loadBirthdayData();
+    const timer = setTimeout(() => {
+      loadBirthdayData();
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [currentFilters]);
 
   const loadBirthdayData = async () => {
