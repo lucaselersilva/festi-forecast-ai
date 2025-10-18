@@ -17,13 +17,13 @@ import {
   exportBirthdayList
 } from "@/lib/birthdayHelpers";
 
-// Função helper para valores iniciais dos filtros
-const getInitialFilters = () => ({
+// Constantes calculadas UMA ÚNICA VEZ quando o módulo é carregado
+const INITIAL_FILTERS = {
   month: new Date().getMonth() + 1,
   year: new Date().getFullYear(),
   clusters: [] as string[],
   ageRanges: [] as string[],
-});
+};
 
 export function ZigBirthdays() {
   const [customers, setCustomers] = useState<BirthdayCustomer[]>([]);
@@ -37,7 +37,7 @@ export function ZigBirthdays() {
   const [exporting, setExporting] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<BirthdayCustomer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [rawFilters, setRawFilters] = useState(getInitialFilters());
+  const [rawFilters, setRawFilters] = useState(INITIAL_FILTERS);
 
   const { toast } = useToast();
   const isLoadingRef = useRef(false);

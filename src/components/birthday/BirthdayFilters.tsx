@@ -16,9 +16,9 @@ interface BirthdayFiltersProps {
   }) => void;
 }
 
-// Funções helper para valores iniciais
-const getCurrentMonth = () => new Date().getMonth() + 1;
-const getCurrentYear = () => new Date().getFullYear();
+// Constantes calculadas UMA ÚNICA VEZ quando o módulo é carregado
+const INITIAL_MONTH = new Date().getMonth() + 1;
+const INITIAL_YEAR = new Date().getFullYear();
 
 const MONTHS = [
   { value: 1, label: 'Janeiro' },
@@ -36,8 +36,8 @@ const MONTHS = [
 ];
 
 export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
-  const [month, setMonth] = useState(getCurrentMonth());
-  const [year, setYear] = useState(getCurrentYear());
+  const [month, setMonth] = useState(INITIAL_MONTH);
+  const [year, setYear] = useState(INITIAL_YEAR);
   const [selectedClusters, setSelectedClusters] = useState<string[]>([]);
   const [selectedAgeRanges, setSelectedAgeRanges] = useState<string[]>([]);
   const [availableClusters, setAvailableClusters] = useState<string[]>([]);
@@ -85,8 +85,8 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   };
 
   const clearFilters = () => {
-    setMonth(getCurrentMonth());
-    setYear(getCurrentYear());
+    setMonth(INITIAL_MONTH);
+    setYear(INITIAL_YEAR);
     setSelectedClusters([]);
     setSelectedAgeRanges([]);
   };
