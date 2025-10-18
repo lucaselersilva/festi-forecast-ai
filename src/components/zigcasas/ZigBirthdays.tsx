@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -29,12 +29,21 @@ export function ZigBirthdays() {
   const [exporting, setExporting] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<BirthdayCustomer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [currentFilters, setCurrentFilters] = useState({
+  const [rawFilters, setRawFilters] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     clusters: [] as string[],
     ageRanges: [] as string[],
   });
+
+  // Memoizar o objeto para prevenir re-renders desnecessários
+  const currentFilters = useMemo(() => rawFilters, [
+    rawFilters.month, 
+    rawFilters.year, 
+    rawFilters.clusters.join(','), 
+    rawFilters.ageRanges.join(',')
+  ]);
+
   const { toast } = useToast();
   const isLoadingRef = useRef(false);
 
@@ -48,20 +57,22 @@ export function ZigBirthdays() {
 
   const loadBirthdayData = async () => {
     if (isLoadingRef.current) {
-      console.log('Load already in progress, skipping...');
+      console.log('🚫 Load already in progress, skipping...');
       return;
     }
     
+    console.log('🔄 Loading birthday data for:', currentFilters);
     isLoadingRef.current = true;
     setLoading(true);
     try {
       const data = await getMonthBirthdays(currentFilters);
+      console.log('✅ Loaded', data.length, 'birthday customers');
       setCustomers(data);
       
       const calculatedMetrics = calculateBirthdayMetrics(data);
       setMetrics(calculatedMetrics);
     } catch (error) {
-      console.error('Error loading birthday data:', error);
+      console.error('❌ Error loading birthday data:', error);
       toast({
         title: "Erro ao carregar dados",
         description: error instanceof Error ? error.message : "Erro desconhecido",
@@ -92,8 +103,8 @@ export function ZigBirthdays() {
     }
   };
 
-  const handleFilterChange = useCallback((filters: typeof currentFilters) => {
-    setCurrentFilters(filters);
+  const handleFilterChange = useCallback((filters: typeof rawFilters) => {
+    setRawFilters(filters);
   }, []);
 
   const handleViewDetails = (customer: BirthdayCustomer) => {

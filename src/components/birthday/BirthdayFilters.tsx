@@ -46,7 +46,7 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
 
   useEffect(() => {
     onFilterChange({ month, year, clusters: selectedClusters, ageRanges: selectedAgeRanges });
-  }, [month, year, selectedClusters, selectedAgeRanges, onFilterChange]);
+  }, [month, year, selectedClusters, selectedAgeRanges]);
 
   const loadFilterOptions = async () => {
     const { data: clusters } = await supabase
