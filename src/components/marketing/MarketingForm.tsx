@@ -32,7 +32,7 @@ const eventSchema = z.object({
   target_audience: z.string().min(10, "Descreva o público-alvo com mais detalhes"),
   capacity: z.coerce.number().min(1, "Capacidade deve ser maior que 0"),
   ticket_price: z.coerce.number().min(0, "Preço inválido"),
-  budget: z.coerce.number().min(0, "Orçamento inválido"),
+  budget: z.coerce.number().min(0, "Orçamento inválido").optional(),
   description: z.string().optional(),
 });
 
@@ -212,14 +212,17 @@ export function MarketingForm({ onSubmit, isLoading }: MarketingFormProps) {
 
             {/* Orçamento */}
             <div className="space-y-2">
-              <Label htmlFor="budget">Orçamento de Marketing (R$) *</Label>
+              <Label htmlFor="budget">Orçamento de Marketing (R$)</Label>
               <Input
                 id="budget"
                 type="number"
                 step="0.01"
                 {...register("budget")}
-                placeholder="Ex: 5000.00"
+                placeholder="Ex: 5000.00 (opcional)"
               />
+              <p className="text-xs text-muted-foreground">
+                Opcional - deixe em branco se não definido
+              </p>
               {errors.budget && (
                 <p className="text-sm text-destructive">{errors.budget.message}</p>
               )}

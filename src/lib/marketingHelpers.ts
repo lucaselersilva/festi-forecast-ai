@@ -128,12 +128,24 @@ export async function searchCities(query: string): Promise<string[]> {
 export async function getGenres(): Promise<string[]> {
   const { data, error } = await supabase
     .from('events')
-    .select('genre');
+    .select('genre')
+    .not('genre', 'is', null);
   
-  if (error || !data) return [];
+  if (error || !data) {
+    // Retornar gêneros padrão em caso de erro
+    return ["Sertanejo", "Eletrônico", "Rock", "Pop", "Funk", "Hip Hop", "MPB", "Jazz", "Forró", "Pagode", "Reggae", "Gospel", "Samba", "Axé", "Outro"];
+  }
   
-  const uniqueGenres = Array.from(new Set(data.map(e => e.genre)));
-  return uniqueGenres.sort();
+  // Gêneros da base de dados
+  const dbGenres = Array.from(new Set(data.map(e => e.genre).filter(Boolean)));
+  
+  // Gêneros padrão brasileiros
+  const defaultGenres = ["Sertanejo", "Eletrônico", "Rock", "Pop", "Funk", "Hip Hop", "MPB", "Jazz", "Forró", "Pagode", "Reggae", "Gospel", "Samba", "Axé", "Outro"];
+  
+  // Combinar e remover duplicados
+  const allGenres = Array.from(new Set([...dbGenres, ...defaultGenres]));
+  
+  return allGenres.sort();
 }
 
 export interface SearchParams {
