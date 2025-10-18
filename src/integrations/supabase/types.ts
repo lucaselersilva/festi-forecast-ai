@@ -445,6 +445,108 @@ export type Database = {
           },
         ]
       }
+      marketing_plans: {
+        Row: {
+          budget: number | null
+          capacity: number | null
+          cluster_strategies: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          event_city: string
+          event_date: string
+          event_genre: string | null
+          event_id: string | null
+          event_name: string
+          event_venue: string | null
+          general_strategy: Json | null
+          id: string
+          marketing_plan: Json
+          status: string | null
+          target_audience: string | null
+          ticket_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          budget?: number | null
+          capacity?: number | null
+          cluster_strategies?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          event_city: string
+          event_date: string
+          event_genre?: string | null
+          event_id?: string | null
+          event_name: string
+          event_venue?: string | null
+          general_strategy?: Json | null
+          id?: string
+          marketing_plan: Json
+          status?: string | null
+          target_audience?: string | null
+          ticket_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          budget?: number | null
+          capacity?: number | null
+          cluster_strategies?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          event_city?: string
+          event_date?: string
+          event_genre?: string | null
+          event_id?: string | null
+          event_name?: string
+          event_venue?: string | null
+          general_strategy?: Json | null
+          id?: string
+          marketing_plan?: Json
+          status?: string | null
+          target_audience?: string | null
+          ticket_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_plans_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_plans_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "marketing_plans_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_analogs"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "marketing_plans_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_context"
+            referencedColumns: ["event_id"]
+          },
+          {
+            foreignKeyName: "marketing_plans_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "vw_event_perf"
+            referencedColumns: ["event_id"]
+          },
+        ]
+      }
       scoring_snapshots: {
         Row: {
           created_at: string
