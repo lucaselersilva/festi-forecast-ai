@@ -39,24 +39,27 @@ export function ZigBirthdays() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [rawFilters, setRawFilters] = useState(getInitialFilters());
 
-  // Memoizar o objeto para prevenir re-renders desnecessários
-  const currentFilters = useMemo(() => rawFilters, [
-    rawFilters.month, 
-    rawFilters.year, 
-    rawFilters.clusters.join(','), 
-    rawFilters.ageRanges.join(',')
-  ]);
-
   const { toast } = useToast();
   const isLoadingRef = useRef(false);
+  const lastFiltersRef = useRef<string>('');
 
   useEffect(() => {
+    const filtersKey = `${rawFilters.month}-${rawFilters.year}-${rawFilters.clusters.join(',')}-${rawFilters.ageRanges.join(',')}`;
+    
+    // Só carrega se os filtros realmente mudaram
+    if (lastFiltersRef.current === filtersKey) {
+      console.log('⏭️ Filtros não mudaram, ignorando load');
+      return;
+    }
+    
+    lastFiltersRef.current = filtersKey;
+    
     const timer = setTimeout(() => {
       loadBirthdayData();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [currentFilters]);
+  }, [rawFilters.month, rawFilters.year, rawFilters.clusters.join(','), rawFilters.ageRanges.join(',')]);
 
   const loadBirthdayData = async () => {
     if (isLoadingRef.current) {
@@ -64,12 +67,12 @@ export function ZigBirthdays() {
       return;
     }
     
-    console.log('🔄 Loading birthday data for:', currentFilters);
+    console.log('🔄 Loading birthday data for:', rawFilters);
     isLoadingRef.current = true;
     setLoading(true);
     try {
-      const data = await getMonthBirthdays(currentFilters);
-      console.log('✅ Loaded', data.length, 'birthday customers');
+      const data = await getMonthBirthdays(rawFilters);
+      console.log('✅ Loaded', data.length, 'birthday customers for month:', rawFilters.month);
       setCustomers(data);
       
       const calculatedMetrics = calculateBirthdayMetrics(data);
@@ -90,7 +93,7 @@ export function ZigBirthdays() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const result = await exportBirthdayList(customers, currentFilters.month, currentFilters.year);
+      const result = await exportBirthdayList(customers, rawFilters.month, rawFilters.year);
       toast({
         title: "Lista exportada com sucesso!",
         description: `${result.count} aniversariantes exportados para ${result.fileName}`,
