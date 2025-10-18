@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -109,10 +109,10 @@ export function ZigBirthdays() {
     }
   };
 
-  const handleFilterChange = (filters: typeof rawFilters) => {
+  const handleFilterChange = useCallback((filters: typeof rawFilters) => {
     console.log('🔄 Recebendo novos filtros:', filters);
     setRawFilters(filters);
-  };
+  }, []);
 
   const handleViewDetails = (customer: BirthdayCustomer) => {
     setSelectedCustomer(customer);
