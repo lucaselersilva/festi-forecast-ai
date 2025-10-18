@@ -50,7 +50,7 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   useEffect(() => {
     console.log('📊 Filtros atualizados:', { month, year, selectedClusters, selectedAgeRanges });
     onFilterChange({ month, year, clusters: selectedClusters, ageRanges: selectedAgeRanges });
-  }, [month, year, selectedClusters, selectedAgeRanges]);
+  }, [month, year, selectedClusters, selectedAgeRanges, onFilterChange]);
 
   const loadFilterOptions = async () => {
     const { data: clusters } = await supabase

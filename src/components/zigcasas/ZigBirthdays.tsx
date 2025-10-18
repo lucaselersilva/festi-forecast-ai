@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -59,7 +59,7 @@ export function ZigBirthdays() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [rawFilters.month, rawFilters.year, rawFilters.clusters.join(','), rawFilters.ageRanges.join(',')]);
+  }, [rawFilters]);
 
   const loadBirthdayData = async () => {
     if (isLoadingRef.current) {
@@ -109,9 +109,10 @@ export function ZigBirthdays() {
     }
   };
 
-  const handleFilterChange = useCallback((filters: typeof rawFilters) => {
+  const handleFilterChange = (filters: typeof rawFilters) => {
+    console.log('🔄 Recebendo novos filtros:', filters);
     setRawFilters(filters);
-  }, []);
+  };
 
   const handleViewDetails = (customer: BirthdayCustomer) => {
     setSelectedCustomer(customer);
