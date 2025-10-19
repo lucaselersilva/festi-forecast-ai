@@ -85,6 +85,13 @@ export default function Birthdays() {
     });
   };
 
+  const handleViewDetails = (customer: BirthdayCustomer) => {
+    toast({
+      title: "Detalhes do Cliente",
+      description: `${customer.nome} - ${customer.email || customer.telefone || 'Sem contato'}`
+    });
+  };
+
   const groupByCluster = () => {
     const groups: Record<string, BirthdayCustomer[]> = {};
     customers.forEach(customer => {
@@ -171,7 +178,7 @@ export default function Birthdays() {
             <CardTitle>📋 Lista Completa de Aniversariantes</CardTitle>
           </CardHeader>
           <CardContent>
-            <BirthdayTable customers={customers} />
+            <BirthdayTable customers={customers} onViewDetails={handleViewDetails} />
           </CardContent>
         </Card>
       )}
