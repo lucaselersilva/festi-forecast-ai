@@ -7,26 +7,8 @@ import { BirthdayMetrics } from "@/components/birthday/BirthdayMetrics";
 import { BirthdayTable } from "@/components/birthday/BirthdayTable";
 import { BirthdayClusterCard } from "@/components/birthday/BirthdayClusterCard";
 import { ClusteringLoader } from "@/components/birthday/ClusteringLoader";
-import { getBirthdayCustomers, generateClusterActions, getClusterActions, exportBirthdayList } from "@/lib/birthdayHelpers";
+import { BirthdayCustomer, getBirthdayCustomers, generateClusterActions, getClusterActions, exportBirthdayList } from "@/lib/birthdayHelpers";
 import { Sparkles, Download, Cake } from "lucide-react";
-
-interface BirthdayCustomer {
-  customer_id: string;
-  nome: string;
-  email: string;
-  telefone: string;
-  aniversario: string;
-  idade: number;
-  consumo: number;
-  presencas: number;
-  recency_days: number;
-  cluster_comportamental: string;
-  cluster_valor: string;
-  faixa_etaria: string;
-  propensity_score: number;
-  genero: string;
-  aplicativo_ativo: boolean;
-}
 
 export default function Birthdays() {
   const { toast } = useToast();
