@@ -18,7 +18,6 @@ export default function Birthdays() {
   const [clusterActions, setClusterActions] = useState<any[]>([]);
   const [filters, setFilters] = useState({
     month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
     clusters: [] as string[],
     ageRanges: [] as string[]
   });
@@ -50,7 +49,8 @@ export default function Birthdays() {
 
   const loadExistingActions = async () => {
     try {
-      const actions = await getClusterActions(filters.month, filters.year);
+      const currentYear = new Date().getFullYear();
+      const actions = await getClusterActions(filters.month, currentYear);
       setClusterActions(actions);
     } catch (error) {
       console.error('Error loading existing actions:', error);
@@ -60,11 +60,12 @@ export default function Birthdays() {
   const handleGenerateActions = async () => {
     setGeneratingActions(true);
     try {
-      const result = await generateClusterActions(filters.month, filters.year);
-      setClusterActions(result.actions);
+      const currentYear = new Date().getFullYear();
+      await generateClusterActions(filters.month, currentYear);
+      await loadExistingActions();
       toast({
-        title: "Ações geradas com sucesso!",
-        description: `${result.actions.length} clusters analisados`
+        title: "✨ Ações geradas!",
+        description: "Estratégias personalizadas criadas para cada cluster"
       });
     } catch (error: any) {
       toast({

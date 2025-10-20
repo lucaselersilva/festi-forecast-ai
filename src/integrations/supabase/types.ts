@@ -123,7 +123,7 @@ export type Database = {
           id?: string
           month: number
           updated_at?: string | null
-          year: number
+          year?: number
         }
         Update: {
           actions?: Json
@@ -366,6 +366,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      import_staging: {
+        Row: {
+          created_at: string | null
+          file_name: string | null
+          id: string
+          mapped_data: Json | null
+          raw_data: Json
+          session_id: string
+          source_name: string | null
+          status: string | null
+          total_rows: number | null
+          updated_at: string | null
+          validation_results: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name?: string | null
+          id?: string
+          mapped_data?: Json | null
+          raw_data: Json
+          session_id: string
+          source_name?: string | null
+          status?: string | null
+          total_rows?: number | null
+          updated_at?: string | null
+          validation_results?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string | null
+          id?: string
+          mapped_data?: Json | null
+          raw_data?: Json
+          session_id?: string
+          source_name?: string | null
+          status?: string | null
+          total_rows?: number | null
+          updated_at?: string | null
+          validation_results?: Json | null
+        }
+        Relationships: []
+      }
+      import_templates: {
+        Row: {
+          column_mappings: Json
+          created_at: string | null
+          description: string | null
+          field_transformations: Json | null
+          id: string
+          is_default: boolean | null
+          name: string
+          source_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          column_mappings: Json
+          created_at?: string | null
+          description?: string | null
+          field_transformations?: Json | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          source_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          column_mappings?: Json
+          created_at?: string | null
+          description?: string | null
+          field_transformations?: Json | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          source_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       interactions: {
         Row: {

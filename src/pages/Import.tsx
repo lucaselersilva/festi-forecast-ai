@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { dataService, ImportResult } from "@/lib/dataService"
+import { RequiredFieldsInfo } from "@/components/import/RequiredFieldsInfo"
 
 type ImportStatus = 'idle' | 'processing' | 'success' | 'error'
 
@@ -323,6 +324,8 @@ const Import = () => {
               </div>
 
               <div className="space-y-6">
+                <RequiredFieldsInfo />
+                
                 <Card className="glass border-border/50">
                   <CardHeader>
                     <CardTitle>Template & Instructions</CardTitle>

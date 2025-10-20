@@ -32,7 +32,6 @@ export interface BirthdayMetrics {
 
 export interface BirthdayFilters {
   month: number;
-  year: number;
   clusters?: string[];
   ageRanges?: string[];
 }
@@ -175,7 +174,8 @@ export async function getClusterActions(month: number, year: number) {
   return data || [];
 }
 
-export function exportClusterPlan(cluster: any, customers: BirthdayCustomer[]) {
+export function exportClusterPlan(cluster: any, customers: BirthdayCustomer[], month?: number) {
+
   const exportData = [
     { Section: 'PLANO DE ANIVERSARIANTES', Value: '' },
     { Section: 'Cluster', Value: cluster.name },

@@ -10,7 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 interface BirthdayFiltersProps {
   onFilterChange: (filters: {
     month: number;
-    year: number;
     clusters: string[];
     ageRanges: string[];
   }) => void;
@@ -18,7 +17,6 @@ interface BirthdayFiltersProps {
 
 // Constantes calculadas UMA ÚNICA VEZ quando o módulo é carregado
 const INITIAL_MONTH = new Date().getMonth() + 1;
-const INITIAL_YEAR = new Date().getFullYear();
 
 const MONTHS = [
   { value: 1, label: 'Janeiro' },
@@ -37,7 +35,6 @@ const MONTHS = [
 
 export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   const [month, setMonth] = useState(INITIAL_MONTH);
-  const [year, setYear] = useState(INITIAL_YEAR);
   const [selectedClusters, setSelectedClusters] = useState<string[]>([]);
   const [selectedAgeRanges, setSelectedAgeRanges] = useState<string[]>([]);
   const [availableClusters, setAvailableClusters] = useState<string[]>([]);
@@ -48,9 +45,9 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   }, []);
 
   useEffect(() => {
-    console.log('📊 Filtros atualizados:', { month, year, selectedClusters, selectedAgeRanges });
-    onFilterChange({ month, year, clusters: selectedClusters, ageRanges: selectedAgeRanges });
-  }, [month, year, selectedClusters, selectedAgeRanges, onFilterChange]);
+    console.log('📊 Filtros atualizados:', { month, selectedClusters, selectedAgeRanges });
+    onFilterChange({ month, clusters: selectedClusters, ageRanges: selectedAgeRanges });
+  }, [month, selectedClusters, selectedAgeRanges, onFilterChange]);
 
   const loadFilterOptions = async () => {
     const { data: clusters } = await supabase
@@ -86,7 +83,6 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
 
   const clearFilters = () => {
     setMonth(INITIAL_MONTH);
-    setYear(INITIAL_YEAR);
     setSelectedClusters([]);
     setSelectedAgeRanges([]);
   };
@@ -110,38 +106,20 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Mês</Label>
-              <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map(m => (
-                    <SelectItem key={m.value} value={String(m.value)}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Ano</Label>
-              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[2024, 2025, 2026].map(y => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Mês</Label>
+            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map(m => (
+                  <SelectItem key={m.value} value={String(m.value)}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {availableClusters.length > 0 && (
