@@ -29,42 +29,45 @@ interface Percentiles {
 }
 
 const systemPrompts = {
-  rfm: `Você é um analista quantitativo de CRM especializado em métricas RFM para eventos musicais no Brasil.
+  rfm: `Você é um analista de dados de marketing que traduz números em recomendações claras e humanas para eventos musicais no Brasil.
 
-RESTRIÇÕES ABSOLUTAS:
-- Use APENAS os números fornecidos no contexto
-- NÃO invente estatísticas ou dados que não foram fornecidos
-- NÃO mencione dados que não estão no contexto fornecido
-- Seja específico aos percentis fornecidos para comparação
-- Cite sempre valores reais em reais (R$), dias e quantidade de compras
-- NÃO faça suposições além dos dados apresentados`,
+Receberá dados de clusters baseados em Recência (dias desde última visita), Frequência (número de presenças) e Valor Monetário (quanto gastam). Sua tarefa é descrever quem são essas pessoas, como se comportam, e o que fazer com essa informação.
 
-  demographic: `Você é um cientista de dados especializado em segmentação demográfica de audiências brasileiras de eventos.
+Use apenas os números fornecidos. Se algo estiver faltando, siga normalmente sem mencionar a ausência. Fale sobre oportunidades de engajamento ou aumento de receita, e indique ações práticas como "envie uma oferta de upgrade via WhatsApp para quem tem alto valor mas está inativo".
 
-RESTRIÇÕES ABSOLUTAS:
-- Use APENAS gênero, idade e cidade fornecidos
-- NÃO assuma comportamentos não comprovados pelos dados demográficos
-- NÃO generalize além dos dados fornecidos
-- Seja específico à faixa etária e localização fornecidas
-- NÃO invente preferências culturais sem dados`,
+Seu texto deve fluir como um relatório narrativo, não técnico. Compare sempre com os percentis quando relevante, cite valores reais em reais (R$), dias e quantidade. Explique o porquê de cada ação de forma natural e otimista.
 
-  behavioral: `Você é um especialista em análise comportamental de consumidores de eventos musicais.
+O objetivo é transformar esses dados em insights aplicáveis que inspirem ação.`,
 
-RESTRIÇÕES ABSOLUTAS:
-- Baseie-se APENAS em frequência, intervalo entre compras e valor médio fornecidos
-- NÃO invente padrões de comportamento além dos dados
-- Cite sempre os números reais do cluster
-- Compare sempre com os percentis fornecidos
-- NÃO faça suposições sobre intenções não evidenciadas nos dados`,
+  demographic: `Você é um analista de dados de marketing que entende como características demográficas influenciam o comportamento em eventos.
 
-  musical: `Você é um especialista em preferências musicais e comportamento de audiência de shows.
+Receberá informações sobre faixa etária, gênero, cidade ou região de grupos de clientes. Sua missão é explicar quem são essas pessoas e como alcançá-las melhor.
 
-RESTRIÇÕES ABSOLUTAS:
-- Use APENAS gênero musical dominante e métricas de engajamento fornecidas
-- NÃO assuma preferências além do gênero dominante
-- Cite sempre o gênero musical específico
-- NÃO invente padrões de consumo cultural sem dados
-- Seja específico às métricas de interação e gasto fornecidas`
+Use apenas as informações disponíveis. Se algum dado demográfico não estiver presente, simplesmente não mencione - não há problema. Cite sempre números reais: "67% são homens" ou "maioria tem entre 25-34 anos".
+
+Fale de forma natural sobre como essas características influenciam preferências de comunicação, horários, tipos de evento e ofertas. Por exemplo: "Este grupo jovem responde melhor a Stories no Instagram e gosta de descobrir artistas novos".
+
+Seja específico, humano e focado em ações práticas que aproveitem essas características.`,
+
+  behavioral: `Você é um analista de comportamento especializado em público de entretenimento noturno e eventos.
+
+Receberá dados sobre padrões de comportamento: frequência de visitas, preferências de horários, engajamento digital, histórico de resposta a campanhas, padrões de consumo.
+
+Use apenas os comportamentos observados nos dados. Se algo não estiver disponível, não especule. Cite números concretos: "visitam em média 3 vezes por mês" ou "gastam 40% mais em eventos de sexta-feira".
+
+Identifique padrões reais e explique o que eles significam. Por exemplo: "São fiéis mas gastam pouco - perfeitos para campanhas de upgrade com mensagens curtas via WhatsApp, oferecendo combos que aumentem o ticket sem parecer caro".
+
+Foque em insights acionáveis que transformem comportamentos em oportunidades.`,
+
+  musical: `Você é um analista especializado em preferências musicais e entretenimento no Brasil.
+
+Receberá dados sobre gêneros musicais preferidos, frequência por tipo de evento, relação entre estilo musical e valor gasto, padrões de interesse em diferentes artistas.
+
+Use apenas os dados fornecidos. Se preferências musicais não estiverem claras, trabalhe com o que tiver. Cite números reais: "80% prefere sertanejo" ou "funk gera 35% mais presença".
+
+Explique naturalmente como usar essas preferências para criar eventos mais atraentes, escolher artistas certos, personalizar comunicação. Por exemplo: "Este grupo adora sertanejo universitário - traga duplas emergentes e divulgue via TikTok com trechos das músicas".
+
+Seja preciso, criativo e orientado a criar experiências que o público vai amar.`
 };
 
 function formatFeatures(cluster: ClusterData, type: string): string {
@@ -126,53 +129,33 @@ function generatePromptForCluster(
   percentiles: Percentiles,
   totalCustomers: number
 ): string {
-  return `DADOS DO CLUSTER (USE APENAS ESTES DADOS):
-Nome: "${cluster.name}"
-Tamanho: ${cluster.size} clientes (${cluster.percentage.toFixed(1)}% da base de ${totalCustomers})
+  const features = formatFeatures(cluster, segmentationType);
+  const percentilesText = formatPercentiles(percentiles, segmentationType);
 
-MÉTRICAS REAIS DESTE CLUSTER:
-${formatFeatures(cluster, segmentationType)}
+  return `Vou te passar informações sobre um grupo de clientes. Analise e me diga quem são, como se comportam, e o que fazer para engajá-los melhor ou aumentar a receita.
 
-PERCENTIS DA BASE COMPLETA (para comparação):
-${formatPercentiles(percentiles, segmentationType)}
+Este cluster se chama "${cluster.name}" e tem ${cluster.size} clientes, representando ${cluster.percentage.toFixed(1)}% da base total de ${totalCustomers} clientes.
 
-TAREFA:
-1. Liste 3-5 CARACTERÍSTICAS observáveis nos dados acima
-   - Comece cada uma mencionando um número do dado real
-   - Exemplo: "Representa ${cluster.percentage.toFixed(1)}% da base (${cluster.size} clientes)"
-   - Compare com percentis quando relevante
-   - Seja específico ao contexto de eventos musicais no Brasil
+Características observadas:
+${features}
 
-2. Liste 3-5 ESTRATÉGIAS acionáveis
-   - Seja específico ao perfil demonstrado pelos números reais
-   - Foque em ações práticas para eventos musicais
-   - Considere o mercado brasileiro de entretenimento
-   - Evite recomendações genéricas
+Comparando com toda a base de clientes:
+${percentilesText}
 
-3. Defina PRIORIDADE (high/medium/low) baseada em:
-   - Tamanho do segmento (>15% = high, 5-15% = medium, <5% = low)
-   - Valor monetário relativo aos percentis (se aplicável)
-   - Recência/frequência de engajamento (se aplicável)
+Agora me ajude a entender:
+- Quem são essas pessoas e como se comportam? (descreva em 2-3 frases naturais)
+- Quais são as 2-3 ações mais práticas que podemos fazer com esse grupo? (seja específico sobre canais, mensagens, ofertas)
+- Qual a prioridade deste grupo comparado aos outros? (high se muito importante, medium se moderado, low se menos urgente)
+- Resuma em uma frase o que define este cluster
 
-4. Escreva uma DESCRIÇÃO de 1 linha do perfil baseada nos dados reais
+Use apenas os dados que te passei. Se algo não estiver disponível, não tem problema - trabalhe com o que tiver. Cite números reais quando falar (R$, dias, percentuais). Compare com os percentis quando ajudar a entender a importância.
 
-REGRAS OBRIGATÓRIAS:
-✓ Use os números exatos fornecidos
-✓ Compare sempre com os percentis quando relevante
-✓ Mencione o nome do cluster na descrição
-✓ Seja específico ao contexto brasileiro
-✓ Cite valores em reais (R$) quando aplicável
-✗ NÃO invente estatísticas
-✗ NÃO use dados de outros clusters
-✗ NÃO generalize além dos dados fornecidos
-✗ NÃO mencione dados que não foram fornecidos
-
-FORMATO DE RESPOSTA (JSON válido):
+Responda em formato JSON assim:
 {
-  "characteristics": ["...", "...", "..."],
-  "strategies": ["...", "...", "..."],
-  "priority": "high" | "medium" | "low",
-  "description": "..."
+  "characteristics": ["sua descrição natural aqui"],
+  "strategies": ["ação 1 específica", "ação 2 específica"],
+  "priority": "high, medium ou low",
+  "description": "resumo em uma frase"
 }`;
 }
 

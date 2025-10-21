@@ -78,83 +78,55 @@ serve(async (req) => {
     const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     // 4. Montar prompt contextualizado
-    const systemPrompt = `Você é um especialista em marketing para eventos de entretenimento no Brasil, com profundo conhecimento em:
+    const systemPrompt = `Você é um estrategista de marketing especializado em eventos musicais e entretenimento noturno no Brasil. Seu trabalho é criar planos completos e realistas que inspirem ação.
 
-1. Funil de Vendas para Eventos: awareness → interest → desire → action
-2. Storytelling Emocional: criar narrativas que conectam emocionalmente
-3. Gatilhos Psicológicos: escassez, urgência, prova social, autoridade, reciprocidade
-4. Segmentação Comportamental: adaptar mensagens por perfil de cliente
-5. Marketing Digital: Instagram, WhatsApp, Facebook, Google Ads
-6. Otimização de Orçamento: ROI, CAC, LTV
+Quando receber informações sobre um evento - nome, data, cidade, gênero musical, histórico de vendas, clusters de clientes ou orçamento - use o que estiver disponível. Se algum dado faltar, não invente nada. Apenas explique naturalmente, por exemplo: "não temos informação sobre o orçamento, mas baseado no restante dos dados...".
 
-Sua missão é criar planos de marketing personalizados, práticos e executáveis que maximizem vendas de ingressos.
+Seu plano deve fluir como uma conversa entre consultor e cliente. Organize em partes naturais:
+- Visão geral inspiradora do evento (1 frase que capture a essência)
+- Fases do plano (pré-lançamento, lançamento, engajamento, último chamado) com datas aproximadas quando houver
+- Ações recomendadas e por quê funcionam
+- Canais ideais e tom de comunicação apropriado
+- Distribuição de orçamento quando disponível
+- Mensagem central da campanha
 
-DIRETRIZES:
-- Linguagem envolvente e criativa
-- Mensagens curtas com emojis sutis (1-2 por mensagem)
-- Foco em ação e urgência
-- KPIs mensuráveis e realistas
-- Considere o contexto brasileiro (feriados, payday, comportamento local)`;
+Mantenha o tom humano, otimista e estratégico. Evite jargões técnicos - transforme números e scores em ações compreensíveis. Considere o contexto cultural brasileiro, público jovem/adulto, comunicação leve e inteligente.
 
-    let userPrompt = `Crie um plano de marketing completo para:
+Seu objetivo final é transformar dados em insights aplicáveis e inspiradores para o dono do evento executar o plano com confiança.`;
 
-INFORMAÇÕES DO EVENTO:
-- Nome: ${eventData.event_name}
-- Data: ${eventData.event_date} (faltam ${daysUntil} dias)
-- Cidade: ${eventData.event_city}
-- Local: ${eventData.event_venue || 'A definir'}
-- Gênero Musical: ${eventData.event_genre}
-- Público-Alvo: ${eventData.target_audience}
-- Capacidade: ${eventData.capacity} pessoas
-- Preço Médio: R$ ${eventData.ticket_price}
-- Orçamento Marketing: R$ ${eventData.budget}
-${eventData.description ? `\nDESCRIÇÃO: ${eventData.description}` : ''}`;
+    let userPrompt = `Vou te passar as informações disponíveis sobre este evento. Use o que tiver para criar o melhor plano possível.
 
-    // Adicionar informações de clusters
+O evento se chama "${eventData.event_name}" e acontecerá em ${eventData.event_date} na cidade de ${eventData.event_city}${eventData.event_venue ? `, no local ${eventData.event_venue}` : ''}.
+
+${eventData.capacity ? `Esperamos cerca de ${eventData.capacity} pessoas.` : 'Ainda não temos estimativa de público.'}
+
+${eventData.event_genre ? `O gênero musical é ${eventData.event_genre}.` : ''}
+
+${eventData.budget ? `O orçamento de marketing disponível é de R$ ${eventData.budget}.` : 'Não temos orçamento definido ainda, mas sugira uma distribuição ideal.'}
+
+${daysUntil <= 15 ? `⚠️ Atenção: faltam apenas ${daysUntil} dias! O plano precisa focar em conversão urgente através de WhatsApp e Push, criar senso de urgência (medo de ficar de fora), e ativar o público que já demonstrou interesse.` : 
+  daysUntil <= 30 ? `Temos ${daysUntil} dias - um prazo moderado. Há tempo para construir desejo mas também precisamos de conversão.` : 
+  `Temos ${daysUntil} dias - tempo suficiente para uma campanha completa com antecipação e construção de expectativa.`}
+${eventData.description ? `\n\nSobre o evento: ${eventData.description}` : ''}`;
+
+    // Adicionar informações históricas da cidade se houver
+    if (cityEvents && cityEvents.length > 0) {
+      const avgOccupancy = cityEvents.reduce((acc, e) => acc + ((e.tickets_sold || 0) / (e.capacity || 1)), 0) / cityEvents.length;
+      userPrompt += `\n\nSobre a cidade ${eventData.event_city}: já realizamos ${cityEvents.length} eventos similares aqui, com ocupação média de ${(avgOccupancy * 100).toFixed(0)}%. Use esse histórico para entender o comportamento do público local e adaptar a estratégia.`;
+    }
+
+    // Adicionar informações de clusters se houver
     if (clusterData.length > 0) {
-      userPrompt += `\n\n🎯 ANÁLISE DE PÚBLICO (Baseada em eventos anteriores na cidade):\n`;
+      userPrompt += `\n\nSobre os clientes que já temos na base:\n`;
       
       clusterData.forEach(cluster => {
-        userPrompt += `\n**${cluster.cluster_comportamental}** - ${cluster.total_clientes} clientes
-- Consumo médio: R$ ${cluster.consumo_medio?.toFixed(2)}
-- Presença média: ${cluster.presencas_media} eventos
-- Recency: ${cluster.recency_media} dias desde última visita
-- Gêneros preferidos: ${cluster.generos?.join(', ') || 'Variados'}
-- Faixas etárias: ${cluster.faixas_etarias?.join(', ') || 'Diversas'}
-- Com app ativo: ${cluster.com_app_ativo} clientes
-- Propensity score médio: ${cluster.propensity_media?.toFixed(2)}
-`;
+        userPrompt += `\n• **${cluster.cluster_comportamental}** (${cluster.total_clientes} pessoas): gastam em média R$ ${cluster.consumo_medio?.toFixed(2)}, comparecem a ${cluster.presencas_media?.toFixed(1)} eventos, última visita há ${cluster.recency_media?.toFixed(0)} dias. ${cluster.com_app_ativo > 0 ? `${cluster.com_app_ativo} têm o app ativo.` : ''}`;
       });
       
-      userPrompt += `\n✅ IMPORTANTE: Crie estratégias personalizadas para cada cluster acima.`;
+      userPrompt += `\n\nUse esses perfis para personalizar as mensagens e escolher os canais certos para cada grupo.`;
     }
 
-    // Adicionar urgência se necessário
-    if (daysUntil < 14) {
-      userPrompt += `\n\n⚠️ URGÊNCIA: Evento em menos de 2 semanas! 
-- Compacte as fases do plano
-- Enfatize escassez e urgência em TODAS as mensagens
-- Priorize canais de resposta rápida (WhatsApp, Stories)
-- Ações devem ser executáveis IMEDIATAMENTE`;
-    } else if (daysUntil > 60) {
-      userPrompt += `\n\n📅 PLANEJAMENTO EXTENSO: Mais de 2 meses até o evento
-- Crie mais fases (5-7 fases)
-- Inclua fase de "Antecipação" e "Teasers"
-- Construa storytelling progressivo
-- Trabalhe awareness e interesse antes da conversão`;
-    }
-
-    userPrompt += `\n\nESTRUTURE O PLANO COM:
-
-1. **Estratégia Geral:**
-   - Overview executivo (2-3 parágrafos)
-   - 5-7 mensagens-chave do evento
-   - Canais prioritários
-   - Alocação de orçamento por canal (%)
-
-2. **Fases do Plano (Timeline):**
-   - Divida em ${daysUntil < 14 ? '3-4' : daysUntil < 30 ? '4-5' : '5-7'} fases
-   - Cada fase com nome criativo, período, objetivo e ações específicas`;
+    userPrompt += `\n\nAgora crie um plano de marketing que seja inspirador, prático e focado em resultados reais.`;
 
     // 5. Chamar OpenAI com tool calling
     const tools = [{

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +34,21 @@ serve(async (req) => {
       const strategies = [];
 
       for (const cluster of clusters) {
-        const strategyData = generateStrategyForCluster(cluster);
+        let strategyData;
+        
+        if (openaiKey) {
+          try {
+            strategyData = await generateStrategyWithAI(cluster, openaiKey);
+            console.log(`✅ AI strategy generated for ${cluster.cluster_comportamental}`);
+          } catch (error) {
+            console.error(`⚠️ AI failed for ${cluster.cluster_comportamental}, using default:`, error);
+            strategyData = generateDefaultStrategy(cluster);
+          }
+        } else {
+          console.log(`⚠️ No OpenAI key, using default strategy for ${cluster.cluster_comportamental}`);
+          strategyData = generateDefaultStrategy(cluster);
+        }
+        
         strategies.push(strategyData);
       }
 
@@ -72,7 +87,83 @@ serve(async (req) => {
   }
 });
 
-function generateStrategyForCluster(cluster: any) {
+async function generateStrategyWithAI(cluster: any, openaiKey: string) {
+  const prompt = `Você é um estrategista de CRM e fidelização para eventos musicais no Brasil.
+
+Recebeu informações sobre um grupo de clientes:
+
+**Cluster: ${cluster.cluster_comportamental}**
+- Tamanho: ${cluster.total_clientes} clientes
+- Consumo médio: R$ ${cluster.consumo_medio?.toFixed(2) || '0'}
+- Presenças média: ${cluster.presencas_media?.toFixed(1) || '0'}
+- Recência média: ${cluster.recencia_media?.toFixed(0) || '0'} dias
+- Propensão média: ${(cluster.propensity_media * 100)?.toFixed(0) || '0'}%
+
+Analise o perfil comportamental e crie uma estratégia de reativação personalizada.
+
+Descubra o motivo provável da inatividade ou comportamento deste grupo e crie:
+
+1. **Título da estratégia** (curto e inspirador)
+2. **Descrição da estratégia** (como abordar este perfil especificamente)
+3. **Template de mensagem** (texto completo, humanizado, com emojis, placeholders [Nome] e [link])
+4. **Canal recomendado** (WhatsApp para urgência, Email para storytelling, Push para lembretes)
+5. **Taxa de conversão esperada** (entre 0 e 1, realista para este perfil)
+6. **Prioridade** (1=urgente, 2=importante, 3=moderado, 4=baixo)
+
+Adapte o tom ao perfil:
+- **VIPs/Alto Valor**: exclusivo, sofisticado, privilégios únicos
+- **Frequentes**: próximo, "você é de casa", nostalgia
+- **Econômicos**: claro, direto, benefício tangível
+- **Inativos/Risco**: acolhedor, "sentimos sua falta", incentivo forte
+- **Novatos**: entusiasta, descoberta, primeira experiência
+
+Exemplo de mensagem humanizada:
+"Faz tempo que não te vejo na pista! 👀 Tem um novo evento que é a sua cara — e um desconto especial até amanhã. Bora viver isso de novo? 🎉"
+
+Retorne JSON válido.`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um especialista em marketing de reativação para eventos. Responda sempre com JSON válido.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.8,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const aiResult = JSON.parse(data.choices[0].message.content);
+
+  return {
+    cluster_comportamental: cluster.cluster_comportamental,
+    strategy_title: aiResult.strategy_title || aiResult.titulo || 'Estratégia de Reativação',
+    strategy_description: aiResult.strategy_description || aiResult.descricao || aiResult.description || 'Reativar clientes do cluster',
+    message_template: aiResult.message_template || aiResult.mensagem || aiResult.template || 'Olá [Nome]! Temos novidades para você.',
+    recommended_channel: aiResult.recommended_channel || aiResult.canal || 'WhatsApp',
+    expected_conversion_rate: aiResult.expected_conversion_rate || aiResult.conversao || 0.3,
+    priority: aiResult.priority || aiResult.prioridade || 3,
+  };
+}
+
+function generateDefaultStrategy(cluster: any) {
   const clusterName = cluster.cluster_comportamental;
   const avgConsumption = cluster.consumo_medio;
   const avgPresences = cluster.presencas_media;

@@ -224,39 +224,42 @@ async function generateActionsWithAI(clusterName: string, analysis: any): Promis
     return generateDefaultActions(clusterName, analysis);
   }
 
-  const prompt = `Você é um especialista em marketing de relacionamento para eventos e entretenimento.
+  const prompt = `Você é um redator publicitário especializado em relacionamento com o público de eventos. Está criando mensagens de aniversário personalizadas para o mês ${analysis.month}/${analysis.year}.
 
-CONTEXTO:
-Estamos planejando campanhas de aniversário para o mês ${analysis.month}/${analysis.year}.
-
-CLUSTER: ${clusterName}
-- Tamanho: ${analysis.size} clientes
-- Consumo médio: R$ ${analysis.avgSpending.toFixed(2)}
-- Recência média: ${analysis.avgRecency.toFixed(0)} dias
-- Presenças médias: ${analysis.avgFrequency.toFixed(1)}
+Este cluster "${clusterName}" tem ${analysis.size} clientes com características específicas:
+- Consumo médio de R$ ${analysis.avgSpending.toFixed(2)}
+- Recência de ${analysis.avgRecency.toFixed(0)} dias desde a última visita
+- Frequência de ${analysis.avgFrequency.toFixed(1)} presenças em eventos
 - Faixa etária predominante: ${analysis.dominantAge}
 - Gênero predominante: ${analysis.dominantGender}
-- Com app ativo: ${analysis.activeAppPercent.toFixed(1)}%
+- ${analysis.activeAppPercent.toFixed(0)}% têm o app ativo
 
-OBJETIVO:
-Gerar 5-7 ações específicas e criativas para reativar/engajar esses aniversariantes, aumentando a conversão e o ticket médio.
+Sua missão é gerar 5-7 ações criativas e específicas para esse perfil. Considere:
 
-ESTRUTURE as ações considerando:
-1. Canal de comunicação (WhatsApp, Email, SMS, Push, Presencial)
-2. Timing (quando enviar em relação à data de aniversário)
-3. Mensagem personalizada (use gatilhos emocionais adequados ao perfil)
-4. Oferta/benefício (desconto, brinde, upgrade, acesso VIP, etc.)
-5. Taxa de conversão esperada (%)
+**O canal certo:**
+- WhatsApp para urgência e alto valor
+- Email para informação e storytelling
+- Push para lembretes rápidos
+- Presencial para exclusividade
 
-DIRETRIZES:
-- Seja criativo e específico para o perfil do cluster
-- Use linguagem adequada à faixa etária
-- Considere o nível de engajamento (recência)
-- Para inativos: ênfase em reativação e escassez
-- Para fidelizados: exclusividade e gratidão
-- Para alto valor: experiências premium
-- Inclua mensagens prontas para copiar
-- Considere custo-benefício das ações`;
+**O timing perfeito:**
+- Quando enviar em relação ao aniversário (antes/no dia/depois)
+- Frequência de contato sem ser invasivo
+
+**A mensagem que toca o coração:**
+Adapte o tom ao perfil:
+- VIPs e Alto Valor → exclusivo, sofisticado, privilégios únicos
+- Frequentes → próximo, descontraído, "você é de casa"
+- Econômicos → alegre, direto, benefício claro e tangível
+- Inativos → nostálgico, acolhedor, "sentimos sua falta"
+- Novatos → entusiasta, descoberta, primeira experiência memorável
+
+As mensagens devem soar humanas e emocionais. Exemplo: "Parabéns! 🎉 Você faz parte dos momentos mais incríveis da nossa história. Aproveite o mês com benefícios exclusivos nos nossos eventos."
+
+Inclua para cada ação:
+- Oferta ou benefício específico
+- Taxa de conversão esperada (baseada no perfil)
+- Custo estimado se aplicável`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
