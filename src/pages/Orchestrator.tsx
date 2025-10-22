@@ -1,25 +1,16 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ObjectiveForm from "@/components/orchestrator/ObjectiveForm";
-import DataPlanCard from "@/components/orchestrator/DataPlanCard";
 import DataProfilePreview from "@/components/orchestrator/DataProfilePreview";
-import HypothesisChips from "@/components/orchestrator/HypothesisChips";
 import FindingsViewer from "@/components/orchestrator/FindingsViewer";
 import StrategyCard from "@/components/orchestrator/StrategyCard";
-import { Target, TrendingUp } from "lucide-react";
+import { Target, TrendingUp, Sparkles, Loader2 } from "lucide-react";
 
-const STEPS = [
-  "Objetivo & Contexto",
-  "Plano de Dados",
-  "Hipóteses",
-  "Findings",
-  "Estratégias",
-  "Persistir"
-];
+const STEPS = ["Setup", "Resultados"];
 
 export default function Orchestrator() {
   const [currentStep, setCurrentStep] = useState(0);
@@ -27,37 +18,105 @@ export default function Orchestrator() {
   const [newEvent, setNewEvent] = useState<any>({});
   const [goal, setGoal] = useState<string>("boost_revenue");
   const [constraints, setConstraints] = useState<any>({});
-  const [plan, setPlan] = useState<any>(null);
   const [dataProfile, setDataProfile] = useState<any>(null);
-  const [hypotheses, setHypotheses] = useState<any[]>([]);
-  const [approvedHypotheses, setApprovedHypotheses] = useState<any[]>([]);
   const [findings, setFindings] = useState<any>(null);
   const [strategies, setStrategies] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState<string>("");
   const { toast } = useToast();
 
   const progress = ((currentStep + 1) / STEPS.length) * 100;
 
-  const handleGeneratePlan = async () => {
+  const handleGenerateComplete = async () => {
     setLoading(true);
+    
     try {
-      const { data, error } = await supabase.functions.invoke('orchestrator', {
+      // Step 1: Generate Plan
+      setLoadingStep("Gerando plano de dados...");
+      const { data: planData, error: planError } = await supabase.functions.invoke('orchestrator', {
         body: {
           action: 'plan',
           payload: { newEvent, goal, constraints }
         }
       });
 
-      if (error) throw error;
+      if (planError) throw planError;
       
-      setRunId(data.runId);
-      setPlan(data.plan);
+      const generatedRunId = planData.runId;
+      const plan = planData.plan;
+      setRunId(generatedRunId);
+
+      // Step 2: Execute Plan
+      setLoadingStep("Coletando dados...");
+      const { data: executeData, error: executeError } = await supabase.functions.invoke('orchestrator', {
+        body: {
+          action: 'execute',
+          payload: { runId: generatedRunId, plan }
+        }
+      });
+
+      if (executeError) throw executeError;
+      
+      const profile = executeData.dataProfile;
+      setDataProfile(profile);
+
+      // Step 3: Generate Hypotheses
+      setLoadingStep("Gerando hipóteses...");
+      const { data: hypothesesData, error: hypothesesError } = await supabase.functions.invoke('orchestrator', {
+        body: {
+          action: 'hypotheses',
+          payload: { runId: generatedRunId, dataProfile: profile }
+        }
+      });
+
+      if (hypothesesError) throw hypothesesError;
+      
+      const allHypotheses = hypothesesData.hypotheses.hypotheses || [];
+
+      // Step 4: Test ALL Hypotheses (sem aprovação manual)
+      setLoadingStep("Testando hipóteses...");
+      const { data: testData, error: testError } = await supabase.functions.invoke('orchestrator', {
+        body: {
+          action: 'test',
+          payload: { runId: generatedRunId, dataProfile: profile, approvedHypotheses: allHypotheses }
+        }
+      });
+
+      if (testError) throw testError;
+      
+      const generatedFindings = testData.findings.findings || testData.findings;
+      setFindings(generatedFindings);
+
+      // Step 5: Generate Strategies
+      setLoadingStep("Gerando estratégias...");
+      const { data: strategiesData, error: strategiesError } = await supabase.functions.invoke('orchestrator', {
+        body: {
+          action: 'strategize',
+          payload: { runId: generatedRunId, findings: generatedFindings, constraints }
+        }
+      });
+
+      if (strategiesError) throw strategiesError;
+      
+      const generatedStrategies = strategiesData.strategies || [];
+      setStrategies(generatedStrategies);
+
+      // Step 6: Auto-save
+      setLoadingStep("Salvando análise...");
+      await supabase.functions.invoke('orchestrator', {
+        body: {
+          action: 'save',
+          payload: { runId: generatedRunId }
+        }
+      });
+
       setCurrentStep(1);
       
       toast({
-        title: "✅ Plano gerado",
-        description: "Plano de dados criado com sucesso"
+        title: "✅ Análise Completa",
+        description: `${generatedStrategies.length} estratégias geradas e salvas`
       });
+
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -66,164 +125,29 @@ export default function Orchestrator() {
       });
     } finally {
       setLoading(false);
+      setLoadingStep("");
     }
   };
 
-  const handleExecutePlan = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('orchestrator', {
-        body: {
-          action: 'execute',
-          payload: { runId, plan }
-        }
-      });
-
-      if (error) throw error;
-      
-      setDataProfile(data.dataProfile);
-      setCurrentStep(2);
-      
-      toast({
-        title: "✅ Dados coletados",
-        description: "DataProfile criado com sucesso"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleReset = () => {
+    setCurrentStep(0);
+    setRunId(null);
+    setNewEvent({});
+    setGoal("boost_revenue");
+    setConstraints({});
+    setDataProfile(null);
+    setFindings(null);
+    setStrategies([]);
   };
 
-  const handleGenerateHypotheses = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('orchestrator', {
-        body: {
-          action: 'hypotheses',
-          payload: { runId, dataProfile }
-        }
-      });
-
-      if (error) throw error;
-      
-      setHypotheses(data.hypotheses.hypotheses || []);
-      
-      toast({
-        title: "✅ Hipóteses geradas",
-        description: `${data.hypotheses.hypotheses?.length || 0} hipóteses criadas`
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTestHypotheses = async () => {
-    if (approvedHypotheses.length === 0) {
-      toast({
-        title: "Atenção",
-        description: "Aprove pelo menos uma hipótese",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('orchestrator', {
-        body: {
-          action: 'test',
-          payload: { runId, dataProfile, approvedHypotheses }
-        }
-      });
-
-      if (error) throw error;
-      
-      setFindings(data.findings.findings || data.findings);
-      setCurrentStep(3);
-      
-      toast({
-        title: "✅ Findings gerados",
-        description: "Análise completa"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGenerateStrategies = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('orchestrator', {
-        body: {
-          action: 'strategize',
-          payload: { runId, findings, constraints }
-        }
-      });
-
-      if (error) throw error;
-      
-      setStrategies(data.strategies || []);
-      setCurrentStep(4);
-      
-      toast({
-        title: "✅ Estratégias geradas",
-        description: `${data.strategies?.length || 0} estratégias criadas`
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.functions.invoke('orchestrator', {
-        body: {
-          action: 'save',
-          payload: { runId }
-        }
-      });
-
-      if (error) throw error;
-      
-      setCurrentStep(5);
-      
-      toast({
-        title: "✅ Salvo com sucesso",
-        description: "Análise e estratégias persistidas"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleExport = () => {
+    const exportData = { dataProfile, findings, strategies };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analysis-${runId}.json`;
+    a.click();
   };
 
   return (
@@ -232,28 +156,30 @@ export default function Orchestrator() {
         <Target className="h-8 w-8 text-primary" />
         <div>
           <h1 className="text-3xl font-bold">Orquestrador de Análise</h1>
-          <p className="text-muted-foreground">Sistema guiado por dados: Planner → Analyst → Strategist</p>
+          <p className="text-muted-foreground">
+            Sistema integrado: análise completa em um clique
+          </p>
         </div>
       </div>
 
       {/* Progress Bar */}
       <Card className="p-6">
         <div className="space-y-4">
-          <div className="flex justify-between text-sm text-muted-foreground">
+          <div className="flex justify-between text-sm">
             {STEPS.map((step, idx) => (
               <div
                 key={step}
                 className={`flex items-center gap-2 ${
                   idx === currentStep ? 'text-primary font-semibold' : ''
-                } ${idx < currentStep ? 'text-green-600' : ''}`}
+                } ${idx < currentStep ? 'text-success' : 'text-muted-foreground'}`}
               >
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full border-2 ${
+                <span className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
                   idx === currentStep ? 'border-primary bg-primary/10' : 
-                  idx < currentStep ? 'border-green-600 bg-green-600/10' : 'border-muted'
+                  idx < currentStep ? 'border-success bg-success/10' : 'border-muted'
                 }`}>
                   {idx + 1}
                 </span>
-                <span className="hidden md:inline">{step}</span>
+                <span>{step}</span>
               </div>
             ))}
           </div>
@@ -261,7 +187,7 @@ export default function Orchestrator() {
         </div>
       </Card>
 
-      {/* Step Content */}
+      {/* Step 1: Setup */}
       {currentStep === 0 && (
         <ObjectiveForm
           newEvent={newEvent}
@@ -270,102 +196,185 @@ export default function Orchestrator() {
           setGoal={setGoal}
           constraints={constraints}
           setConstraints={setConstraints}
-          onGenerate={handleGeneratePlan}
+          onGenerate={handleGenerateComplete}
           loading={loading}
         />
       )}
 
-      {currentStep === 1 && plan && (
-        <DataPlanCard
-          plan={plan}
-          onExecute={handleExecutePlan}
-          loading={loading}
-        />
-      )}
-
-      {currentStep === 2 && dataProfile && (
-        <DataProfilePreview
-          dataProfile={dataProfile}
-          onGenerateHypotheses={handleGenerateHypotheses}
-          hypotheses={hypotheses}
-          approvedHypotheses={approvedHypotheses}
-          setApprovedHypotheses={setApprovedHypotheses}
-          onTest={handleTestHypotheses}
-          loading={loading}
-        />
-      )}
-
-      {currentStep === 3 && findings && (
-        <FindingsViewer
-          findings={findings}
-          onGenerateStrategies={handleGenerateStrategies}
-          loading={loading}
-        />
-      )}
-
-      {currentStep === 4 && strategies.length > 0 && (
-        <div className="space-y-4">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <h2 className="text-2xl font-bold">Estratégias Geradas</h2>
-              </div>
-              <Button onClick={handleSave} disabled={loading}>
-                Salvar Tudo
-              </Button>
+      {/* Loading State */}
+      {loading && (
+        <Card className="p-12">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <Loader2 className="h-12 w-12 text-primary animate-spin" />
+            <div>
+              <h3 className="text-xl font-semibold mb-2">Processando Análise</h3>
+              <p className="text-muted-foreground">{loadingStep}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                ⏱️ Isso pode levar 30-60 segundos
+              </p>
             </div>
-          </Card>
-          
-          {strategies.map((strategy, idx) => (
-            <StrategyCard
-              key={idx}
-              strategy={strategy}
-              runId={runId!}
-              eventId={null}
-              constraints={constraints}
-            />
-          ))}
-        </div>
+          </div>
+        </Card>
       )}
 
-      {currentStep === 5 && (
-        <Card className="p-12 text-center">
-          <div className="mx-auto w-fit rounded-full bg-green-100 p-4 mb-4">
-            <TrendingUp className="h-12 w-12 text-green-600" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Análise Completa!</h2>
-          <p className="text-muted-foreground mb-6">
-            DataProfile, Findings e Estratégias foram salvos no Supabase.
-          </p>
+      {/* Step 2: Resultados */}
+      {currentStep === 1 && !loading && (
+        <div className="space-y-6">
+          {/* Data Profile */}
+          {dataProfile && (
+            <Card className="p-6 space-y-6">
+              <CardHeader className="p-0">
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  DataProfile
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Segmentos */}
+                {dataProfile.segments && (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {dataProfile.segments.attended_similar && (
+                      <div className="bg-muted p-4 rounded-lg">
+                        <div className="text-sm text-muted-foreground mb-1">🎵 Frequentaram Similar</div>
+                        <div className="text-2xl font-bold">{dataProfile.segments.attended_similar.count}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Média: R${dataProfile.segments.attended_similar.avg_monetary?.toFixed(0)}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {dataProfile.segments.high_value && (
+                      <div className="bg-muted p-4 rounded-lg">
+                        <div className="text-sm text-muted-foreground mb-1">⭐ Alto Valor</div>
+                        <div className="text-2xl font-bold">{dataProfile.segments.high_value.count}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Média: R${dataProfile.segments.high_value.avg_monetary?.toFixed(0)}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {dataProfile.segments.at_risk && (
+                      <div className="bg-muted p-4 rounded-lg">
+                        <div className="text-sm text-muted-foreground mb-1">⚠️ Em Risco</div>
+                        <div className="text-2xl font-bold">{dataProfile.segments.at_risk.count}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Inatividade: {dataProfile.segments.at_risk.avg_recency?.toFixed(0)}d
+                        </div>
+                      </div>
+                    )}
+                    
+                    {dataProfile.segments.high_bar_spenders && (
+                      <div className="bg-muted p-4 rounded-lg">
+                        <div className="text-sm text-muted-foreground mb-1">🍺 Alto Consumo Bar</div>
+                        <div className="text-2xl font-bold">{dataProfile.segments.high_bar_spenders.count}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Média bar: R${dataProfile.segments.high_bar_spenders.avg_spend?.toFixed(0)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Benchmarks */}
+                {dataProfile.analogous_events && (
+                  <div className="mt-6">
+                    <h3 className="font-semibold mb-3">Benchmarks de Eventos Similares</h3>
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <div className="bg-muted p-3 rounded-lg">
+                        <div className="text-xs text-muted-foreground">Eventos Similares</div>
+                        <div className="text-xl font-bold">{dataProfile.analogous_events.total_found}</div>
+                      </div>
+                      <div className="bg-muted p-3 rounded-lg">
+                        <div className="text-xs text-muted-foreground">Ocupação Média</div>
+                        <div className="text-xl font-bold">
+                          {(dataProfile.analogous_events.avg_occupancy * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                      <div className="bg-muted p-3 rounded-lg">
+                        <div className="text-xs text-muted-foreground">Receita Média</div>
+                        <div className="text-xl font-bold">
+                          R${(dataProfile.analogous_events.avg_revenue / 1000).toFixed(0)}K
+                        </div>
+                      </div>
+                      <div className="bg-muted p-3 rounded-lg">
+                        <div className="text-xs text-muted-foreground">Preço Médio</div>
+                        <div className="text-xl font-bold">
+                          R${dataProfile.analogous_events.avg_ticket_price?.toFixed(0)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Findings & Strategies Combined */}
+          {findings && (
+            <Card className="p-6 space-y-6">
+              <CardHeader className="p-0">
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Insights & Estratégias
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 space-y-6">
+                {/* Findings Summary */}
+                <div className="prose prose-sm max-w-none">
+                  {findings.key_segments && findings.key_segments.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">🎯 Segmentos Identificados:</h4>
+                      {findings.key_segments.slice(0, 3).map((seg: any, idx: number) => (
+                        <p key={idx} className="text-sm text-muted-foreground">
+                          • <strong>{seg.name}</strong> ({seg.size} clientes): {seg.evidence?.[0]}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {findings.opportunities && findings.opportunities.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <h4 className="font-semibold text-sm">💡 Oportunidades:</h4>
+                      {findings.opportunities.slice(0, 2).map((opp: any, idx: number) => (
+                        <p key={idx} className="text-sm text-muted-foreground">
+                          • {opp.hypothesis} - <em>{opp.est_impact}</em>
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Strategies */}
+                {strategies.length > 0 && (
+                  <div className="space-y-4 mt-6">
+                    <h3 className="font-semibold text-lg">🚀 Estratégias Recomendadas</h3>
+                    <div className="grid gap-4">
+                      {strategies.map((strategy, idx) => (
+                        <StrategyCard
+                          key={idx}
+                          strategy={strategy}
+                          runId={runId!}
+                          eventId={null}
+                          constraints={constraints}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Actions */}
           <div className="flex gap-4 justify-center">
-            <Button variant="outline" onClick={() => {
-              setCurrentStep(0);
-              setRunId(null);
-              setNewEvent({});
-              setPlan(null);
-              setDataProfile(null);
-              setHypotheses([]);
-              setApprovedHypotheses([]);
-              setFindings(null);
-              setStrategies([]);
-            }}>
+            <Button variant="outline" onClick={handleReset}>
               Nova Análise
             </Button>
-            <Button onClick={() => {
-              // Export functionality
-              const exportData = { dataProfile, findings, strategies };
-              const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `analysis-${runId}.json`;
-              a.click();
-            }}>
+            <Button onClick={handleExport}>
               Exportar JSON
             </Button>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

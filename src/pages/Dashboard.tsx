@@ -2,73 +2,45 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
-import { Input } from "@/components/ui/input"
+import { DateRange } from "react-day-picker"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { 
   TrendingUp, 
   Users, 
   DollarSign, 
   Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
-  BarChart3,
-  Zap,
-  Target,
   Brain,
-  Filter,
   RefreshCw,
-  MapPin,
-  Music,
   Ticket,
-  TrendingDown,
-  Eye,
-  EyeOff
+  BarChart3,
+  Music2
 } from "lucide-react"
 import { 
-  LineChart, 
-  Line, 
+  AreaChart,
+  Area,
   XAxis, 
   YAxis, 
   CartesianGrid, 
   ResponsiveContainer,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
-  ScatterChart,
-  Scatter,
-  Area,
-  AreaChart,
-  ComposedChart,
   Tooltip,
   Legend
 } from "recharts"
 import { dataService } from "@/lib/dataService"
 import { useToast } from "@/hooks/use-toast"
 import MLRunner from "@/components/MLRunner"
+import SmartInsightsCard from "@/components/dashboard/SmartInsightsCard"
+import AdvancedAnalysis from "@/components/dashboard/AdvancedAnalysis"
 
 interface FilterState {
-  dateRange: { from: Date | undefined, to: Date | undefined }
+  dateRange?: DateRange
   genres: string[]
   cities: string[]
   minPrice: number | null
   maxPrice: number | null
-  minCapacity: number | null
-  maxCapacity: number | null
-}
-
-interface ChartVisibility {
-  timeline: boolean
-  genres: boolean
-  cities: boolean
-  scatterPlot: boolean
-  occupancy: boolean
-  crossAnalysis: boolean
 }
 
 const Dashboard = () => {
@@ -77,32 +49,18 @@ const Dashboard = () => {
   const [metrics, setMetrics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showMLRunner, setShowMLRunner] = useState(false)
-  const [activeView, setActiveView] = useState('overview')
   const [selectedMetric, setSelectedMetric] = useState('revenue')
+  const [breakdownView, setBreakdownView] = useState<'genre' | 'city'>('genre')
   const { toast } = useToast()
 
-  // Filter state
   const [filters, setFilters] = useState<FilterState>({
-    dateRange: { from: undefined, to: undefined },
+    dateRange: undefined,
     genres: [],
     cities: [],
     minPrice: null,
-    maxPrice: null,
-    minCapacity: null,
-    maxCapacity: null
+    maxPrice: null
   })
 
-  // Chart visibility
-  const [chartVisibility, setChartVisibility] = useState<ChartVisibility>({
-    timeline: true,
-    genres: true,
-    cities: true,
-    scatterPlot: true,
-    occupancy: true,
-    crossAnalysis: true
-  })
-
-  // Available options for filters
   const [availableGenres, setAvailableGenres] = useState<string[]>([])
   const [availableCities, setAvailableCities] = useState<string[]>([])
 
@@ -121,7 +79,6 @@ const Dashboard = () => {
       
       setAllEvents(eventsData)
       
-      // Extract unique values for filters
       const genres = [...new Set(eventsData.map(e => e.genre))].filter(Boolean)
       const cities = [...new Set(eventsData.map(e => e.city))].filter(Boolean)
       
@@ -131,8 +88,8 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error loading dashboard data:', error)
       toast({
-        title: "Error Loading Data",
-        description: "Failed to load dashboard data. Please try again.",
+        title: "Erro ao Carregar",
+        description: "Falha ao carregar dados do dashboard",
         variant: "destructive"
       })
     } finally {
@@ -143,25 +100,21 @@ const Dashboard = () => {
   const applyFilters = () => {
     let filtered = [...allEvents]
 
-    // Date range filter
-    if (filters.dateRange.from && filters.dateRange.to) {
+    if (filters.dateRange?.from && filters.dateRange?.to) {
       filtered = filtered.filter(event => {
         const eventDate = new Date(event.date)
-        return eventDate >= filters.dateRange.from! && eventDate <= filters.dateRange.to!
+        return eventDate >= filters.dateRange!.from! && eventDate <= filters.dateRange!.to!
       })
     }
 
-    // Genre filter
     if (filters.genres.length > 0) {
       filtered = filtered.filter(event => filters.genres.includes(event.genre))
     }
 
-    // City filter
     if (filters.cities.length > 0) {
       filtered = filtered.filter(event => filters.cities.includes(event.city))
     }
 
-    // Price filters
     if (filters.minPrice !== null) {
       filtered = filtered.filter(event => event.ticket_price >= filters.minPrice!)
     }
@@ -169,17 +122,7 @@ const Dashboard = () => {
       filtered = filtered.filter(event => event.ticket_price <= filters.maxPrice!)
     }
 
-    // Capacity filters
-    if (filters.minCapacity !== null) {
-      filtered = filtered.filter(event => event.capacity >= filters.minCapacity!)
-    }
-    if (filters.maxCapacity !== null) {
-      filtered = filtered.filter(event => event.capacity <= filters.maxCapacity!)
-    }
-
     setFilteredEvents(filtered)
-    
-    // Calculate metrics for filtered data
     calculateMetrics(filtered)
   }
 
@@ -226,29 +169,19 @@ const Dashboard = () => {
 
   const clearFilters = () => {
     setFilters({
-      dateRange: { from: undefined, to: undefined },
+      dateRange: undefined,
       genres: [],
       cities: [],
       minPrice: null,
-      maxPrice: null,
-      minCapacity: null,
-      maxCapacity: null
+      maxPrice: null
     })
   }
 
-  const toggleChart = (chartName: keyof ChartVisibility) => {
-    setChartVisibility(prev => ({
-      ...prev,
-      [chartName]: !prev[chartName]
-    }))
-  }
-
-  // Data processing for charts
   const getTimelineData = () => {
     const monthlyData: Record<string, { events: number, revenue: number, tickets: number }> = {}
     
     filteredEvents.forEach(event => {
-      const month = new Date(event.date).toISOString().substring(0, 7) // YYYY-MM
+      const month = new Date(event.date).toISOString().substring(0, 7)
       if (!monthlyData[month]) {
         monthlyData[month] = { events: 0, revenue: 0, tickets: 0 }
       }
@@ -265,48 +198,23 @@ const Dashboard = () => {
         tickets: data.tickets
       }))
       .sort((a, b) => a.month.localeCompare(b.month))
-      .slice(-12) // Last 12 months
+      .slice(-12)
   }
 
-  const getGenreData = () => {
-    const genreStats: Record<string, { events: number, revenue: number, tickets: number, avgPrice: number }> = {}
+  const getBreakdownData = () => {
+    const stats: Record<string, { events: number, revenue: number, tickets: number }> = {}
     
     filteredEvents.forEach(event => {
-      const genre = event.genre
-      if (!genreStats[genre]) {
-        genreStats[genre] = { events: 0, revenue: 0, tickets: 0, avgPrice: 0 }
+      const key = breakdownView === 'genre' ? event.genre : event.city
+      if (!stats[key]) {
+        stats[key] = { events: 0, revenue: 0, tickets: 0 }
       }
-      genreStats[genre].events += 1
-      genreStats[genre].revenue += event.revenue || 0
-      genreStats[genre].tickets += event.sold_tickets || 0
+      stats[key].events += 1
+      stats[key].revenue += event.revenue || 0
+      stats[key].tickets += event.sold_tickets || 0
     })
 
-    return Object.entries(genreStats)
-      .map(([name, data]) => ({
-        name,
-        events: data.events,
-        revenue: data.revenue,
-        tickets: data.tickets,
-        avgPrice: data.revenue / data.tickets || 0
-      }))
-      .sort((a, b) => (b[selectedMetric as keyof typeof a] as number) - (a[selectedMetric as keyof typeof a] as number))
-      .slice(0, 8)
-  }
-
-  const getCityData = () => {
-    const cityStats: Record<string, { events: number, revenue: number, tickets: number }> = {}
-    
-    filteredEvents.forEach(event => {
-      const city = event.city
-      if (!cityStats[city]) {
-        cityStats[city] = { events: 0, revenue: 0, tickets: 0 }
-      }
-      cityStats[city].events += 1
-      cityStats[city].revenue += event.revenue || 0
-      cityStats[city].tickets += event.sold_tickets || 0
-    })
-
-    return Object.entries(cityStats)
+    return Object.entries(stats)
       .map(([name, data]) => ({
         name,
         events: data.events,
@@ -315,48 +223,6 @@ const Dashboard = () => {
       }))
       .sort((a, b) => (b[selectedMetric as keyof typeof a] as number) - (a[selectedMetric as keyof typeof a] as number))
       .slice(0, 10)
-  }
-
-  const getScatterData = () => {
-    return filteredEvents.map(event => ({
-      x: event.ticket_price || 0,
-      y: (event.sold_tickets || 0) / (event.capacity || 1) * 100, // Occupancy %
-      z: event.revenue || 0,
-      genre: event.genre,
-      city: event.city,
-      name: `${event.artist} - ${event.venue}`
-    }))
-  }
-
-  const getCrossAnalysisData = () => {
-    const analysis: Record<string, Record<string, { events: number, revenue: number }>> = {}
-    
-    filteredEvents.forEach(event => {
-      const genre = event.genre
-      const city = event.city
-      
-      if (!analysis[genre]) analysis[genre] = {}
-      if (!analysis[genre][city]) analysis[genre][city] = { events: 0, revenue: 0 }
-      
-      analysis[genre][city].events += 1
-      analysis[genre][city].revenue += event.revenue || 0
-    })
-
-    const result = []
-    Object.entries(analysis).forEach(([genre, cities]) => {
-      Object.entries(cities).forEach(([city, data]) => {
-        result.push({
-          genre,
-          city,
-          combination: `${genre} em ${city}`,
-          events: data.events,
-          revenue: data.revenue,
-          avgRevenue: data.revenue / data.events
-        })
-      })
-    })
-
-    return result.sort((a, b) => b.revenue - a.revenue).slice(0, 10)
   }
 
   if (loading) {
@@ -370,14 +236,12 @@ const Dashboard = () => {
   if (showMLRunner) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowMLRunner(false)}
-          >
-            ← Back to Dashboard
-          </Button>
-        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => setShowMLRunner(false)}
+        >
+          ← Voltar ao Dashboard
+        </Button>
         <MLRunner events={filteredEvents} />
       </div>
     )
@@ -385,31 +249,30 @@ const Dashboard = () => {
 
   const metricCards = [
     {
-      title: "Eventos Filtrados",
+      title: "Eventos",
       value: filteredEvents.length.toString(),
-      change: ((filteredEvents.length / allEvents.length) * 100).toFixed(1),
+      subtitle: `${((filteredEvents.length / allEvents.length) * 100).toFixed(0)}% do total`,
       icon: Calendar,
-      color: "text-primary",
-      suffix: "%"
+      color: "text-primary"
     },
     {
       title: "Receita Total",
       value: `R$ ${((metrics?.totalRevenue || 0) / 1000000).toFixed(1)}M`,
-      change: metrics ? ((metrics.totalRevenue / 1000000) / (filteredEvents.length / 1000)).toFixed(1) : "0",
+      subtitle: `Média R$ ${((metrics?.avgRevenuePerEvent || 0) / 1000).toFixed(0)}K/evento`,
       icon: DollarSign,
       color: "text-success"
     },
     {
       title: "Taxa de Ocupação",
       value: `${(metrics?.occupancyRate || 0).toFixed(1)}%`,
-      change: (metrics?.occupancyRate || 0) > 75 ? "Excelente" : (metrics?.occupancyRate || 0) > 50 ? "Bom" : "Baixo",
+      subtitle: (metrics?.occupancyRate || 0) > 75 ? "Excelente" : (metrics?.occupancyRate || 0) > 50 ? "Bom" : "Baixo",
       icon: Users,
       color: "text-warning"
     },
     {
       title: "Ticket Médio",
       value: `R$ ${(metrics?.avgTicketPrice || 0).toFixed(0)}`,
-      change: `${(metrics?.avgRevenuePerEvent || 0) / 1000}K por evento`,
+      subtitle: `${(metrics?.totalSold || 0).toLocaleString()} ingressos`,
       icon: Ticket,
       color: "text-info"
     }
@@ -420,9 +283,9 @@ const Dashboard = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Dashboard Interativo</h1>
+          <h1 className="text-3xl font-bold gradient-text">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Navegue e explore {allEvents.length} eventos • {filteredEvents.length} filtrados
+            {allEvents.length} eventos • {filteredEvents.length} filtrados
           </p>
         </div>
         
@@ -440,474 +303,195 @@ const Dashboard = () => {
             onClick={() => setShowMLRunner(true)}
           >
             <Brain className="w-4 h-4" />
-            AI & ML Analysis
+            AI & ML
           </Button>
         </div>
       </div>
 
-      <Tabs value={activeView} onValueChange={setActiveView} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="analysis">Análise Cruzada</TabsTrigger>
-          <TabsTrigger value="trends">Tendências</TabsTrigger>
-          <TabsTrigger value="filters">Filtros Avançados</TabsTrigger>
-        </TabsList>
+      {/* Filtros em uma linha */}
+      <Card className="glass border-border/50">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Filtros</CardTitle>
+            <div className="flex gap-2 items-center">
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Limpar
+              </Button>
+              <Select value={selectedMetric} onValueChange={setSelectedMetric}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="revenue">Receita</SelectItem>
+                  <SelectItem value="events">Eventos</SelectItem>
+                  <SelectItem value="tickets">Ingressos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-3 items-center">
+              <DatePickerWithRange
+                date={filters.dateRange}
+                onDateChange={(range) => setFilters({ ...filters, dateRange: range })}
+              />
+              
+              <div className="flex flex-wrap gap-1">
+                <Label className="text-xs text-muted-foreground w-full mb-1">Gêneros:</Label>
+                {availableGenres.slice(0, 8).map(genre => (
+                  <Badge 
+                    key={genre}
+                    variant={filters.genres.includes(genre) ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => toggleGenreFilter(genre)}
+                  >
+                    {genre}
+                  </Badge>
+                ))}
+              </div>
+              
+              <div className="flex flex-wrap gap-1">
+                <Label className="text-xs text-muted-foreground w-full mb-1">Cidades:</Label>
+                {availableCities.slice(0, 8).map(city => (
+                  <Badge 
+                    key={city}
+                    variant={filters.cities.includes(city) ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => toggleCityFilter(city)}
+                  >
+                    {city}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Filters Bar */}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {metricCards.map((card) => {
+          const Icon = card.icon
+          return (
+            <Card key={card.title} className="glass border-border/50">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {card.title}
+                  </CardTitle>
+                  <Icon className={`w-4 h-4 ${card.color}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{card.value}</div>
+                <p className="text-xs text-muted-foreground mt-1">{card.subtitle}</p>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Gráficos Principais */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Timeline */}
         <Card className="glass border-border/50">
-          <CardHeader className="pb-3">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Evolução Temporal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={getTimelineData()}>
+                <defs>
+                  <linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="month" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={selectedMetric}
+                  stroke="hsl(var(--primary))"
+                  fillOpacity={1}
+                  fill="url(#colorMetric)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Breakdown */}
+        <Card className="glass border-border/50">
+          <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Filter className="w-4 h-4" />
-                Filtros Rápidos
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Performance por {breakdownView === 'genre' ? 'Gênero' : 'Cidade'}
               </CardTitle>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={clearFilters}>
-                  Limpar
+              <div className="flex gap-1">
+                <Button
+                  variant={breakdownView === 'genre' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setBreakdownView('genre')}
+                >
+                  <Music2 className="w-4 h-4" />
                 </Button>
-                <Select value={selectedMetric} onValueChange={setSelectedMetric}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border z-50">
-                    <SelectItem value="revenue">Receita</SelectItem>
-                    <SelectItem value="events">Nº Eventos</SelectItem>
-                    <SelectItem value="tickets">Ingressos</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Button
+                  variant={breakdownView === 'city' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setBreakdownView('city')}
+                >
+                  Cidades
+                </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Genre Filter */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Gêneros</Label>
-                <div className="flex flex-wrap gap-1">
-                  {availableGenres.slice(0, 6).map(genre => (
-                    <Badge 
-                      key={genre}
-                      variant={filters.genres.includes(genre) ? "default" : "outline"}
-                      className="cursor-pointer text-xs"
-                      onClick={() => toggleGenreFilter(genre)}
-                    >
-                      {genre}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* City Filter */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Cidades</Label>
-                <div className="flex flex-wrap gap-1">
-                  {availableCities.slice(0, 6).map(city => (
-                    <Badge 
-                      key={city}
-                      variant={filters.cities.includes(city) ? "default" : "outline"}
-                      className="cursor-pointer text-xs"
-                      onClick={() => toggleCityFilter(city)}
-                    >
-                      {city}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price Range */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Faixa de Preço</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Min"
-                    value={filters.minPrice || ''}
-                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: Number(e.target.value) || null }))}
-                    className="h-8"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Max"
-                    value={filters.maxPrice || ''}
-                    onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: Number(e.target.value) || null }))}
-                    className="h-8"
-                  />
-                </div>
-              </div>
-
-              {/* Chart Toggles */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Visualizações</Label>
-                <div className="flex flex-wrap gap-1">
-                  {Object.entries(chartVisibility).slice(0, 4).map(([key, visible]) => (
-                    <Badge 
-                      key={key}
-                      variant={visible ? "default" : "outline"}
-                      className="cursor-pointer text-xs gap-1"
-                      onClick={() => toggleChart(key as keyof ChartVisibility)}
-                    >
-                      {visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                      {key}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={getBreakdownData()}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Bar dataKey={selectedMetric} fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
+      </div>
 
-        <TabsContent value="overview" className="space-y-6">
-          {/* Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {metricCards.map((metric) => {
-              const Icon = metric.icon
-              
-              return (
-                <Card key={metric.title} className="glass border-border/50 hover:border-primary/20 transition-colors">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        {metric.title}
-                      </CardTitle>
-                      <Icon className={`w-4 h-4 ${metric.color}`} />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold mb-1">{metric.value}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {metric.change}{metric.suffix || ''}
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
+      {/* Smart Insights */}
+      <SmartInsightsCard events={filteredEvents} metrics={metrics} />
 
-          {/* Main Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {chartVisibility.timeline && (
-              <Card className="glass border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4" />
-                    Tendência Temporal - {selectedMetric}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={getTimelineData()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis 
-                          dataKey="month" 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12}
-                        />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--background))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }} 
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey={selectedMetric} 
-                          stroke="hsl(var(--primary))" 
-                          fill="hsl(var(--primary))"
-                          fillOpacity={0.2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {chartVisibility.genres && (
-              <Card className="glass border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Music className="w-4 h-4" />
-                    Por Gênero - {selectedMetric}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={getGenreData()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis 
-                          dataKey="name" 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12}
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                        />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--background))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }} 
-                        />
-                        <Bar 
-                          dataKey={selectedMetric} 
-                          fill="hsl(var(--primary))" 
-                          radius={[4, 4, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="analysis" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {chartVisibility.scatterPlot && (
-              <Card className="glass border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="w-4 h-4" />
-                    Preço vs Ocupação
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ScatterChart data={getScatterData()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis 
-                          type="number"
-                          dataKey="x" 
-                          name="Preço"
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12}
-                        />
-                        <YAxis 
-                          type="number"
-                          dataKey="y" 
-                          name="Ocupação %"
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12}
-                        />
-                        <Tooltip 
-                          cursor={{ strokeDasharray: '3 3' }}
-                          content={({ active, payload }) => {
-                            if (active && payload && payload[0]) {
-                              const data = payload[0].payload
-                              return (
-                                <div className="bg-background p-3 border border-border rounded-lg shadow-lg">
-                                  <p className="font-medium">{data.name}</p>
-                                  <p className="text-sm">Preço: R$ {data.x}</p>
-                                  <p className="text-sm">Ocupação: {data.y.toFixed(1)}%</p>
-                                  <p className="text-sm">Receita: R$ {data.z?.toLocaleString()}</p>
-                                  <p className="text-sm text-muted-foreground">{data.genre} • {data.city}</p>
-                                </div>
-                              )
-                            }
-                            return null
-                          }}
-                        />
-                        <Scatter dataKey="y" fill="hsl(var(--primary))" />
-                      </ScatterChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {chartVisibility.crossAnalysis && (
-              <Card className="glass border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4" />
-                    Análise Cruzada: Gênero x Cidade
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {getCrossAnalysisData().map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-accent/20 hover:bg-accent/30 transition-colors">
-                        <div>
-                          <div className="font-medium text-sm">{item.combination}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {item.events} eventos • R$ {item.avgRevenue.toFixed(0)} médio
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold">R$ {(item.revenue / 1000).toFixed(0)}K</div>
-                          <div className="text-xs text-muted-foreground">#{index + 1}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {chartVisibility.cities && (
-            <Card className="glass border-border/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  Performance por Cidade - {selectedMetric}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={getCityData()}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="hsl(var(--muted-foreground))" 
-                        fontSize={12}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))', 
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
-                        }} 
-                      />
-                      <Bar dataKey={selectedMetric} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="events" 
-                        stroke="hsl(var(--destructive))" 
-                        strokeWidth={2}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="trends" className="space-y-6">
-          {/* Trends content - would need more specific trend analysis */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="glass border-border/50">
-              <CardHeader>
-                <CardTitle>Tendências de Crescimento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-success/10">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-success" />
-                      <span className="font-medium">Eletrônica</span>
-                    </div>
-                    <span className="text-success font-bold">+23%</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-warning/10">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-warning" />
-                      <span className="font-medium">Rock</span>
-                    </div>
-                    <span className="text-warning font-bold">+12%</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/10">
-                    <div className="flex items-center gap-2">
-                      <TrendingDown className="w-4 h-4 text-destructive" />
-                      <span className="font-medium">Sertanejo</span>
-                    </div>
-                    <span className="text-destructive font-bold">-8%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass border-border/50">
-              <CardHeader>
-                <CardTitle>Oportunidades Identificadas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
-                    <h4 className="font-medium text-primary">Expansion São Paulo</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Ocupação média de 85% sugere demanda reprimida
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg border border-success/20 bg-success/5">
-                    <h4 className="font-medium text-success">Premium Pricing</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Eventos eletrônicos podem suportar preços 30% maiores
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg border border-warning/20 bg-warning/5">
-                    <h4 className="font-medium text-warning">Marketing Digital</h4>
-                    <p className="text-sm text-muted-foreground">
-                      ROI 40% maior em campanhas online vs offline
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="filters" className="space-y-6">
-          <Card className="glass border-border/50">
-            <CardHeader>
-              <CardTitle>Filtros Avançados</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label>Capacidade Mínima</Label>
-                  <Input
-                    type="number"
-                    value={filters.minCapacity || ''}
-                    onChange={(e) => setFilters(prev => ({ ...prev, minCapacity: Number(e.target.value) || null }))}
-                    placeholder="Ex: 1000"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Capacidade Máxima</Label>
-                  <Input
-                    type="number"
-                    value={filters.maxCapacity || ''}
-                    onChange={(e) => setFilters(prev => ({ ...prev, maxCapacity: Number(e.target.value) || null }))}
-                    placeholder="Ex: 50000"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Controles de Visualização</Label>
-                  <div className="space-y-2">
-                    {Object.entries(chartVisibility).map(([key, visible]) => (
-                      <div key={key} className="flex items-center space-x-2">
-                        <Switch
-                          id={key}
-                          checked={visible}
-                          onCheckedChange={() => toggleChart(key as keyof ChartVisibility)}
-                        />
-                        <Label htmlFor={key} className="text-sm">
-                          {key.charAt(0).toUpperCase() + key.slice(1)}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* Análises Avançadas (Accordion) */}
+      <Card className="glass border-border/50">
+        <CardHeader>
+          <CardTitle>Análises Detalhadas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AdvancedAnalysis events={filteredEvents} />
+        </CardContent>
+      </Card>
     </div>
   )
 }
