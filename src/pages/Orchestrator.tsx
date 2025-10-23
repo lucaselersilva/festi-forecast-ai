@@ -98,7 +98,9 @@ export default function Orchestrator() {
 
       if (strategiesError) throw strategiesError;
       
-      const generatedStrategies = strategiesData.strategies || [];
+      const generatedStrategies = Array.isArray(strategiesData.strategies) 
+        ? strategiesData.strategies 
+        : [];
       setStrategies(generatedStrategies);
 
       // Step 6: Auto-save
@@ -321,7 +323,7 @@ export default function Orchestrator() {
               <CardContent className="p-0 space-y-6">
                 {/* Findings Summary */}
                 <div className="prose prose-sm max-w-none">
-                  {findings.key_segments && findings.key_segments.length > 0 && (
+                  {findings.key_segments && Array.isArray(findings.key_segments) && findings.key_segments.length > 0 && (
                     <div className="space-y-2">
                       <h4 className="font-semibold text-sm">🎯 Segmentos Identificados:</h4>
                       {findings.key_segments.slice(0, 3).map((seg: any, idx: number) => (
@@ -332,7 +334,7 @@ export default function Orchestrator() {
                     </div>
                   )}
                   
-                  {findings.opportunities && findings.opportunities.length > 0 && (
+                  {findings.opportunities && Array.isArray(findings.opportunities) && findings.opportunities.length > 0 && (
                     <div className="space-y-2 mt-4">
                       <h4 className="font-semibold text-sm">💡 Oportunidades:</h4>
                       {findings.opportunities.slice(0, 2).map((opp: any, idx: number) => (
@@ -345,7 +347,7 @@ export default function Orchestrator() {
                 </div>
 
                 {/* Strategies */}
-                {strategies.length > 0 && (
+                {Array.isArray(strategies) && strategies.length > 0 && (
                   <div className="space-y-4 mt-6">
                     <h3 className="font-semibold text-lg">🚀 Estratégias Recomendadas</h3>
                     <div className="grid gap-4">
