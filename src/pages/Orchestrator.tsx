@@ -84,7 +84,12 @@ export default function Orchestrator() {
 
       if (testError) throw testError;
       
-      const generatedFindings = testData.findings.findings || testData.findings;
+      const rawFindings = testData.findings?.findings || testData.findings || {};
+      const generatedFindings = {
+        ...rawFindings,
+        key_segments: Array.isArray(rawFindings.key_segments) ? rawFindings.key_segments : [],
+        opportunities: Array.isArray(rawFindings.opportunities) ? rawFindings.opportunities : []
+      };
       setFindings(generatedFindings);
 
       // Step 5: Generate Strategies

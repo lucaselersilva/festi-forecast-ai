@@ -7,6 +7,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, XCircle, MessageSquare, Clock, Target, TrendingUp } from "lucide-react";
 
+const ensureArray = <T,>(value: T | T[] | undefined): T[] => {
+  if (Array.isArray(value)) return value;
+  if (value !== undefined && value !== null) return [value];
+  return [];
+};
+
 interface Props {
   strategy: any;
   runId: string;
@@ -79,7 +85,7 @@ export default function StrategyCard({ strategy, runId, eventId, constraints }: 
             Canais
           </div>
           <div className="flex flex-wrap gap-2">
-            {strategy.channel?.map((ch: string, idx: number) => (
+            {ensureArray(strategy.channel).map((ch: string, idx: number) => (
               <Badge key={idx} variant="secondary">{ch}</Badge>
             ))}
           </div>
@@ -132,7 +138,7 @@ export default function StrategyCard({ strategy, runId, eventId, constraints }: 
         <div className="space-y-1">
           <div className="text-sm font-medium">Rationale (Evidências):</div>
           <ul className="text-sm text-muted-foreground space-y-1">
-            {strategy.rationale.map((rat: string, idx: number) => (
+            {ensureArray(strategy.rationale).map((rat: string, idx: number) => (
               <li key={idx} className="flex items-start gap-2">
                 <span className="text-primary">•</span>
                 <span>{rat}</span>
@@ -146,7 +152,7 @@ export default function StrategyCard({ strategy, runId, eventId, constraints }: 
         <Alert variant="destructive">
           <AlertDescription>
             <ul className="text-sm space-y-1">
-              {validation.reasons.map((reason: string, idx: number) => (
+              {ensureArray(validation?.reasons).map((reason: string, idx: number) => (
                 <li key={idx}>• {reason}</li>
               ))}
             </ul>
