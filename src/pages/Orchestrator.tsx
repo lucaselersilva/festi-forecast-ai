@@ -361,7 +361,7 @@ export default function Orchestrator() {
                           key={idx}
                           strategy={strategy}
                           runId={runId!}
-                          eventId={null}
+                          eventId="temp"
                           constraints={constraints}
                         />
                       ))}

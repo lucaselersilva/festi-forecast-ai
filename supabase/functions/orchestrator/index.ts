@@ -500,15 +500,19 @@ Each strategy must cite evidence and be specific.`;
         // Step 6: Validate strategy
         const { strategyId, strategy, eventId, constraints } = payload;
 
-        // Get event capacity
-        const { data: event } = await supabase
-          .from('events')
-          .select('capacity')
-          .eq('id', eventId)
-          .single();
-
         const reasons: string[] = [];
         let ok = true;
+
+        // Get event capacity only if eventId is valid (not "temp" or null)
+        let event = null;
+        if (eventId && eventId !== "temp") {
+          const { data } = await supabase
+            .from('events')
+            .select('capacity')
+            .eq('id', eventId)
+            .single();
+          event = data;
+        }
 
         // Check capacity
         if (strategy.target_segment && event) {
