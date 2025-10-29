@@ -156,18 +156,38 @@ const Dashboard = () => {
   const loadValleClientesData = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('valle_clientes')
-        .select('*', { count: 'exact' })
-        .order('primeira_entrada', { ascending: false })
-        .limit(15000)
+      let allData: any[] = []
+      let from = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('valle_clientes')
+          .select('*')
+          .order('primeira_entrada', { ascending: false })
+          .range(from, from + pageSize - 1)
+        
+        if (error) throw error
+        
+        if (data && data.length > 0) {
+          allData = [...allData, ...data]
+          from += pageSize
+          console.log(`📦 Carregados ${allData.length} clientes até agora...`)
+          
+          // Se retornou menos que pageSize, chegamos ao fim
+          if (data.length < pageSize) {
+            hasMore = false
+          }
+        } else {
+          hasMore = false
+        }
+      }
       
-      if (error) throw error
+      console.log('✅ Total de clientes carregados:', allData.length)
+      setValleClientes(allData)
       
-      console.log('📊 Valle Clientes carregados:', data?.length)
-      setValleClientes(data || [])
-      
-      const generos = [...new Set(data?.map(c => c.genero).filter(Boolean))]
+      const generos = [...new Set(allData.map(c => c.genero).filter(Boolean))]
       setAvailableGenres(generos)
       setAvailableCities([])
       
