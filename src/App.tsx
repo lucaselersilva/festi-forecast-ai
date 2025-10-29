@@ -19,6 +19,7 @@ import Orchestrator from "./pages/Orchestrator";
 import ZigCasas from "./pages/ZigCasas";
 import MarketingAssistant from "./pages/MarketingAssistant";
 import Birthdays from "./pages/Birthdays";
+import ValleClientesDashboard from "./pages/ValleClientesDashboard";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/marketing-assistant" element={<MarketingAssistant />} />
             <Route path="/zig-casas" element={<ZigCasas />} />
             <Route path="/birthdays" element={<Birthdays />} />
+            <Route path="/valle-dashboard" element={<ValleClientesDashboard />} />
             <Route path="/events" element={<Events />} />
             <Route path="/sponsors" element={<Sponsors />} />
             <Route path="/sponsors" element={<Forecast />} />
