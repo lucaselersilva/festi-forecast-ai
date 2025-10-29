@@ -33,8 +33,6 @@ import { dataService } from "@/lib/dataService"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import MLRunner from "@/components/MLRunner"
-import SmartInsightsCard from "@/components/dashboard/SmartInsightsCard"
-import AdvancedAnalysis from "@/components/dashboard/AdvancedAnalysis"
 
 interface FilterState {
   dateRange?: DateRange
@@ -42,6 +40,7 @@ interface FilterState {
   cities: string[]
   minPrice: number | null
   maxPrice: number | null
+  month: string | null
 }
 
 const Dashboard = () => {
@@ -69,8 +68,10 @@ const Dashboard = () => {
     genres: [],
     cities: [],
     minPrice: null,
-    maxPrice: null
+    maxPrice: null,
+    month: null
   })
+  const [availableMonths, setAvailableMonths] = useState<string[]>([])
 
   const [availableGenres, setAvailableGenres] = useState<string[]>([])
   const [availableCities, setAvailableCities] = useState<string[]>([])
@@ -108,9 +109,14 @@ const Dashboard = () => {
       
       const genres = [...new Set(eventsData.map(e => e.genre))].filter(Boolean)
       const cities = [...new Set(eventsData.map(e => e.city))].filter(Boolean)
+      const months = [...new Set(eventsData.map(e => {
+        const date = new Date(e.date)
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      }))].sort().reverse()
       
       setAvailableGenres(genres)
       setAvailableCities(cities)
+      setAvailableMonths(months)
       
     } catch (error) {
       console.error('Error loading dashboard data:', error)
@@ -126,6 +132,14 @@ const Dashboard = () => {
 
   const applyFilters = () => {
     let filtered = [...allEvents]
+
+    if (filters.month) {
+      filtered = filtered.filter(event => {
+        const eventDate = new Date(event.date)
+        const eventMonth = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, '0')}`
+        return eventMonth === filters.month
+      })
+    }
 
     if (filters.dateRange?.from && filters.dateRange?.to) {
       filtered = filtered.filter(event => {
@@ -188,8 +202,15 @@ const Dashboard = () => {
       setValleClientes(allData)
       
       const generos = [...new Set(allData.map(c => c.genero).filter(Boolean))]
+      const months = [...new Set(allData.map(c => {
+        if (!c.primeira_entrada) return null
+        const date = new Date(c.primeira_entrada)
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      }).filter(Boolean))].sort().reverse()
+      
       setAvailableGenres(generos)
       setAvailableCities([])
+      setAvailableMonths(months as string[])
       
       setLoading(false)
     } catch (error) {
@@ -234,6 +255,15 @@ const Dashboard = () => {
     
     console.log('🔍 Aplicando filtros. ValleClientes:', valleClientes.length)
     let filtered = [...valleClientes]
+
+    if (filters.month) {
+      filtered = filtered.filter(cliente => {
+        if (!cliente.primeira_entrada) return false
+        const clienteDate = new Date(cliente.primeira_entrada)
+        const clienteMonth = `${clienteDate.getFullYear()}-${String(clienteDate.getMonth() + 1).padStart(2, '0')}`
+        return clienteMonth === filters.month
+      })
+    }
 
     if (filters.genres.length > 0) {
       filtered = filtered.filter(cliente => filters.genres.includes(cliente.genero))
@@ -311,7 +341,8 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
       genres: [],
       cities: [],
       minPrice: null,
-      maxPrice: null
+      maxPrice: null,
+      month: null
     })
   }
 
@@ -584,6 +615,28 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
         <CardContent>
           <div className="space-y-3">
             <div className="flex flex-wrap gap-3 items-center">
+              {/* Filtro de Mês */}
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">Mês:</Label>
+                <Select value={filters.month || 'all'} onValueChange={(value) => setFilters({ ...filters, month: value === 'all' ? null : value })}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Todos os meses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os meses</SelectItem>
+                    {availableMonths.map(month => {
+                      const [year, monthNum] = month.split('-')
+                      const monthName = new Date(parseInt(year), parseInt(monthNum) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+                      return (
+                        <SelectItem key={month} value={month}>
+                          {monthName.charAt(0).toUpperCase() + monthName.slice(1)}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
           {dataSource === 'events' && (
             <DatePickerWithRange
               date={filters.dateRange}
@@ -764,25 +817,6 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
         </Card>
       </div>
 
-      {/* Smart Insights */}
-      <SmartInsightsCard 
-        events={dataSource === 'events' ? filteredEvents : filteredClientes} 
-        metrics={metrics}
-        dataSource={dataSource}
-      />
-
-      {/* Análises Avançadas (Accordion) */}
-      <Card className="glass border-border/50">
-        <CardHeader>
-          <CardTitle>Análises Detalhadas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AdvancedAnalysis 
-            events={dataSource === 'events' ? filteredEvents : filteredClientes}
-            dataSource={dataSource}
-          />
-        </CardContent>
-      </Card>
     </div>
   )
 }
