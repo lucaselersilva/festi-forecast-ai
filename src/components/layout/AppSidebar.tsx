@@ -12,8 +12,7 @@ import {
   Activity,
   Workflow,
   Sparkles,
-  Cake,
-  Database
+  Cake
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 
@@ -32,7 +31,6 @@ import {
 
 const mainItems = [
   { title: "Dashboard", url: "/", icon: BarChart3 },
-  { title: "Valle Clientes", url: "/valle-dashboard", icon: Database },
   { title: "Import Data", url: "/import", icon: Upload },
   { title: "Insights Planner", url: "/insights-planner", icon: Target },
   { title: "Clustering", url: "/clustering", icon: Activity },

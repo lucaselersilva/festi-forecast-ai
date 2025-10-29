@@ -158,8 +158,9 @@ const Dashboard = () => {
       setLoading(true)
       const { data, error } = await supabase
         .from('valle_clientes')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('primeira_entrada', { ascending: false })
+        .limit(15000)
       
       if (error) throw error
       
