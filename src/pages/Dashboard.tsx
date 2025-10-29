@@ -75,6 +75,8 @@ const Dashboard = () => {
     } else {
       loadValleClientesData()
       setSelectedMetric('consumo')
+      // Limpar filtro de data para Valle Clientes
+      setFilters(prev => ({ ...prev, dateRange: undefined }))
     }
   }, [dataSource])
 
@@ -207,17 +209,13 @@ const Dashboard = () => {
     console.log('🔍 Aplicando filtros. ValleClientes:', valleClientes.length)
     let filtered = [...valleClientes]
 
-    if (filters.dateRange?.from && filters.dateRange?.to) {
-      filtered = filtered.filter(cliente => {
-        const clienteDate = new Date(cliente.primeira_entrada)
-        return clienteDate >= filters.dateRange!.from! && clienteDate <= filters.dateRange!.to!
-      })
-    }
+    // Não aplicar filtro de data para visão geral de clientes
 
     if (filters.genres.length > 0) {
       filtered = filtered.filter(cliente => filters.genres.includes(cliente.genero))
     }
 
+    console.log('✅ Clientes filtrados:', filtered.length)
     setFilteredClientes(filtered)
     calculateValleClientesMetrics(filtered)
   }
@@ -549,10 +547,12 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
         <CardContent>
           <div className="space-y-3">
             <div className="flex flex-wrap gap-3 items-center">
-              <DatePickerWithRange
-                date={filters.dateRange}
-                onDateChange={(range) => setFilters({ ...filters, dateRange: range })}
-              />
+          {dataSource === 'events' && (
+            <DatePickerWithRange
+              date={filters.dateRange}
+              onDateChange={(range) => setFilters({ ...filters, dateRange: range })}
+            />
+          )}
               
               <div className="flex flex-wrap gap-1">
                 <Label className="text-xs text-muted-foreground w-full mb-1">Gêneros:</Label>
