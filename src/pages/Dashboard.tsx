@@ -50,7 +50,14 @@ const Dashboard = () => {
   const [filteredEvents, setFilteredEvents] = useState<any[]>([])
   const [valleClientes, setValleClientes] = useState<any[]>([])
   const [filteredClientes, setFilteredClientes] = useState<any[]>([])
-  const [metrics, setMetrics] = useState<any>(null)
+  const [metrics, setMetrics] = useState<any>({
+    totalClientes: 0,
+    consumoMedio: 0,
+    presencaMedia: 0,
+    taxaAppAtivo: 0,
+    recenciaMedia: 0,
+    consumoTotal: 0
+  })
   const [loading, setLoading] = useState(true)
   const [showMLRunner, setShowMLRunner] = useState(false)
   const [selectedMetric, setSelectedMetric] = useState('revenue')
@@ -75,8 +82,6 @@ const Dashboard = () => {
     } else {
       loadValleClientesData()
       setSelectedMetric('consumo')
-      // Limpar filtro de data para Valle Clientes
-      setFilters(prev => ({ ...prev, dateRange: undefined }))
     }
   }, [dataSource])
 
@@ -89,10 +94,10 @@ const Dashboard = () => {
   useEffect(() => {
     if (dataSource === 'events') {
       applyFilters()
-    } else {
+    } else if (valleClientes.length > 0) {
       applyValleClientesFilters()
     }
-  }, [filters, allEvents, dataSource])
+  }, [filters, allEvents, dataSource, valleClientes])
 
   const loadDashboardData = async () => {
     try {
@@ -158,17 +163,12 @@ const Dashboard = () => {
       
       if (error) throw error
       
+      console.log('📊 Valle Clientes carregados:', data?.length)
       setValleClientes(data || [])
       
       const generos = [...new Set(data?.map(c => c.genero).filter(Boolean))]
       setAvailableGenres(generos)
       setAvailableCities([])
-      
-      // Aplicar filtros imediatamente após carregar
-      console.log('📊 Valle Clientes carregados:', data?.length)
-      setFilteredClientes(data || [])
-      calculateValleClientesMetrics(data || [])
-      console.log('✅ Métricas calculadas')
       
       setLoading(false)
     } catch (error) {
@@ -206,10 +206,13 @@ const Dashboard = () => {
   }
 
   const applyValleClientesFilters = () => {
+    if (valleClientes.length === 0) {
+      console.log('⚠️ ValleClientes ainda vazio, aguardando...')
+      return
+    }
+    
     console.log('🔍 Aplicando filtros. ValleClientes:', valleClientes.length)
     let filtered = [...valleClientes]
-
-    // Não aplicar filtro de data para visão geral de clientes
 
     if (filters.genres.length > 0) {
       filtered = filtered.filter(cliente => filters.genres.includes(cliente.genero))
@@ -221,11 +224,21 @@ const Dashboard = () => {
   }
 
 const calculateValleClientesMetrics = (clientes: any[]) => {
-    if (clientes.length === 0) {
-      setMetrics(null)
+    if (!clientes || clientes.length === 0) {
+      console.log('⚠️ Nenhum cliente para calcular métricas')
+      setMetrics({
+        totalClientes: 0,
+        consumoMedio: 0,
+        presencaMedia: 0,
+        taxaAppAtivo: 0,
+        recenciaMedia: 0,
+        consumoTotal: 0
+      })
       return
     }
 
+    console.log('📊 Calculando métricas para', clientes.length, 'clientes')
+    
     const totalConsumo = clientes.reduce((sum, c) => sum + (c.consumo || 0), 0)
     const totalPresencas = clientes.reduce((sum, c) => sum + (c.presencas || 0), 0)
     const comAppAtivo = clientes.filter(c => c.aplicativo_ativo).length
@@ -240,14 +253,17 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
       ? recencyDays.reduce((a, b) => a + b, 0) / recencyDays.length 
       : 0
 
-    setMetrics({
+    const calculatedMetrics = {
       totalClientes: clientes.length,
       consumoMedio: totalConsumo / clientes.length,
       presencaMedia: totalPresencas / clientes.length,
       taxaAppAtivo: (comAppAtivo / clientes.length) * 100,
       recenciaMedia: avgRecency,
       consumoTotal: totalConsumo
-    })
+    }
+    
+    console.log('✅ Métricas calculadas:', calculatedMetrics)
+    setMetrics(calculatedMetrics)
   }
 
   const toggleGenreFilter = (genre: string) => {
