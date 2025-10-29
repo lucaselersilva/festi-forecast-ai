@@ -71,8 +71,16 @@ const Dashboard = () => {
   useEffect(() => {
     if (dataSource === 'events') {
       loadDashboardData()
+      setSelectedMetric('revenue')
     } else {
       loadValleClientesData()
+      setSelectedMetric('consumo')
+    }
+  }, [dataSource])
+
+  useEffect(() => {
+    if (dataSource === 'valle_clientes') {
+      setBreakdownView('genre')
     }
   }, [dataSource])
 
@@ -207,7 +215,7 @@ const Dashboard = () => {
     calculateValleClientesMetrics(filtered)
   }
 
-  const calculateValleClientesMetrics = (clientes: any[]) => {
+const calculateValleClientesMetrics = (clientes: any[]) => {
     if (clientes.length === 0) {
       setMetrics(null)
       return
@@ -218,11 +226,14 @@ const Dashboard = () => {
     const comAppAtivo = clientes.filter(c => c.aplicativo_ativo).length
     
     const now = new Date()
-    const recencyDays = clientes.map(c => {
-      if (!c.ultima_visita) return 999
-      return Math.floor((now.getTime() - new Date(c.ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
-    })
-    const avgRecency = recencyDays.reduce((a, b) => a + b, 0) / recencyDays.length
+    const recencyDays = clientes
+      .filter(c => c.ultima_visita)
+      .map(c => {
+        return Math.floor((now.getTime() - new Date(c.ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
+      })
+    const avgRecency = recencyDays.length > 0 
+      ? recencyDays.reduce((a, b) => a + b, 0) / recencyDays.length 
+      : 0
 
     setMetrics({
       totalClientes: clientes.length,
@@ -289,6 +300,7 @@ const Dashboard = () => {
       const monthlyData: Record<string, { clientes: number, consumo: number, presencas: number }> = {}
       
       filteredClientes.forEach(cliente => {
+        if (!cliente.primeira_entrada) return
         const month = new Date(cliente.primeira_entrada).toISOString().substring(0, 7)
         if (!monthlyData[month]) {
           monthlyData[month] = { clientes: 0, consumo: 0, presencas: 0 }
@@ -417,13 +429,13 @@ const Dashboard = () => {
       icon: Users,
       color: "text-primary"
     },
-    {
-      title: "Consumo Médio",
-      value: `R$ ${(metrics?.consumoMedio || 0).toFixed(0)}`,
-      subtitle: `Total R$ ${((metrics?.consumoTotal || 0) / 1000).toFixed(1)}K`,
-      icon: DollarSign,
-      color: "text-success"
-    },
+  {
+    title: "Consumo Médio",
+    value: `R$ ${((metrics?.consumoMedio || 0) / 1000).toFixed(1)}K`,
+    subtitle: `Total R$ ${((metrics?.consumoTotal || 0) / 1000).toFixed(0)}K`,
+    icon: DollarSign,
+    color: "text-success"
+  },
     {
       title: "Taxa App Ativo",
       value: `${(metrics?.taxaAppAtivo || 0).toFixed(1)}%`,
@@ -594,10 +606,10 @@ const Dashboard = () => {
         {/* Timeline */}
         <Card className="glass border-border/50">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Evolução Temporal
-            </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5" />
+            {dataSource === 'events' ? 'Evolução Temporal' : 'Evolução de Clientes'}
+          </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -611,13 +623,25 @@ const Dashboard = () => {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis className="text-xs" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
+                }}
+                formatter={(value: any, name: string) => {
+                  if (dataSource === 'events') {
+                    if (name === 'revenue') return [`R$ ${(value / 1000).toFixed(0)}K`, 'Receita']
+                    if (name === 'tickets') return [value.toLocaleString(), 'Ingressos']
+                    if (name === 'events') return [value, 'Eventos']
+                  } else {
+                    if (name === 'consumo') return [`R$ ${(value / 1000).toFixed(1)}K`, 'Consumo']
+                    if (name === 'clientes') return [value.toLocaleString(), 'Clientes']
+                    if (name === 'presencas') return [value, 'Presenças']
+                  }
+                  return [value, name]
+                }}
+              />
                 <Area
                   type="monotone"
                   dataKey={selectedMetric}
@@ -634,10 +658,13 @@ const Dashboard = () => {
         <Card className="glass border-border/50">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                Performance por {breakdownView === 'genre' ? 'Gênero' : 'Cidade'}
-              </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5" />
+            {dataSource === 'events' 
+              ? `Performance por ${breakdownView === 'genre' ? 'Gênero' : 'Cidade'}`
+              : 'Distribuição por Gênero'
+            }
+          </CardTitle>
               <div className="flex gap-1">
                 <Button
                   variant={breakdownView === 'genre' ? 'default' : 'outline'}
@@ -664,13 +691,25 @@ const Dashboard = () => {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} className="text-xs" />
                 <YAxis className="text-xs" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
+                }}
+                formatter={(value: any, name: string) => {
+                  if (dataSource === 'events') {
+                    if (name === 'revenue') return [`R$ ${(value / 1000).toFixed(0)}K`, 'Receita']
+                    if (name === 'tickets') return [value.toLocaleString(), 'Ingressos']
+                    if (name === 'events') return [value, 'Eventos']
+                  } else {
+                    if (name === 'consumo') return [`R$ ${(value / 1000).toFixed(1)}K`, 'Consumo']
+                    if (name === 'clientes') return [value.toLocaleString(), 'Clientes']
+                    if (name === 'presencas') return [value, 'Presenças']
+                  }
+                  return [value, name]
+                }}
+              />
                 <Bar dataKey={selectedMetric} fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
