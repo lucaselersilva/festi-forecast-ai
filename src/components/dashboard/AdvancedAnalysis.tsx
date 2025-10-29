@@ -20,10 +20,21 @@ import {
 
 interface AdvancedAnalysisProps {
   events: any[];
+  dataSource?: 'events' | 'valle_clientes';
 }
 
-export default function AdvancedAnalysis({ events }: AdvancedAnalysisProps) {
+export default function AdvancedAnalysis({ events, dataSource = 'events' }: AdvancedAnalysisProps) {
   const getScatterData = () => {
+    if (dataSource === 'valle_clientes') {
+      return events.map(cliente => ({
+        x: cliente.consumo || 0,
+        y: cliente.presencas || 0,
+        z: cliente.aplicativo_ativo ? 1 : 0,
+        genre: cliente.genero || 'Não informado',
+        name: cliente.nome || 'Cliente'
+      }));
+    }
+    
     return events.map(event => ({
       x: event.ticket_price || 0,
       y: (event.sold_tickets || 0) / (event.capacity || 1) * 100,
@@ -34,6 +45,31 @@ export default function AdvancedAnalysis({ events }: AdvancedAnalysisProps) {
   };
 
   const getCrossAnalysisData = () => {
+    if (dataSource === 'valle_clientes') {
+      const analysis: Record<string, { clientes: number, consumo: number, presencas: number }> = {};
+      
+      events.forEach(cliente => {
+        const genero = cliente.genero || 'Não informado';
+        
+        if (!analysis[genero]) analysis[genero] = { clientes: 0, consumo: 0, presencas: 0 };
+        
+        analysis[genero].clientes += 1;
+        analysis[genero].consumo += cliente.consumo || 0;
+        analysis[genero].presencas += cliente.presencas || 0;
+      });
+
+      return Object.entries(analysis)
+        .map(([genero, data]) => ({
+          name: genero,
+          clientes: data.clientes,
+          consumo: data.consumo,
+          presencas: data.presencas,
+          consumoMedio: data.consumo / data.clientes
+        }))
+        .sort((a, b) => b.consumo - a.consumo)
+        .slice(0, 10);
+    }
+
     const analysis: Record<string, Record<string, { events: number, revenue: number }>> = {};
     
     events.forEach(event => {
@@ -68,7 +104,7 @@ export default function AdvancedAnalysis({ events }: AdvancedAnalysisProps) {
     <Accordion type="single" collapsible className="w-full">
       <AccordionItem value="scatter">
         <AccordionTrigger className="text-base font-semibold">
-          📊 Análise de Preço vs Ocupação
+          {dataSource === 'valle_clientes' ? '📊 Análise de Consumo vs Presença' : '📊 Análise de Preço vs Ocupação'}
         </AccordionTrigger>
         <AccordionContent>
           <Card className="p-4">
@@ -78,21 +114,32 @@ export default function AdvancedAnalysis({ events }: AdvancedAnalysisProps) {
                 <XAxis
                   type="number"
                   dataKey="x"
-                  name="Preço"
-                  label={{ value: 'Preço do Ingresso (R$)', position: 'bottom' }}
+                  name={dataSource === 'valle_clientes' ? 'Consumo' : 'Preço'}
+                  label={{ value: dataSource === 'valle_clientes' ? 'Consumo Total (R$)' : 'Preço do Ingresso (R$)', position: 'bottom' }}
                   className="text-muted-foreground"
                 />
                 <YAxis
                   type="number"
                   dataKey="y"
-                  name="Ocupação"
-                  label={{ value: 'Ocupação (%)', angle: -90, position: 'left' }}
+                  name={dataSource === 'valle_clientes' ? 'Presenças' : 'Ocupação'}
+                  label={{ value: dataSource === 'valle_clientes' ? 'Número de Presenças' : 'Ocupação (%)', angle: -90, position: 'left' }}
                   className="text-muted-foreground"
                 />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
+                      if (dataSource === 'valle_clientes') {
+                        return (
+                          <div className="bg-background border border-border p-3 rounded-lg shadow-lg">
+                            <p className="font-semibold text-sm mb-1">{data.name}</p>
+                            <p className="text-xs text-muted-foreground">Consumo: R$ {data.x.toFixed(0)}</p>
+                            <p className="text-xs text-muted-foreground">Presenças: {data.y}</p>
+                            <p className="text-xs text-muted-foreground">App Ativo: {data.z ? 'Sim' : 'Não'}</p>
+                            <p className="text-xs text-primary mt-1">{data.genre}</p>
+                          </div>
+                        );
+                      }
                       return (
                         <div className="bg-background border border-border p-3 rounded-lg shadow-lg">
                           <p className="font-semibold text-sm mb-1">{data.name}</p>
@@ -115,7 +162,7 @@ export default function AdvancedAnalysis({ events }: AdvancedAnalysisProps) {
 
       <AccordionItem value="cross">
         <AccordionTrigger className="text-base font-semibold">
-          🎯 Análise Cruzada: Gênero × Cidade
+          {dataSource === 'valle_clientes' ? '🎯 Análise por Gênero' : '🎯 Análise Cruzada: Gênero × Cidade'}
         </AccordionTrigger>
         <AccordionContent>
           <Card className="p-4">
@@ -123,7 +170,7 @@ export default function AdvancedAnalysis({ events }: AdvancedAnalysisProps) {
               <ComposedChart data={getCrossAnalysisData()}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
-                  dataKey="combination"
+                  dataKey={dataSource === 'valle_clientes' ? 'name' : 'combination'}
                   angle={-45}
                   textAnchor="end"
                   height={120}
@@ -131,19 +178,30 @@ export default function AdvancedAnalysis({ events }: AdvancedAnalysisProps) {
                 />
                 <YAxis
                   yAxisId="left"
-                  label={{ value: 'Receita (R$)', angle: -90, position: 'insideLeft' }}
+                  label={{ value: dataSource === 'valle_clientes' ? 'Consumo (R$)' : 'Receita (R$)', angle: -90, position: 'insideLeft' }}
                   className="text-muted-foreground"
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  label={{ value: 'Nº Eventos', angle: 90, position: 'insideRight' }}
+                  label={{ value: dataSource === 'valle_clientes' ? 'Nº Clientes' : 'Nº Eventos', angle: 90, position: 'insideRight' }}
                   className="text-muted-foreground"
                 />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
+                      if (dataSource === 'valle_clientes') {
+                        return (
+                          <div className="bg-background border border-border p-3 rounded-lg shadow-lg">
+                            <p className="font-semibold text-sm mb-1">{data.name}</p>
+                            <p className="text-xs text-muted-foreground">Clientes: {data.clientes}</p>
+                            <p className="text-xs text-muted-foreground">Consumo Total: R$ {(data.consumo / 1000).toFixed(0)}K</p>
+                            <p className="text-xs text-muted-foreground">Consumo Médio: R$ {data.consumoMedio.toFixed(0)}</p>
+                            <p className="text-xs text-muted-foreground">Presenças: {data.presencas}</p>
+                          </div>
+                        );
+                      }
                       return (
                         <div className="bg-background border border-border p-3 rounded-lg shadow-lg">
                           <p className="font-semibold text-sm mb-1">{data.genre} em {data.city}</p>
@@ -156,8 +214,19 @@ export default function AdvancedAnalysis({ events }: AdvancedAnalysisProps) {
                     return null;
                   }}
                 />
-                <Bar yAxisId="left" dataKey="revenue" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                <Line yAxisId="right" type="monotone" dataKey="events" stroke="hsl(var(--chart-2))" strokeWidth={2} />
+                <Bar 
+                  yAxisId="left" 
+                  dataKey={dataSource === 'valle_clientes' ? 'consumo' : 'revenue'} 
+                  fill="hsl(var(--primary))" 
+                  radius={[8, 8, 0, 0]} 
+                />
+                <Line 
+                  yAxisId="right" 
+                  type="monotone" 
+                  dataKey={dataSource === 'valle_clientes' ? 'clientes' : 'events'} 
+                  stroke="hsl(var(--chart-2))" 
+                  strokeWidth={2} 
+                />
               </ComposedChart>
             </ResponsiveContainer>
           </Card>

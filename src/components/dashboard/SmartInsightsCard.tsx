@@ -5,13 +5,76 @@ import { TrendingUp, TrendingDown, AlertCircle, Target, Sparkles } from "lucide-
 interface SmartInsightsCardProps {
   events: any[];
   metrics: any;
+  dataSource?: 'events' | 'valle_clientes';
 }
 
-export default function SmartInsightsCard({ events, metrics }: SmartInsightsCardProps) {
+export default function SmartInsightsCard({ events, metrics, dataSource = 'events' }: SmartInsightsCardProps) {
   const generateInsights = () => {
     const insights: Array<{ type: 'positive' | 'warning' | 'info', text: string }> = [];
 
     if (events.length === 0) return insights;
+
+    if (dataSource === 'valle_clientes') {
+      // Insights para Valle Clientes
+      const generoStats: Record<string, { consumo: number, count: number }> = {};
+      events.forEach(cliente => {
+        const genero = cliente.genero || 'Não informado';
+        if (!generoStats[genero]) generoStats[genero] = { consumo: 0, count: 0 };
+        generoStats[genero].consumo += cliente.consumo || 0;
+        generoStats[genero].count += 1;
+      });
+
+      const topGenero = Object.entries(generoStats)
+        .sort((a, b) => b[1].consumo - a[1].consumo)[0];
+      
+      if (topGenero && topGenero[0] !== 'Não informado') {
+        insights.push({
+          type: 'positive',
+          text: `${topGenero[0]} lidera com ${topGenero[1].count} clientes e consumo total de R$ ${(topGenero[1].consumo / 1000).toFixed(0)}K`
+        });
+      }
+
+      if (metrics?.taxaAppAtivo > 60) {
+        insights.push({
+          type: 'positive',
+          text: `Excelente engajamento: ${metrics.taxaAppAtivo.toFixed(1)}% dos clientes têm app ativo`
+        });
+      } else if (metrics?.taxaAppAtivo < 30) {
+        insights.push({
+          type: 'warning',
+          text: `Baixo engajamento digital (${metrics.taxaAppAtivo.toFixed(1)}%) - oportunidade de ativação de app`
+        });
+      }
+
+      if (metrics?.recenciaMedia < 30) {
+        insights.push({
+          type: 'positive',
+          text: `Clientes ativos: recência média de apenas ${metrics.recenciaMedia.toFixed(0)} dias`
+        });
+      } else if (metrics?.recenciaMedia > 90) {
+        insights.push({
+          type: 'warning',
+          text: `Alta recência (${metrics.recenciaMedia.toFixed(0)} dias) - recomenda-se campanha de reativação`
+        });
+      }
+
+      if (metrics?.presencaMedia > 5) {
+        insights.push({
+          type: 'positive',
+          text: `Base fidelizada: ${metrics.presencaMedia.toFixed(1)} presenças médias por cliente`
+        });
+      }
+
+      const highValueClients = events.filter(c => (c.consumo || 0) > metrics?.consumoMedio * 2).length;
+      if (highValueClients > 0) {
+        insights.push({
+          type: 'info',
+          text: `${highValueClients} clientes VIP identificados (consumo > 2x média) - potencial para programa de fidelidade`
+        });
+      }
+
+      return insights;
+    }
 
     // Análise de Gêneros
     const genreStats: Record<string, { revenue: number, count: number }> = {};

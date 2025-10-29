@@ -31,6 +31,7 @@ import {
 } from "recharts"
 import { dataService } from "@/lib/dataService"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/integrations/supabase/client"
 import MLRunner from "@/components/MLRunner"
 import SmartInsightsCard from "@/components/dashboard/SmartInsightsCard"
 import AdvancedAnalysis from "@/components/dashboard/AdvancedAnalysis"
@@ -44,8 +45,11 @@ interface FilterState {
 }
 
 const Dashboard = () => {
+  const [dataSource, setDataSource] = useState<'events' | 'valle_clientes'>('events')
   const [allEvents, setAllEvents] = useState<any[]>([])
   const [filteredEvents, setFilteredEvents] = useState<any[]>([])
+  const [valleClientes, setValleClientes] = useState<any[]>([])
+  const [filteredClientes, setFilteredClientes] = useState<any[]>([])
   const [metrics, setMetrics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showMLRunner, setShowMLRunner] = useState(false)
@@ -65,12 +69,20 @@ const Dashboard = () => {
   const [availableCities, setAvailableCities] = useState<string[]>([])
 
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    if (dataSource === 'events') {
+      loadDashboardData()
+    } else {
+      loadValleClientesData()
+    }
+  }, [dataSource])
 
   useEffect(() => {
-    applyFilters()
-  }, [filters, allEvents])
+    if (dataSource === 'events') {
+      applyFilters()
+    } else {
+      applyValleClientesFilters()
+    }
+  }, [filters, allEvents, valleClientes, dataSource])
 
   const loadDashboardData = async () => {
     try {
@@ -126,6 +138,34 @@ const Dashboard = () => {
     calculateMetrics(filtered)
   }
 
+  const loadValleClientesData = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('valle_clientes')
+        .select('*')
+        .order('primeira_entrada', { ascending: false })
+      
+      if (error) throw error
+      
+      setValleClientes(data || [])
+      
+      const generos = [...new Set(data?.map(c => c.genero).filter(Boolean))]
+      setAvailableGenres(generos)
+      setAvailableCities([])
+      
+    } catch (error) {
+      console.error('Error loading valle clientes:', error)
+      toast({
+        title: "Erro ao Carregar",
+        description: "Falha ao carregar dados de clientes",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const calculateMetrics = (events: any[]) => {
     if (events.length === 0) {
       setMetrics(null)
@@ -146,6 +186,51 @@ const Dashboard = () => {
       occupancyRate: isNaN(occupancyRate) ? 0 : occupancyRate,
       avgRevenuePerEvent: totalRevenue / events.length,
       avgTicketsPerEvent: totalSold / events.length
+    })
+  }
+
+  const applyValleClientesFilters = () => {
+    let filtered = [...valleClientes]
+
+    if (filters.dateRange?.from && filters.dateRange?.to) {
+      filtered = filtered.filter(cliente => {
+        const clienteDate = new Date(cliente.primeira_entrada)
+        return clienteDate >= filters.dateRange!.from! && clienteDate <= filters.dateRange!.to!
+      })
+    }
+
+    if (filters.genres.length > 0) {
+      filtered = filtered.filter(cliente => filters.genres.includes(cliente.genero))
+    }
+
+    setFilteredClientes(filtered)
+    calculateValleClientesMetrics(filtered)
+  }
+
+  const calculateValleClientesMetrics = (clientes: any[]) => {
+    if (clientes.length === 0) {
+      setMetrics(null)
+      return
+    }
+
+    const totalConsumo = clientes.reduce((sum, c) => sum + (c.consumo || 0), 0)
+    const totalPresencas = clientes.reduce((sum, c) => sum + (c.presencas || 0), 0)
+    const comAppAtivo = clientes.filter(c => c.aplicativo_ativo).length
+    
+    const now = new Date()
+    const recencyDays = clientes.map(c => {
+      if (!c.ultima_visita) return 999
+      return Math.floor((now.getTime() - new Date(c.ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
+    })
+    const avgRecency = recencyDays.reduce((a, b) => a + b, 0) / recencyDays.length
+
+    setMetrics({
+      totalClientes: clientes.length,
+      consumoMedio: totalConsumo / clientes.length,
+      presencaMedia: totalPresencas / clientes.length,
+      taxaAppAtivo: (comAppAtivo / clientes.length) * 100,
+      recenciaMedia: avgRecency,
+      consumoTotal: totalConsumo
     })
   }
 
@@ -178,51 +263,99 @@ const Dashboard = () => {
   }
 
   const getTimelineData = () => {
-    const monthlyData: Record<string, { events: number, revenue: number, tickets: number }> = {}
-    
-    filteredEvents.forEach(event => {
-      const month = new Date(event.date).toISOString().substring(0, 7)
-      if (!monthlyData[month]) {
-        monthlyData[month] = { events: 0, revenue: 0, tickets: 0 }
-      }
-      monthlyData[month].events += 1
-      monthlyData[month].revenue += event.revenue || 0
-      monthlyData[month].tickets += event.sold_tickets || 0
-    })
+    if (dataSource === 'events') {
+      const monthlyData: Record<string, { events: number, revenue: number, tickets: number }> = {}
+      
+      filteredEvents.forEach(event => {
+        const month = new Date(event.date).toISOString().substring(0, 7)
+        if (!monthlyData[month]) {
+          monthlyData[month] = { events: 0, revenue: 0, tickets: 0 }
+        }
+        monthlyData[month].events += 1
+        monthlyData[month].revenue += event.revenue || 0
+        monthlyData[month].tickets += event.sold_tickets || 0
+      })
 
-    return Object.entries(monthlyData)
-      .map(([month, data]) => ({
-        month,
-        events: data.events,
-        revenue: data.revenue,
-        tickets: data.tickets
-      }))
-      .sort((a, b) => a.month.localeCompare(b.month))
-      .slice(-12)
+      return Object.entries(monthlyData)
+        .map(([month, data]) => ({
+          month,
+          events: data.events,
+          revenue: data.revenue,
+          tickets: data.tickets
+        }))
+        .sort((a, b) => a.month.localeCompare(b.month))
+        .slice(-12)
+    } else {
+      const monthlyData: Record<string, { clientes: number, consumo: number, presencas: number }> = {}
+      
+      filteredClientes.forEach(cliente => {
+        const month = new Date(cliente.primeira_entrada).toISOString().substring(0, 7)
+        if (!monthlyData[month]) {
+          monthlyData[month] = { clientes: 0, consumo: 0, presencas: 0 }
+        }
+        monthlyData[month].clientes += 1
+        monthlyData[month].consumo += cliente.consumo || 0
+        monthlyData[month].presencas += cliente.presencas || 0
+      })
+
+      return Object.entries(monthlyData)
+        .map(([month, data]) => ({
+          month,
+          clientes: data.clientes,
+          consumo: data.consumo,
+          presencas: data.presencas
+        }))
+        .sort((a, b) => a.month.localeCompare(b.month))
+        .slice(-12)
+    }
   }
 
   const getBreakdownData = () => {
-    const stats: Record<string, { events: number, revenue: number, tickets: number }> = {}
-    
-    filteredEvents.forEach(event => {
-      const key = breakdownView === 'genre' ? event.genre : event.city
-      if (!stats[key]) {
-        stats[key] = { events: 0, revenue: 0, tickets: 0 }
-      }
-      stats[key].events += 1
-      stats[key].revenue += event.revenue || 0
-      stats[key].tickets += event.sold_tickets || 0
-    })
+    if (dataSource === 'events') {
+      const stats: Record<string, { events: number, revenue: number, tickets: number }> = {}
+      
+      filteredEvents.forEach(event => {
+        const key = breakdownView === 'genre' ? event.genre : event.city
+        if (!stats[key]) {
+          stats[key] = { events: 0, revenue: 0, tickets: 0 }
+        }
+        stats[key].events += 1
+        stats[key].revenue += event.revenue || 0
+        stats[key].tickets += event.sold_tickets || 0
+      })
 
-    return Object.entries(stats)
-      .map(([name, data]) => ({
-        name,
-        events: data.events,
-        revenue: data.revenue,
-        tickets: data.tickets
-      }))
-      .sort((a, b) => (b[selectedMetric as keyof typeof a] as number) - (a[selectedMetric as keyof typeof a] as number))
-      .slice(0, 10)
+      return Object.entries(stats)
+        .map(([name, data]) => ({
+          name,
+          events: data.events,
+          revenue: data.revenue,
+          tickets: data.tickets
+        }))
+        .sort((a, b) => (b[selectedMetric as keyof typeof a] as number) - (a[selectedMetric as keyof typeof a] as number))
+        .slice(0, 10)
+    } else {
+      const stats: Record<string, { clientes: number, consumo: number, presencas: number }> = {}
+      
+      filteredClientes.forEach(cliente => {
+        const key = cliente.genero || 'Não informado'
+        if (!stats[key]) {
+          stats[key] = { clientes: 0, consumo: 0, presencas: 0 }
+        }
+        stats[key].clientes += 1
+        stats[key].consumo += cliente.consumo || 0
+        stats[key].presencas += cliente.presencas || 0
+      })
+
+      return Object.entries(stats)
+        .map(([name, data]) => ({
+          name,
+          clientes: data.clientes,
+          consumo: data.consumo,
+          presencas: data.presencas
+        }))
+        .sort((a, b) => (b[selectedMetric as keyof typeof a] as number) - (a[selectedMetric as keyof typeof a] as number))
+        .slice(0, 10)
+    }
   }
 
   if (loading) {
@@ -247,7 +380,7 @@ const Dashboard = () => {
     )
   }
 
-  const metricCards = [
+  const metricCards = dataSource === 'events' ? [
     {
       title: "Eventos",
       value: filteredEvents.length.toString(),
@@ -276,6 +409,35 @@ const Dashboard = () => {
       icon: Ticket,
       color: "text-info"
     }
+  ] : [
+    {
+      title: "Total Clientes",
+      value: filteredClientes.length.toString(),
+      subtitle: `${((filteredClientes.length / (valleClientes.length || 1)) * 100).toFixed(0)}% do total`,
+      icon: Users,
+      color: "text-primary"
+    },
+    {
+      title: "Consumo Médio",
+      value: `R$ ${(metrics?.consumoMedio || 0).toFixed(0)}`,
+      subtitle: `Total R$ ${((metrics?.consumoTotal || 0) / 1000).toFixed(1)}K`,
+      icon: DollarSign,
+      color: "text-success"
+    },
+    {
+      title: "Taxa App Ativo",
+      value: `${(metrics?.taxaAppAtivo || 0).toFixed(1)}%`,
+      subtitle: (metrics?.taxaAppAtivo || 0) > 50 ? "Excelente" : "Baixo",
+      icon: Brain,
+      color: "text-warning"
+    },
+    {
+      title: "Presença Média",
+      value: (metrics?.presencaMedia || 0).toFixed(1),
+      subtitle: `Recência ${(metrics?.recenciaMedia || 0).toFixed(0)} dias`,
+      icon: Calendar,
+      color: "text-info"
+    }
   ]
 
   return (
@@ -285,15 +447,37 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold gradient-text">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            {allEvents.length} eventos • {filteredEvents.length} filtrados
+            {dataSource === 'events' 
+              ? `${allEvents.length} eventos • ${filteredEvents.length} filtrados`
+              : `${valleClientes.length} clientes • ${filteredClientes.length} filtrados`
+            }
           </p>
         </div>
         
         <div className="flex gap-2">
+          <Select value={dataSource} onValueChange={(value: 'events' | 'valle_clientes') => setDataSource(value)}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="events">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Eventos
+                </div>
+              </SelectItem>
+              <SelectItem value="valle_clientes">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Valle Clientes
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <Button 
             variant="outline" 
             className="gap-2"
-            onClick={loadDashboardData}
+            onClick={() => dataSource === 'events' ? loadDashboardData() : loadValleClientesData()}
           >
             <RefreshCw className="w-4 h-4" />
             Atualizar
@@ -322,9 +506,19 @@ const Dashboard = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="revenue">Receita</SelectItem>
-                  <SelectItem value="events">Eventos</SelectItem>
-                  <SelectItem value="tickets">Ingressos</SelectItem>
+                  {dataSource === 'events' ? (
+                    <>
+                      <SelectItem value="revenue">Receita</SelectItem>
+                      <SelectItem value="events">Eventos</SelectItem>
+                      <SelectItem value="tickets">Ingressos</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="consumo">Consumo</SelectItem>
+                      <SelectItem value="clientes">Clientes</SelectItem>
+                      <SelectItem value="presencas">Presenças</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -352,19 +546,21 @@ const Dashboard = () => {
                 ))}
               </div>
               
-              <div className="flex flex-wrap gap-1">
-                <Label className="text-xs text-muted-foreground w-full mb-1">Cidades:</Label>
-                {availableCities.slice(0, 8).map(city => (
-                  <Badge 
-                    key={city}
-                    variant={filters.cities.includes(city) ? "default" : "outline"}
-                    className="cursor-pointer text-xs"
-                    onClick={() => toggleCityFilter(city)}
-                  >
-                    {city}
-                  </Badge>
-                ))}
-              </div>
+              {dataSource === 'events' && (
+                <div className="flex flex-wrap gap-1">
+                  <Label className="text-xs text-muted-foreground w-full mb-1">Cidades:</Label>
+                  {availableCities.slice(0, 8).map(city => (
+                    <Badge 
+                      key={city}
+                      variant={filters.cities.includes(city) ? "default" : "outline"}
+                      className="cursor-pointer text-xs"
+                      onClick={() => toggleCityFilter(city)}
+                    >
+                      {city}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -450,13 +646,15 @@ const Dashboard = () => {
                 >
                   <Music2 className="w-4 h-4" />
                 </Button>
-                <Button
-                  variant={breakdownView === 'city' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setBreakdownView('city')}
-                >
-                  Cidades
-                </Button>
+                {dataSource === 'events' && (
+                  <Button
+                    variant={breakdownView === 'city' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setBreakdownView('city')}
+                  >
+                    Cidades
+                  </Button>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -481,7 +679,11 @@ const Dashboard = () => {
       </div>
 
       {/* Smart Insights */}
-      <SmartInsightsCard events={filteredEvents} metrics={metrics} />
+      <SmartInsightsCard 
+        events={dataSource === 'events' ? filteredEvents : filteredClientes} 
+        metrics={metrics}
+        dataSource={dataSource}
+      />
 
       {/* Análises Avançadas (Accordion) */}
       <Card className="glass border-border/50">
@@ -489,7 +691,10 @@ const Dashboard = () => {
           <CardTitle>Análises Detalhadas</CardTitle>
         </CardHeader>
         <CardContent>
-          <AdvancedAnalysis events={filteredEvents} />
+          <AdvancedAnalysis 
+            events={dataSource === 'events' ? filteredEvents : filteredClientes}
+            dataSource={dataSource}
+          />
         </CardContent>
       </Card>
     </div>
