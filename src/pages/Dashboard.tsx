@@ -90,7 +90,7 @@ const Dashboard = () => {
     } else {
       applyValleClientesFilters()
     }
-  }, [filters, allEvents, valleClientes, dataSource])
+  }, [filters, allEvents, dataSource])
 
   const loadDashboardData = async () => {
     try {
@@ -163,9 +163,12 @@ const Dashboard = () => {
       setAvailableCities([])
       
       // Aplicar filtros imediatamente após carregar
+      console.log('📊 Valle Clientes carregados:', data?.length)
       setFilteredClientes(data || [])
       calculateValleClientesMetrics(data || [])
+      console.log('✅ Métricas calculadas')
       
+      setLoading(false)
     } catch (error) {
       console.error('Error loading valle clientes:', error)
       toast({
@@ -173,7 +176,6 @@ const Dashboard = () => {
         description: "Falha ao carregar dados de clientes",
         variant: "destructive"
       })
-    } finally {
       setLoading(false)
     }
   }
@@ -202,6 +204,7 @@ const Dashboard = () => {
   }
 
   const applyValleClientesFilters = () => {
+    console.log('🔍 Aplicando filtros. ValleClientes:', valleClientes.length)
     let filtered = [...valleClientes]
 
     if (filters.dateRange?.from && filters.dateRange?.to) {
@@ -463,10 +466,13 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
         <div>
           <h1 className="text-3xl font-bold gradient-text">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            {dataSource === 'events' 
-              ? `${allEvents.length} eventos • ${filteredEvents.length} filtrados`
-              : `${valleClientes.length} clientes • ${filteredClientes.length} filtrados`
-            }
+            {loading ? (
+              "Carregando dados..."
+            ) : dataSource === 'events' ? (
+              `${allEvents.length} eventos • ${filteredEvents.length} filtrados`
+            ) : (
+              `${valleClientes.length} clientes • ${filteredClientes.length} filtrados`
+            )}
           </p>
         </div>
         
