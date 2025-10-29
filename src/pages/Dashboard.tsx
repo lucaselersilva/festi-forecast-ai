@@ -162,6 +162,10 @@ const Dashboard = () => {
       setAvailableGenres(generos)
       setAvailableCities([])
       
+      // Aplicar filtros imediatamente após carregar
+      setFilteredClientes(data || [])
+      calculateValleClientesMetrics(data || [])
+      
     } catch (error) {
       console.error('Error loading valle clientes:', error)
       toast({
