@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, AlertCircle, Target, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, AlertCircle, Sparkles, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface SmartInsightsCardProps {
   events: any[];
@@ -9,185 +12,139 @@ interface SmartInsightsCardProps {
 }
 
 export default function SmartInsightsCard({ events, metrics, dataSource = 'events' }: SmartInsightsCardProps) {
-  const generateInsights = () => {
-    const insights: Array<{ type: 'positive' | 'warning' | 'info', text: string }> = [];
+  const [insights, setInsights] = useState<{ positive: string; negative: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-    if (events.length === 0) return insights;
-
-    if (dataSource === 'valle_clientes') {
-      // Insights para Valle Clientes
+  const generateAIInsights = async () => {
+    if (events.length === 0) return;
+    
+    setLoading(true);
+    try {
+      // Preparar dados agregados para enviar à IA
       const generoStats: Record<string, { consumo: number, count: number }> = {};
-      events.forEach(cliente => {
-        const genero = cliente.genero || 'Não informado';
+      events.forEach(item => {
+        const genero = dataSource === 'valle_clientes' 
+          ? (item.genero || 'Não informado')
+          : item.genre;
+        
         if (!generoStats[genero]) generoStats[genero] = { consumo: 0, count: 0 };
-        generoStats[genero].consumo += cliente.consumo || 0;
+        generoStats[genero].consumo += dataSource === 'valle_clientes' 
+          ? (item.consumo || 0) 
+          : (item.revenue || 0);
         generoStats[genero].count += 1;
       });
 
-      const topGenero = Object.entries(generoStats)
-        .sort((a, b) => b[1].consumo - a[1].consumo)[0];
+      const topGeneros = Object.entries(generoStats)
+        .map(([genero, data]) => ({
+          genero,
+          clientes: data.count,
+          consumo: data.consumo
+        }))
+        .sort((a, b) => b.consumo - a.consumo)
+        .slice(0, 5);
+
+      const requestBody = {
+        metrics: {
+          totalClientes: events.length,
+          consumoMedio: metrics?.consumoMedio || 0,
+          consumoTotal: metrics?.consumoTotal || 0,
+          taxaAppAtivo: metrics?.taxaAppAtivo || 0,
+          recenciaMedia: metrics?.recenciaMedia || 0,
+          presencaMedia: metrics?.presencaMedia || 0,
+          topGeneros
+        },
+        dataSource
+      };
+
+      console.log('🤖 Chamando IA para gerar insights...', requestBody);
+
+      const { data, error } = await supabase.functions.invoke('generate-dashboard-insights', {
+        body: requestBody
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      console.log('✅ Insights gerados:', data);
+      setInsights(data);
+
+    } catch (error: any) {
+      console.error('❌ Erro ao gerar insights:', error);
       
-      if (topGenero && topGenero[0] !== 'Não informado') {
-        insights.push({
-          type: 'positive',
-          text: `${topGenero[0]} lidera com ${topGenero[1].count} clientes e consumo total de R$ ${(topGenero[1].consumo / 1000).toFixed(0)}K`
-        });
-      }
-
-      if (metrics?.taxaAppAtivo > 60) {
-        insights.push({
-          type: 'positive',
-          text: `Excelente engajamento: ${metrics.taxaAppAtivo.toFixed(1)}% dos clientes têm app ativo`
-        });
-      } else if (metrics?.taxaAppAtivo < 30) {
-        insights.push({
-          type: 'warning',
-          text: `Baixo engajamento digital (${metrics.taxaAppAtivo.toFixed(1)}%) - oportunidade de ativação de app`
-        });
-      }
-
-      if (metrics?.recenciaMedia < 30) {
-        insights.push({
-          type: 'positive',
-          text: `Clientes ativos: recência média de apenas ${metrics.recenciaMedia.toFixed(0)} dias`
-        });
-      } else if (metrics?.recenciaMedia > 90) {
-        insights.push({
-          type: 'warning',
-          text: `Alta recência (${metrics.recenciaMedia.toFixed(0)} dias) - recomenda-se campanha de reativação`
-        });
-      }
-
-      if (metrics?.presencaMedia > 5) {
-        insights.push({
-          type: 'positive',
-          text: `Base fidelizada: ${metrics.presencaMedia.toFixed(1)} presenças médias por cliente`
-        });
-      }
-
-      const highValueClients = events.filter(c => (c.consumo || 0) > metrics?.consumoMedio * 2).length;
-      if (highValueClients > 0) {
-        insights.push({
-          type: 'info',
-          text: `${highValueClients} clientes VIP identificados (consumo > 2x média) - potencial para programa de fidelidade`
-        });
-      }
-
-      return insights;
-    }
-
-    // Análise de Gêneros
-    const genreStats: Record<string, { revenue: number, count: number }> = {};
-    events.forEach(event => {
-      if (!genreStats[event.genre]) genreStats[event.genre] = { revenue: 0, count: 0 };
-      genreStats[event.genre].revenue += event.revenue || 0;
-      genreStats[event.genre].count += 1;
-    });
-
-    const topGenre = Object.entries(genreStats)
-      .sort((a, b) => b[1].revenue - a[1].revenue)[0];
-    
-    if (topGenre) {
-      insights.push({
-        type: 'positive',
-        text: `${topGenre[0]} lidera com ${topGenre[1].count} eventos e receita de R$ ${(topGenre[1].revenue / 1000).toFixed(0)}K`
+      toast({
+        title: "Erro ao Gerar Insights",
+        description: error.message || "Não foi possível gerar insights. Tente novamente.",
+        variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
-
-    // Análise de Ocupação
-    if (metrics?.occupancyRate > 80) {
-      insights.push({
-        type: 'positive',
-        text: `Ocupação excelente de ${metrics.occupancyRate.toFixed(1)}% - considere aumentar preços`
-      });
-    } else if (metrics?.occupancyRate < 50) {
-      insights.push({
-        type: 'warning',
-        text: `Ocupação baixa (${metrics.occupancyRate.toFixed(1)}%) - recomenda-se campanha de promoção`
-      });
-    }
-
-    // Análise de Cidades
-    const cityStats: Record<string, { occupancy: number, count: number }> = {};
-    events.forEach(event => {
-      if (!cityStats[event.city]) cityStats[event.city] = { occupancy: 0, count: 0 };
-      const occ = ((event.sold_tickets || 0) / (event.capacity || 1)) * 100;
-      cityStats[event.city].occupancy += occ;
-      cityStats[event.city].count += 1;
-    });
-
-    const topCity = Object.entries(cityStats)
-      .map(([city, data]) => ({ city, avgOccupancy: data.occupancy / data.count }))
-      .sort((a, b) => b.avgOccupancy - a.avgOccupancy)[0];
-    
-    if (topCity && topCity.avgOccupancy > 70) {
-      insights.push({
-        type: 'positive',
-        text: `${topCity.city} tem ocupação média de ${topCity.avgOccupancy.toFixed(0)}% - mercado promissor`
-      });
-    }
-
-    // Análise de Preço
-    const avgPrice = metrics?.avgTicketPrice || 0;
-    const avgOccupancy = metrics?.occupancyRate || 0;
-    
-    if (avgPrice > 100 && avgOccupancy > 70) {
-      insights.push({
-        type: 'info',
-        text: `Boa elasticidade de preço: R$ ${avgPrice.toFixed(0)} com ${avgOccupancy.toFixed(0)}% ocupação`
-      });
-    }
-
-    // Oportunidades
-    const lowPriceHighOccupancy = events.filter(e => 
-      e.ticket_price < avgPrice * 0.8 && 
-      (e.sold_tickets / e.capacity) > 0.8
-    ).length;
-
-    if (lowPriceHighOccupancy > 5) {
-      insights.push({
-        type: 'info',
-        text: `${lowPriceHighOccupancy} eventos com preço baixo mas alta ocupação - oportunidade de aumento`
-      });
-    }
-
-    return insights;
   };
 
-  const insights = generateInsights();
-
-  if (insights.length === 0) {
+  if (events.length === 0) {
     return null;
   }
 
   return (
     <Card className="glass border-border/50">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Sparkles className="w-5 h-5 text-primary" />
-          Insights Automáticos
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Insights Automáticos com IA
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={generateAIInsights}
+            disabled={loading}
+            className="gap-2"
+          >
+            {loading ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4" />
+            )}
+            {loading ? 'Gerando...' : insights ? 'Gerar Novos' : 'Gerar Insights'}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {insights.map((insight, idx) => (
-            <div
-              key={idx}
-              className={`flex items-start gap-3 p-3 rounded-lg ${
-                insight.type === 'positive' 
-                  ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50'
-                  : insight.type === 'warning'
-                  ? 'bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/50'
-                  : 'bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50'
-              }`}
-            >
-              {insight.type === 'positive' && <TrendingUp className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />}
-              {insight.type === 'warning' && <AlertCircle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />}
-              {insight.type === 'info' && <Target className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />}
-              <p className="text-sm">{insight.text}</p>
+        {!insights && !loading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Clique em "Gerar Insights" para análises automáticas com IA</p>
+          </div>
+        ) : loading ? (
+          <div className="space-y-3">
+            <div className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+            <div className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+          </div>
+        ) : insights ? (
+          <div className="space-y-3">
+            {/* Insight Positivo */}
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50">
+              <TrendingUp className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">Ponto Forte</p>
+                <p className="text-sm text-green-800 dark:text-green-200">{insights.positive}</p>
+              </div>
             </div>
-          ))}
-        </div>
+
+            {/* Insight Negativo/Oportunidade */}
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/50">
+              <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-orange-900 dark:text-orange-100 mb-1">Oportunidade</p>
+                <p className="text-sm text-orange-800 dark:text-orange-200">{insights.negative}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

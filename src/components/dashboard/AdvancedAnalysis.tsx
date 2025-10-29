@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -5,6 +6,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   ScatterChart,
   Scatter,
@@ -17,6 +20,7 @@ import {
   Bar,
   Line
 } from "recharts";
+import { Download } from "lucide-react";
 
 interface AdvancedAnalysisProps {
   events: any[];
@@ -24,9 +28,16 @@ interface AdvancedAnalysisProps {
 }
 
 export default function AdvancedAnalysis({ events, dataSource = 'events' }: AdvancedAnalysisProps) {
+  const [scatterLimit, setScatterLimit] = useState(100);
+
   const getScatterData = () => {
     if (dataSource === 'valle_clientes') {
-      return events.map(cliente => ({
+      // Ordenar por consumo e pegar top N
+      const topClientes = [...events]
+        .sort((a, b) => (b.consumo || 0) - (a.consumo || 0))
+        .slice(0, scatterLimit);
+      
+      return topClientes.map(cliente => ({
         x: cliente.consumo || 0,
         y: cliente.presencas || 0,
         z: cliente.aplicativo_ativo ? 1 : 0,
@@ -108,6 +119,36 @@ export default function AdvancedAnalysis({ events, dataSource = 'events' }: Adva
         </AccordionTrigger>
         <AccordionContent>
           <Card className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">
+                  Exibindo top {scatterLimit} de {events.length.toLocaleString('pt-BR')} {dataSource === 'valle_clientes' ? 'clientes' : 'eventos'}
+                </Badge>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant={scatterLimit === 50 ? "default" : "outline"}
+                    onClick={() => setScatterLimit(50)}
+                  >
+                    Top 50
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={scatterLimit === 100 ? "default" : "outline"}
+                    onClick={() => setScatterLimit(100)}
+                  >
+                    Top 100
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={scatterLimit === 200 ? "default" : "outline"}
+                    onClick={() => setScatterLimit(200)}
+                  >
+                    Top 200
+                  </Button>
+                </div>
+              </div>
+            </div>
             <ResponsiveContainer width="100%" height={400}>
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />

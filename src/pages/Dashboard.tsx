@@ -473,8 +473,8 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
     },
   {
     title: "Consumo Médio",
-    value: `R$ ${((metrics?.consumoMedio || 0) / 1000).toFixed(1)}K`,
-    subtitle: `Total R$ ${((metrics?.consumoTotal || 0) / 1000).toFixed(0)}K`,
+    value: `R$ ${(metrics?.consumoMedio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+    subtitle: `Total R$ ${(metrics?.consumoTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
     icon: DollarSign,
     color: "text-success"
   },
@@ -655,7 +655,7 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
           <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            {dataSource === 'events' ? 'Evolução Temporal' : 'Evolução de Clientes'}
+            {dataSource === 'events' ? 'Evolução Temporal' : 'Evolução do Consumo Médio'}
           </CardTitle>
           </CardHeader>
           <CardContent>
