@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { useTenant } from "@/hooks/useTenant";
 
 interface ZigImportProps {
   onImportComplete?: () => void;
@@ -17,6 +18,7 @@ export function ZigImport({ onImportComplete }: ZigImportProps) {
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
+  const { tenantId } = useTenant();
 
   const parseExcelDate = (excelDate: any): string | null => {
     if (!excelDate) return null;
@@ -119,6 +121,7 @@ export function ZigImport({ onImportComplete }: ZigImportProps) {
           id_evento: row['ID do evento'] || null,
           primeira_interacao: parseExcelDate(row['Primeira interação']),
           primeira_utilizacao: row['É a primeira utilização?'] === 'true' || row['É a primeira utilização?'] === true,
+          tenant_id: tenantId,
         }));
 
         const { error } = await supabase

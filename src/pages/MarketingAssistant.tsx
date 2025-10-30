@@ -8,6 +8,7 @@ import { GeneratingLoader } from "@/components/marketing/GeneratingLoader";
 import { MarketingPlan } from "@/lib/marketingHelpers";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useTenant } from "@/hooks/useTenant";
 
 type ViewMode = "form" | "list" | "viewer" | "editor" | "generating";
 
@@ -29,6 +30,7 @@ export default function MarketingAssistant() {
   const [currentPlan, setCurrentPlan] = useState<MarketingPlan | null>(null);
   const [currentEventData, setCurrentEventData] = useState<EventFormData | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
+  const { tenantId } = useTenant();
 
   const handleGeneratePlan = async (eventData: EventFormData) => {
     setViewMode("generating");
@@ -86,6 +88,7 @@ export default function MarketingAssistant() {
         general_strategy: currentPlan.general_strategy as any,
         cluster_strategies: currentPlan.cluster_strategies as any,
         status: "active",
+        tenant_id: tenantId,
       }).select().single();
 
       if (error) throw error;

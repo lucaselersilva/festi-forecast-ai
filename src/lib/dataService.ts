@@ -63,7 +63,7 @@ class DataService {
     return events
   }
 
-  async importEvents(events: EventData[]): Promise<ImportResult> {
+  async importEvents(events: EventData[], tenantId: string): Promise<ImportResult> {
     let inserted = 0
     let updated = 0
     const errors: string[] = []
@@ -110,7 +110,10 @@ class DataService {
           // Insert new event
           const { error } = await supabase
             .from('events')
-            .insert(event)
+            .insert({
+              ...event,
+              tenant_id: tenantId
+            })
 
           if (error) {
             errors.push(`Error inserting event ${event.event_id}: ${error.message}`)

@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { dataService, ImportResult } from "@/lib/dataService"
 import { RequiredFieldsInfo } from "@/components/import/RequiredFieldsInfo"
+import { useTenant } from "@/hooks/useTenant"
 
 type ImportStatus = 'idle' | 'processing' | 'success' | 'error'
 
@@ -26,6 +27,7 @@ const Import = () => {
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [previewData, setPreviewData] = useState<any[]>([])
   const { toast } = useToast()
+  const { tenantId } = useTenant()
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -79,7 +81,7 @@ const Import = () => {
     try {
       const content = await selectedFile.text()
       const events = await dataService.loadEventsFromCSV(content)
-      const result = await dataService.importEvents(events)
+      const result = await dataService.importEvents(events, tenantId!)
       
       setImportResult(result)
       
