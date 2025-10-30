@@ -199,6 +199,7 @@ export default function Import() {
       <div className="container mx-auto py-8">
         <ColumnMapper
           columns={rawData.columns}
+          sampleData={rawData.sampleData}
           targetSchema={currentImportType.schema}
           sessionId={sessionId}
           onMappingComplete={handleMappingComplete}

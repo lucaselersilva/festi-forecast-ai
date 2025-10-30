@@ -7,16 +7,18 @@ import { Badge } from '@/components/ui/badge'
 import { AlertCircle, Check, ArrowRight } from 'lucide-react'
 import { ImportTargetSchema, suggestFieldMapping } from '@/lib/schemas/import-targets'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 interface ColumnMapperProps {
   columns: string[]
+  sampleData: any[]
   targetSchema: ImportTargetSchema
   sessionId: string
   onMappingComplete: (mappings: Record<string, string>) => void
   onBack: () => void
 }
 
-export function ColumnMapper({ columns, targetSchema, sessionId, onMappingComplete, onBack }: ColumnMapperProps) {
+export function ColumnMapper({ columns, sampleData, targetSchema, sessionId, onMappingComplete, onBack }: ColumnMapperProps) {
   const [mappings, setMappings] = useState<Record<string, string>>(() => {
     // Auto-suggest mappings
     const initial: Record<string, string> = {}
@@ -79,6 +81,39 @@ export function ColumnMapper({ columns, targetSchema, sessionId, onMappingComple
           </AlertDescription>
         </Alert>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Preview dos Dados (3 primeiras linhas)</CardTitle>
+          <CardDescription>
+            Verifique se os dados estão sendo lidos corretamente
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {columns.map(col => (
+                    <TableHead key={col}>{col}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sampleData.slice(0, 3).map((row, idx) => (
+                  <TableRow key={idx}>
+                    {columns.map(col => (
+                      <TableCell key={col} className="max-w-[200px] truncate">
+                        {String(row[col] || '')}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
