@@ -240,6 +240,13 @@ export type Database = {
             referencedColumns: ["customer_id"]
           },
           {
+            foreignKeyName: "consumptions_customerid_fkey"
+            columns: ["customerid"]
+            isOneToOne: false
+            referencedRelation: "vw_valle_rfm_customer"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "consumptions_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -659,6 +666,13 @@ export type Database = {
             referencedColumns: ["customer_id"]
           },
           {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_valle_rfm_customer"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "fk_interactions_event"
             columns: ["event_id"]
             isOneToOne: false
@@ -937,6 +951,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "vw_rfm_customer"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_scoring_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_valle_rfm_customer"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1367,6 +1388,13 @@ export type Database = {
             referencedRelation: "vw_rfm_customer"
             referencedColumns: ["customer_id"]
           },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_valle_rfm_customer"
+            referencedColumns: ["customer_id"]
+          },
         ]
       }
       vw_demographic_profile: {
@@ -1762,6 +1790,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "valle_clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_valle_rfm_customer: {
+        Row: {
+          customer_id: number | null
+          f: number | null
+          frequency_interactions: number | null
+          last_interaction_at: string | null
+          m: number | null
+          monetary_total: number | null
+          r: number | null
+          recency_days: number | null
+          rfm_score: number | null
+          tenant_id: string | null
+        }
+        Insert: {
+          customer_id?: number | null
+          f?: never
+          frequency_interactions?: never
+          last_interaction_at?: string | null
+          m?: never
+          monetary_total?: never
+          r?: never
+          recency_days?: never
+          rfm_score?: never
+          tenant_id?: string | null
+        }
+        Update: {
+          customer_id?: number | null
+          f?: never
+          frequency_interactions?: never
+          last_interaction_at?: string | null
+          m?: never
+          monetary_total?: never
+          r?: never
+          recency_days?: never
+          rfm_score?: never
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
