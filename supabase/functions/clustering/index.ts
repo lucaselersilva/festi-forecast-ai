@@ -450,7 +450,7 @@ serve(async (req) => {
     
     // Build named percentiles based on segmentation type
     const percentiles: any = {};
-    if (segmentationType === 'rfm') {
+    if (segmentationType === 'rfm' || segmentationType === 'valle-rfm') {
       percentiles.recency = rawPercentiles.feature_0;
       percentiles.frequency = rawPercentiles.feature_1;
       percentiles.monetary = rawPercentiles.feature_2;
@@ -531,7 +531,7 @@ serve(async (req) => {
       };
 
       // Add named average features based on segmentation type with decoded values
-      if (segmentationType === 'rfm') {
+      if (segmentationType === 'rfm' || segmentationType === 'valle-rfm') {
         clusterObj.avgRecency = avgFeatures[0];
         clusterObj.avgFrequency = avgFeatures[1];
         clusterObj.avgMonetary = avgFeatures[2];

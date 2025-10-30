@@ -39,6 +39,16 @@ Seu texto deve fluir como um relatório narrativo, não técnico. Compare sempre
 
 O objetivo é transformar esses dados em insights aplicáveis que inspirem ação.`,
 
+  'valle-rfm': `Você é um analista de dados de marketing que traduz números em recomendações claras e humanas para eventos musicais no Brasil.
+
+Receberá dados de clusters baseados em Recência (dias desde última visita), Frequência (número de presenças) e Valor Monetário (quanto gastam). Sua tarefa é descrever quem são essas pessoas, como se comportam, e o que fazer com essa informação.
+
+Use apenas os números fornecidos. Se algo estiver faltando, siga normalmente sem mencionar a ausência. Fale sobre oportunidades de engajamento ou aumento de receita, e indique ações práticas como "envie uma oferta de upgrade via WhatsApp para quem tem alto valor mas está inativo".
+
+Seu texto deve fluir como um relatório narrativo, não técnico. Compare sempre com os percentis quando relevante, cite valores reais em reais (R$), dias e quantidade. Explique o porquê de cada ação de forma natural e otimista.
+
+O objetivo é transformar esses dados em insights aplicáveis que inspirem ação.`,
+
   demographic: `Você é um analista de dados de marketing que entende como características demográficas influenciam o comportamento em eventos.
 
 Receberá informações sobre faixa etária, gênero, cidade ou região de grupos de clientes. Sua missão é explicar quem são essas pessoas e como alcançá-las melhor.
@@ -79,6 +89,11 @@ function formatFeatures(cluster: ClusterData, type: string): string {
 - Frequência média: ${features[1]?.toFixed(1)} compras no período
 - Valor monetário médio: R$ ${features[2]?.toFixed(2)}`;
     
+    case 'valle-rfm':
+      return `- Recência média: ${features[0]?.toFixed(1)} dias desde última visita
+- Frequência média: ${features[1]?.toFixed(1)} presenças
+- Valor monetário médio: R$ ${features[2]?.toFixed(2)}`;
+    
     case 'demographic':
       return `- Idade média: ${features[0]?.toFixed(1)} anos
 - Gênero dominante: ${cluster.dominantGender || 'não especificado'}
@@ -102,9 +117,13 @@ function formatFeatures(cluster: ClusterData, type: string): string {
 function formatPercentiles(percentiles: Percentiles, type: string): string {
   switch (type) {
     case 'rfm':
-      return `- Recência: P25=${percentiles.recency?.p25}, P50=${percentiles.recency?.p50}, P75=${percentiles.recency?.p75}
-- Frequência: P25=${percentiles.frequency?.p25}, P50=${percentiles.frequency?.p50}, P75=${percentiles.frequency?.p75}
-- Monetário: P25=R$ ${percentiles.monetary?.p25.toFixed(2)}, P50=R$ ${percentiles.monetary?.p50.toFixed(2)}, P75=R$ ${percentiles.monetary?.p75.toFixed(2)}`;
+    case 'valle-rfm':
+      if (!percentiles.recency || !percentiles.frequency || !percentiles.monetary) {
+        return 'Percentis não disponíveis para comparação';
+      }
+      return `- Recência: P25=${percentiles.recency.p25}, P50=${percentiles.recency.p50}, P75=${percentiles.recency.p75}
+- Frequência: P25=${percentiles.frequency.p25}, P50=${percentiles.frequency.p50}, P75=${percentiles.frequency.p75}
+- Monetário: P25=R$ ${percentiles.monetary.p25.toFixed(2)}, P50=R$ ${percentiles.monetary.p50.toFixed(2)}, P75=R$ ${percentiles.monetary.p75.toFixed(2)}`;
     
     case 'demographic':
       return `- Idade: P25=${percentiles.age?.p25}, P50=${percentiles.age?.p50}, P75=${percentiles.age?.p75}`;
@@ -143,8 +162,8 @@ Comparando com toda a base de clientes:
 ${percentilesText}
 
 Agora me ajude a entender:
-- Quem são essas pessoas e como se comportam? (descreva em 2-3 frases naturais)
-- Quais são as 2-3 ações mais práticas que podemos fazer com esse grupo? (seja específico sobre canais, mensagens, ofertas)
+- Quem são essas pessoas e como se comportam? (crie 3 características descritivas separadas)
+- Quais são as 3-4 ações mais práticas que podemos fazer com esse grupo? (seja específico sobre canais, mensagens, ofertas)
 - Qual a prioridade deste grupo comparado aos outros? (high se muito importante, medium se moderado, low se menos urgente)
 - Resuma em uma frase o que define este cluster
 
@@ -152,8 +171,8 @@ Use apenas os dados que te passei. Se algo não estiver disponível, não tem pr
 
 Responda em formato JSON assim:
 {
-  "characteristics": ["sua descrição natural aqui"],
-  "strategies": ["ação 1 específica", "ação 2 específica"],
+  "characteristics": ["característica 1 em uma frase", "característica 2 em uma frase", "característica 3 em uma frase"],
+  "strategies": ["ação 1 específica", "ação 2 específica", "ação 3 específica"],
   "priority": "high, medium ou low",
   "description": "resumo em uma frase"
 }`;
