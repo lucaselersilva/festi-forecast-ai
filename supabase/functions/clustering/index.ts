@@ -327,10 +327,42 @@ serve(async (req) => {
 
     const config = viewConfig[segmentationType as keyof typeof viewConfig] || viewConfig.rfm;
 
-    // Fetch features from selected view
+    // Get user's tenant_id from auth
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Authorization header missing');
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Unauthorized: ' + (userError?.message || 'No user found'));
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile?.tenant_id) {
+      throw new Error('Tenant not found for user: ' + (profileError?.message || 'No tenant_id'));
+    }
+
+    const tenantId = profile.tenant_id;
+    console.log(`🏢 Filtering data for tenant: ${tenantId}`);
+
+    // Fetch features from selected view, filtered by tenant_id
+    console.log(`📊 Fetching data from view: ${config.view}`);
     const { data: features, error: fetchError } = await supabase
       .from(config.view)
       .select('*')
+      .eq('tenant_id', tenantId)
       .limit(50000)
       .order(config.idField);
 
