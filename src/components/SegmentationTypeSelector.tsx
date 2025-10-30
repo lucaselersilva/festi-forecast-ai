@@ -3,7 +3,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, TrendingUp, Activity, Music, Target } from "lucide-react";
 
-export type SegmentationType = 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
+export type SegmentationType = 'valle-rfm' | 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
 
 interface SegmentationTypeSelectorProps {
   value: SegmentationType;
@@ -13,9 +13,16 @@ interface SegmentationTypeSelectorProps {
 export function SegmentationTypeSelector({ value, onChange }: SegmentationTypeSelectorProps) {
   const types = [
     {
+      value: 'valle-rfm' as const,
+      label: 'Valle RFM',
+      description: 'RFM dos dados do Valle (customers)',
+      icon: TrendingUp,
+      features: ['Recência de visita', 'Presenças', 'Consumo total']
+    },
+    {
       value: 'rfm' as const,
-      label: 'RFM',
-      description: 'Recência, Frequência e Valor Monetário',
+      label: 'RFM Clássico',
+      description: 'RFM baseado em interações',
       icon: TrendingUp,
       features: ['Recência de compra', 'Frequência de interações', 'Valor monetário total']
     },

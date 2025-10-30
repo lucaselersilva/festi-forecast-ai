@@ -14,11 +14,11 @@ interface ClusterData {
 
 interface ClusterVisualizationProps {
   clusters: ClusterData[];
-  type: 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
+  type: 'valle-rfm' | 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
 }
 
 export function ClusterVisualization({ clusters, type }: ClusterVisualizationProps) {
-  if (type === 'rfm') {
+  if (type === 'rfm' || type === 'valle-rfm') {
     // 3D-style scatter plot for RFM
     const scatterData = clusters.map(c => ({
       name: c.name,

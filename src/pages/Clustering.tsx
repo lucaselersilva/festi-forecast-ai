@@ -24,7 +24,7 @@ import {
 export default function Clustering() {
   const { toast } = useToast();
   
-  const [segmentationType, setSegmentationType] = useState<SegmentationType>('rfm');
+  const [segmentationType, setSegmentationType] = useState<SegmentationType>('valle-rfm');
   const [clusteringMethod, setClusteringMethod] = useState<'kmeans' | 'dbscan' | 'gmm'>('kmeans');
   const [clusteringParams, setClusteringParams] = useState({
     k: 4,
@@ -235,7 +235,7 @@ export default function Clustering() {
     
     const percentiles: Percentiles | undefined = clusteringResult?.percentiles;
     
-    if (type === 'rfm' && cluster.avgRecency !== undefined) {
+    if ((type === 'rfm' || type === 'valle-rfm') && cluster.avgRecency !== undefined) {
       if (percentiles && percentiles.recency && percentiles.frequency && percentiles.monetary) {
         const insight = getRFMSegmentNameDynamic({
           avgRecency: cluster.avgRecency,
