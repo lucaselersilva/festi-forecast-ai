@@ -19,13 +19,32 @@ export default function Birthdays() {
   const [filters, setFilters] = useState({
     month: new Date().getMonth() + 1,
     clusters: [] as string[],
-    ageRanges: [] as string[]
+    ageRanges: [] as string[],
+    weeks: [] as number[]
   });
 
   useEffect(() => {
     loadCustomers();
     loadExistingActions();
   }, [filters]);
+
+  const filterByWeeks = (customers: BirthdayCustomer[]): BirthdayCustomer[] => {
+    if (filters.weeks.length === 0) return customers;
+    
+    return customers.filter(customer => {
+      if (!customer.aniversario) return false;
+      
+      const day = new Date(customer.aniversario).getDate();
+      
+      return filters.weeks.some(week => {
+        if (week === 1) return day >= 1 && day <= 7;
+        if (week === 2) return day >= 8 && day <= 14;
+        if (week === 3) return day >= 15 && day <= 21;
+        if (week === 4) return day >= 22;
+        return false;
+      });
+    });
+  };
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -35,7 +54,9 @@ export default function Birthdays() {
         filters.clusters,
         filters.ageRanges
       );
-      setCustomers(data);
+      
+      const filteredData = filterByWeeks(data);
+      setCustomers(filteredData);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar aniversariantes",

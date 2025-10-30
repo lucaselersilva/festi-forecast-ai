@@ -20,9 +20,9 @@ import {
 // Constantes calculadas UMA ÚNICA VEZ quando o módulo é carregado
 const INITIAL_FILTERS = {
   month: new Date().getMonth() + 1,
-  year: new Date().getFullYear(),
   clusters: [] as string[],
   ageRanges: [] as string[],
+  weeks: [] as number[],
 };
 
 export function ZigBirthdays() {
@@ -44,7 +44,7 @@ export function ZigBirthdays() {
   const lastFiltersRef = useRef<string>('');
 
   useEffect(() => {
-    const filtersKey = `${rawFilters.month}-${rawFilters.year}-${rawFilters.clusters.join(',')}-${rawFilters.ageRanges.join(',')}`;
+    const filtersKey = `${rawFilters.month}-${rawFilters.clusters.join(',')}-${rawFilters.ageRanges.join(',')}-${rawFilters.weeks.join(',')}`;
     
     // Só carrega se os filtros realmente mudaram
     if (lastFiltersRef.current === filtersKey) {
