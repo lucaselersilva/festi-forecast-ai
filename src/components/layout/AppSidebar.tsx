@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/sidebar"
 
 const mainItems = [
-  { title: "Dashboard", url: "/", icon: BarChart3 },
+  { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
   { title: "Import Data", url: "/import", icon: Upload },
   { title: "Insights Planner", url: "/insights-planner", icon: Target },
   { title: "Clustering", url: "/clustering", icon: Activity },
@@ -54,7 +54,7 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed"
 
   const isActive = (path: string) => {
-    if (path === "/") return currentPath === "/"
+    if (path === "/dashboard") return currentPath === "/dashboard"
     return currentPath.startsWith(path)
   }
   
@@ -93,7 +93,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink 
                       to={item.url} 
-                      end={item.url === "/"}
+                      end={item.url === "/dashboard"}
                       className={getNavCls}
                     >
                       <item.icon className="w-4 h-4" />
