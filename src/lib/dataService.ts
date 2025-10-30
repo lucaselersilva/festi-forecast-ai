@@ -1,6 +1,19 @@
 import { supabase } from "@/integrations/supabase/client"
 import * as XLSX from 'xlsx'
 
+export interface RawFileData {
+  columns: string[]
+  sampleData: any[]
+  totalRows: number
+  allData: any[]
+}
+
+export interface UploadToStagingParams {
+  file: File
+  tenantId: string
+  sourceName: 'events' | 'customers' | 'valle_clientes' | 'consumptions'
+}
+
 export interface EventData {
   event_id: number
   date: string
@@ -30,6 +43,82 @@ export interface ImportResult {
 }
 
 class DataService {
+  // Parse file and return raw data without mapping
+  async parseFileRaw(file: File): Promise<RawFileData> {
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    
+    if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      return this.parseExcelRaw(file)
+    } else if (fileExtension === 'csv') {
+      return this.parseCSVRaw(file)
+    } else {
+      throw new Error('Formato de arquivo não suportado')
+    }
+  }
+
+  private async parseExcelRaw(file: File): Promise<RawFileData> {
+    const arrayBuffer = await file.arrayBuffer()
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+    const allData = XLSX.utils.sheet_to_json(firstSheet)
+    
+    const columns = allData.length > 0 ? Object.keys(allData[0]) : []
+    const sampleData = allData.slice(0, 10)
+    
+    return {
+      columns,
+      sampleData,
+      totalRows: allData.length,
+      allData
+    }
+  }
+
+  private async parseCSVRaw(file: File): Promise<RawFileData> {
+    const content = await file.text()
+    const lines = content.trim().split('\n')
+    const columns = lines[0].split(',').map(h => h.trim())
+    
+    const allData = lines.slice(1).map(line => {
+      const values = line.split(',')
+      const row: any = {}
+      columns.forEach((col, idx) => {
+        row[col] = values[idx]?.trim() || ''
+      })
+      return row
+    })
+    
+    return {
+      columns,
+      sampleData: allData.slice(0, 10),
+      totalRows: allData.length,
+      allData
+    }
+  }
+
+  // Upload raw data to staging table
+  async uploadToStaging(params: UploadToStagingParams): Promise<string> {
+    const { file, tenantId, sourceName } = params
+    const rawData = await this.parseFileRaw(file)
+    
+    const sessionId = crypto.randomUUID()
+    
+    const { error } = await supabase
+      .from('import_staging')
+      .insert({
+        session_id: sessionId,
+        tenant_id: tenantId,
+        file_name: file.name,
+        source_name: sourceName,
+        raw_data: rawData.allData,
+        total_rows: rawData.totalRows,
+        status: 'pending'
+      })
+    
+    if (error) throw error
+    
+    return sessionId
+  }
+
   async loadEventsFromExcel(file: File): Promise<EventData[]> {
     const arrayBuffer = await file.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: 'array' })

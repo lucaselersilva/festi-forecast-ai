@@ -1,31 +1,27 @@
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Upload, FileText, CheckCircle, Users, ShoppingCart } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  Upload, 
-  FileSpreadsheet, 
-  Download,
-  CheckCircle,
-  AlertCircle,
-  Users,
-  Calendar,
-  ShoppingCart
-} from "lucide-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
+import { ColumnMapper } from "@/components/import/ColumnMapper"
+import { ImportValidation } from "@/components/import/ImportValidation"
+import { dataService, RawFileData } from "@/lib/dataService"
 import { useToast } from "@/hooks/use-toast"
-import { dataService, ImportResult } from "@/lib/dataService"
-import { RequiredFieldsInfo } from "@/components/import/RequiredFieldsInfo"
 import { useTenant } from "@/hooks/useTenant"
+import { getSchemaByName } from "@/lib/schemas/import-targets"
 
-type ImportStatus = 'idle' | 'processing' | 'success' | 'error'
+type ImportStep = 'upload' | 'mapping' | 'validation' | 'complete'
 
-const Import = () => {
-  const [dragActive, setDragActive] = useState(false)
+export default function Import() {
+  const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [importStatus, setImportStatus] = useState<ImportStatus>('idle')
-  const [importResult, setImportResult] = useState<ImportResult | null>(null)
-  const [previewData, setPreviewData] = useState<any[]>([])
+  const [rawData, setRawData] = useState<RawFileData | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [mappings, setMappings] = useState<Record<string, string>>({})
+  const [currentStep, setCurrentStep] = useState<ImportStep>('upload')
+  const [selectedImportType, setSelectedImportType] = useState<string>('valle_clientes')
   const { toast } = useToast()
   const { tenantId } = useTenant()
 
@@ -33,384 +29,313 @@ const Import = () => {
     e.preventDefault()
     e.stopPropagation()
     if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
+      setIsDragging(true)
     } else if (e.type === "dragleave") {
-      setDragActive(false)
+      setIsDragging(false)
+    }
+  }
+
+  const handleFileUpload = async (file: File) => {
+    try {
+      setSelectedFile(file)
+      const parsed = await dataService.parseFileRaw(file)
+      setRawData(parsed)
+      
+      toast({
+        title: "Arquivo carregado",
+        description: `${parsed.totalRows} linhas detectadas`
+      })
+    } catch (error) {
+      console.error('Error parsing file:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível ler o arquivo",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleContinueToMapping = async () => {
+    if (!selectedFile || !tenantId || !rawData) return
+
+    try {
+      const id = await dataService.uploadToStaging({
+        file: selectedFile,
+        tenantId,
+        sourceName: selectedImportType as any
+      })
+      
+      setSessionId(id)
+      setCurrentStep('mapping')
+    } catch (error) {
+      console.error('Error uploading to staging:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar os dados",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleMappingComplete = (newMappings: Record<string, string>) => {
+    setMappings(newMappings)
+    setCurrentStep('validation')
+  }
+
+  const handleValidationComplete = () => {
+    setCurrentStep('complete')
+    toast({
+      title: "Importação concluída!",
+      description: "Os dados foram importados com sucesso"
+    })
+  }
+
+  const handleReset = () => {
+    setSelectedFile(null)
+    setRawData(null)
+    setSessionId(null)
+    setMappings({})
+    setCurrentStep('upload')
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleFileUpload(file)
     }
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
+    setIsDragging(false)
     
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0])
-    }
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setSelectedFile(file)
-      await generatePreview(file)
-    }
-  }
-
-  const generatePreview = async (file: File) => {
-    try {
-      const fileExtension = file.name.split('.').pop()?.toLowerCase()
-      let events: any[] = []
-
-      if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        events = await dataService.loadEventsFromExcel(file)
-      } else if (fileExtension === 'csv') {
-        const content = await file.text()
-        events = await dataService.loadEventsFromCSV(content)
-      } else {
-        throw new Error('Unsupported file format')
-      }
-
-      setPreviewData(events.slice(0, 5)) // Show first 5 rows for preview
-    } catch (error) {
-      console.error('Error generating preview:', error)
-      toast({
-        title: "Preview Error",
-        description: "Could not generate preview. Please check file format.",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const performImport = async () => {
-    if (!selectedFile) return
-    
-    setImportStatus('processing')
-    setImportResult(null)
-    
-    try {
-      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase()
-      let events: any[] = []
-
-      if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        events = await dataService.loadEventsFromExcel(selectedFile)
-      } else if (fileExtension === 'csv') {
-        const content = await selectedFile.text()
-        events = await dataService.loadEventsFromCSV(content)
-      } else {
-        throw new Error('Unsupported file format')
-      }
-
-      const result = await dataService.importEvents(events, tenantId!)
-      
-      setImportResult(result)
-      
-      if (result.success) {
-        setImportStatus('success')
-        toast({
-          title: "Import Successful",
-          description: `${result.inserted} new events imported, ${result.updated} events updated.`,
-        })
-      } else {
-        setImportStatus('error')
-        toast({
-          title: "Import Completed with Errors",
-          description: `${result.errors.length} errors occurred. Check details below.`,
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      setImportStatus('error')
-      toast({
-        title: "Import Failed",
-        description: "An unexpected error occurred during import.",
-        variant: "destructive"
-      })
+    const file = e.dataTransfer.files[0]
+    if (file) {
+      handleFileUpload(file)
     }
   }
 
   const importTypes = [
     {
-      id: 'events',
-      title: 'Events',
-      icon: Calendar,
-      description: 'Import event data with sales and marketing metrics',
-      template: 'events_template.csv',
-      fields: ['event_id', 'date', 'city', 'venue', 'artist', 'genre', 'ticket_price', 'marketing_spend', 'capacity', 'sold_tickets', 'revenue']
-    },
-    {
-      id: 'customers',
-      title: 'Customers',
+      id: "valle_clientes",
+      title: "Valle Clientes",
       icon: Users,
-      description: 'Import customer data with demographics and preferences',
-      template: 'customers_template.csv',
-      fields: ['email', 'name', 'birthDate', 'gender', 'city', 'phone']
+      description: "Importar dados de clientes do Valle",
+      schema: getSchemaByName('valle_clientes')!
     },
     {
-      id: 'consumption',
-      title: 'Consumption',
+      id: "customers",
+      title: "Customers",
+      icon: Users,
+      description: "Importar dados de clientes",
+      schema: getSchemaByName('customers')!
+    },
+    {
+      id: "events",
+      title: "Events",
+      icon: FileText,
+      description: "Importar dados de eventos",
+      schema: getSchemaByName('events')!
+    },
+    {
+      id: "consumptions",
+      title: "Consumptions",
       icon: ShoppingCart,
-      description: 'Import bar and concession consumption data',
-      template: 'consumption_template.csv',
-      fields: ['eventId', 'customerId', 'item', 'quantity', 'totalValue', 'timestamp']
+      description: "Importar dados de consumo",
+      schema: getSchemaByName('consumptions')!
     }
   ]
 
-  const FileUploadZone = () => (
-    <div
-      className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-        dragActive 
-          ? 'border-primary bg-primary/5' 
-          : 'border-border hover:border-primary/50'
-      }`}
-      onDragEnter={handleDrag}
-      onDragLeave={handleDrag}
-      onDragOver={handleDrag}
-      onDrop={handleDrop}
-    >
-      <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-      <div className="space-y-2">
-        <p className="text-lg font-medium">
-          Drop your CSV/Excel files here
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Supports .csv, .xlsx, and .xls formats
-        </p>
-        <p className="text-sm text-muted-foreground">
-          or click to browse your computer
-        </p>
-      </div>
-      <Input
-        type="file"
-        className="hidden"
-        accept=".csv,.json,.xlsx"
-        onChange={handleFileChange}
-        id="file-upload"
-      />
-      <label htmlFor="file-upload">
-        <Button variant="outline" className="mt-4" asChild>
-          <span className="cursor-pointer">Browse Files</span>
-        </Button>
-      </label>
-    </div>
-  )
+  const currentImportType = importTypes.find(t => t.id === selectedImportType)
 
-  const ImportPreview = () => (
-    <Card className="glass border-border/50">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {importStatus === 'success' && <CheckCircle className="w-5 h-5 text-success" />}
-          {importStatus === 'error' && <AlertCircle className="w-5 h-5 text-destructive" />}
-          {importStatus === 'processing' && <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
-          Import Preview
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {selectedFile ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-accent/20 rounded-lg">
-              <FileSpreadsheet className="w-6 h-6 text-primary" />
-              <div className="flex-1">
-                <p className="font-medium">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-              </div>
-              {importStatus === 'success' && (
-                <CheckCircle className="w-5 h-5 text-success" />
-              )}
-            </div>
-
-            {importStatus === 'idle' && previewData.length > 0 && (
-              <div className="space-y-3">
-                <div className="text-sm font-medium">Data Preview:</div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-1">Event ID</th>
-                        <th className="text-left p-1">Date</th>
-                        <th className="text-left p-1">City</th>
-                        <th className="text-left p-1">Artist</th>
-                        <th className="text-left p-1">Genre</th>
-                        <th className="text-left p-1">Price</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {previewData.map((row, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="p-1">{row.event_id}</td>
-                          <td className="p-1">{row.date}</td>
-                          <td className="p-1">{row.city}</td>
-                          <td className="p-1">{row.artist}</td>
-                          <td className="p-1">{row.genre}</td>
-                          <td className="p-1">R$ {row.ticket_price}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <Button 
-                  onClick={performImport}
-                  className="w-full bg-gradient-primary hover:bg-gradient-primary/90"
-                  disabled={importStatus !== 'idle'}
-                >
-                  Import Data
-                </Button>
-              </div>
-            )}
-
-            {importStatus === 'idle' && previewData.length === 0 && selectedFile && (
-              <div className="text-center py-4 text-muted-foreground">
-                Processing file preview...
-              </div>
-            )}
-
-            {importStatus === 'success' && importResult && (
-              <div className="text-center p-4 bg-success/10 rounded-lg border border-success/20">
-                <CheckCircle className="w-8 h-8 text-success mx-auto mb-2" />
-                <p className="font-medium text-success">Import Completed Successfully!</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {importResult.inserted} new records imported, {importResult.updated} records updated
-                </p>
-              </div>
-            )}
-
-            {importStatus === 'error' && importResult && (
-              <div className="space-y-3">
-                <div className="text-center p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-                  <AlertCircle className="w-8 h-8 text-destructive mx-auto mb-2" />
-                  <p className="font-medium text-destructive">Import Completed with Errors</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {importResult.errors.length} errors found
-                  </p>
-                </div>
-                {importResult.errors.length > 0 && (
-                  <div className="max-h-32 overflow-y-auto bg-muted/20 p-2 rounded text-xs">
-                    {importResult.errors.map((error, index) => (
-                      <div key={index} className="text-destructive mb-1">{error}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+  // File upload zone component
+  const FileUploadZone = ({ 
+    isDragging, 
+    onDragOver, 
+    onDragLeave, 
+    onDrop, 
+    onChange 
+  }: {
+    isDragging: boolean
+    onDragOver: (e: React.DragEvent) => void
+    onDragLeave: (e: React.DragEvent) => void
+    onDrop: (e: React.DragEvent) => void
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  }) => (
+    <Card className={`border-2 border-dashed transition-colors ${isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'}`}>
+      <CardContent className="flex flex-col items-center justify-center py-12">
+        <div
+          onDragOver={onDragOver}
+          onDragEnter={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          className="text-center space-y-4"
+        >
+          <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <div className="space-y-2">
+            <p className="text-lg font-medium">
+              Drop your CSV/Excel files here
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Supports .csv, .xlsx, and .xls formats
+            </p>
+            <p className="text-sm text-muted-foreground">
+              or click to browse your computer
+            </p>
           </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            Select a file to see the preview
-          </div>
-        )}
+          <Input
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={onChange}
+            className="max-w-xs mx-auto cursor-pointer"
+          />
+        </div>
       </CardContent>
     </Card>
   )
 
+  if (currentStep === 'mapping' && rawData && sessionId && currentImportType) {
+    return (
+      <div className="container mx-auto py-8">
+        <ColumnMapper
+          columns={rawData.columns}
+          targetSchema={currentImportType.schema}
+          sessionId={sessionId}
+          onMappingComplete={handleMappingComplete}
+          onBack={() => setCurrentStep('upload')}
+        />
+      </div>
+    )
+  }
+
+  if (currentStep === 'validation' && sessionId && currentImportType) {
+    return (
+      <div className="container mx-auto py-8">
+        <ImportValidation
+          sessionId={sessionId}
+          mappings={mappings}
+          targetTable={currentImportType.schema.tableName}
+          onBack={() => setCurrentStep('mapping')}
+          onComplete={handleValidationComplete}
+        />
+      </div>
+    )
+  }
+
+  if (currentStep === 'complete') {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <CheckCircle className="w-12 h-12 text-green-600" />
+              <div>
+                <CardTitle>Importação Concluída!</CardTitle>
+                <CardDescription>Os dados foram importados com sucesso</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleReset}>Nova Importação</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold gradient-text">Data Import</h1>
-        <p className="text-muted-foreground mt-1">
-          Import your customer, ticket, and consumption data
+    <div className="container mx-auto py-8 space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-4xl font-bold tracking-tight">Importação de Dados</h1>
+        <p className="text-muted-foreground">
+          Importe seus dados de arquivos CSV ou Excel
         </p>
       </div>
 
-      <Tabs defaultValue="events" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          {importTypes.map((type) => {
-            const Icon = type.icon
-            return (
-              <TabsTrigger key={type.id} value={type.id} className="flex items-center gap-2">
-                <Icon className="w-4 h-4" />
-                {type.title}
-              </TabsTrigger>
-            )
-          })}
+      <Tabs value={selectedImportType} onValueChange={setSelectedImportType} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          {importTypes.map(type => (
+            <TabsTrigger key={type.id} value={type.id}>
+              <type.icon className="w-4 h-4 mr-2" />
+              {type.title}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        {importTypes.map((type) => (
+        {importTypes.map(type => (
           <TabsContent key={type.id} value={type.id} className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <Card className="glass border-border/50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <type.icon className="w-5 h-5" />
-                      Import {type.title}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {type.description}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <FileUploadZone />
-                  </CardContent>
-                </Card>
-
-                <ImportPreview />
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-6">
+                <FileUploadZone
+                  isDragging={isDragging}
+                  onDragOver={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDrop={handleDrop}
+                  onChange={handleFileChange}
+                />
+                
+                {rawData && selectedFile && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Preview dos Dados</CardTitle>
+                      <CardDescription>
+                        {selectedFile.name} - {rawData.totalRows} linhas detectadas
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {rawData.columns.map(col => (
+                                <TableHead key={col}>{col}</TableHead>
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rawData.sampleData.map((row, idx) => (
+                              <TableRow key={idx}>
+                                {rawData.columns.map(col => (
+                                  <TableCell key={col} className="max-w-[200px] truncate">
+                                    {String(row[col] || '')}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {rawData.sampleData.length < rawData.totalRows && (
+                        <p className="text-sm text-muted-foreground mt-4 text-center">
+                          Mostrando {rawData.sampleData.length} de {rawData.totalRows} linhas
+                        </p>
+                      )}
+                    </CardContent>
+                    <CardFooter>
+                      <Button onClick={handleContinueToMapping} className="w-full">
+                        Continuar para Mapeamento
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                )}
               </div>
 
               <div className="space-y-6">
-                <RequiredFieldsInfo />
-                
-                <Card className="glass border-border/50">
+                <Card>
                   <CardHeader>
-                    <CardTitle>Template & Instructions</CardTitle>
+                    <CardTitle>Sobre {type.title}</CardTitle>
+                    <CardDescription>{type.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <h4 className="font-medium mb-2">Required Fields:</h4>
-                      <div className="space-y-1">
-                        {type.fields.map((field) => (
-                          <div key={field} className="text-sm font-mono bg-accent/20 px-2 py-1 rounded">
-                            {field}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <Button 
-                      onClick={() => {
-                        const link = document.createElement('a')
-                        link.href = `/templates/${type.template}`
-                        link.download = type.template
-                        link.click()
-                      }}
-                      variant="outline" 
-                      className="w-full gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download Template
-                    </Button>
-
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <p>• Supported formats: CSV, JSON, XLSX</p>
-                      <p>• Maximum file size: 50MB</p>
-                      <p>• Date format: YYYY-MM-DD</p>
-                      <p>• Encoding: UTF-8</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="glass border-border/50">
-                  <CardHeader>
-                    <CardTitle>Recent Imports</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-success" />
-                        <span>customers_dec.csv</span>
-                        <span className="ml-auto text-muted-foreground">2h ago</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-success" />
-                        <span>tickets_nov.xlsx</span>
-                        <span className="ml-auto text-muted-foreground">1d ago</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-warning" />
-                        <span>consumption.json</span>
-                        <span className="ml-auto text-muted-foreground">2d ago</span>
-                      </div>
+                    <div className="text-sm space-y-2">
+                      <p className="font-medium">Campos obrigatórios:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {type.schema.fields
+                          .filter(f => f.required)
+                          .map(f => (
+                            <li key={f.name}>{f.label}</li>
+                          ))}
+                      </ul>
                     </div>
                   </CardContent>
                 </Card>
@@ -422,5 +347,3 @@ const Import = () => {
     </div>
   )
 }
-
-export default Import
