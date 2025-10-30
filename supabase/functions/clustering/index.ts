@@ -327,11 +327,10 @@ serve(async (req) => {
 
     const config = viewConfig[segmentationType as keyof typeof viewConfig] || viewConfig.rfm;
 
-    // Fetch features from selected view (aumentando limite para 50000)
+    // Fetch features from selected view
     const { data: features, error: fetchError } = await supabase
       .from(config.view)
       .select('*')
-      .limit(50000)
       .order(config.idField);
 
     if (fetchError) {
