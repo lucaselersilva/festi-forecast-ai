@@ -18,6 +18,8 @@ interface ColumnMapperProps {
   onBack: () => void
 }
 
+const UNMAPPED_VALUE = '__UNMAPPED__'
+
 export function ColumnMapper({ columns, sampleData, targetSchema, sessionId, onMappingComplete, onBack }: ColumnMapperProps) {
   const [mappings, setMappings] = useState<Record<string, string>>(() => {
     // Auto-suggest mappings
@@ -32,10 +34,15 @@ export function ColumnMapper({ columns, sampleData, targetSchema, sessionId, onM
   })
 
   const handleMappingChange = (sourceColumn: string, targetField: string) => {
-    setMappings(prev => ({
-      ...prev,
-      [sourceColumn]: targetField
-    }))
+    setMappings(prev => {
+      const newMappings = { ...prev }
+      if (targetField === UNMAPPED_VALUE) {
+        delete newMappings[sourceColumn]
+      } else {
+        newMappings[sourceColumn] = targetField
+      }
+      return newMappings
+    })
   }
 
   const getMappedFields = () => {
@@ -142,14 +149,14 @@ export function ColumnMapper({ columns, sampleData, targetSchema, sessionId, onM
 
                 <div className="flex-1">
                   <Select
-                    value={mappings[sourceColumn] || ''}
+                    value={mappings[sourceColumn] || UNMAPPED_VALUE}
                     onValueChange={(value) => handleMappingChange(sourceColumn, value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Ignorar esta coluna" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Ignorar esta coluna</SelectItem>
+                      <SelectItem value={UNMAPPED_VALUE}>Ignorar esta coluna</SelectItem>
                       {targetSchema.fields.map(field => {
                         const isUsed = usedTargetFields.has(field.name) && mappings[sourceColumn] !== field.name
                         return (
