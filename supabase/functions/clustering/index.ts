@@ -331,6 +331,7 @@ serve(async (req) => {
     const { data: features, error: fetchError } = await supabase
       .from(config.view)
       .select('*')
+      .limit(50000)
       .order(config.idField);
 
     if (fetchError) {
