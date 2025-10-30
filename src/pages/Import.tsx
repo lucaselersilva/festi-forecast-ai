@@ -59,8 +59,18 @@ const Import = () => {
 
   const generatePreview = async (file: File) => {
     try {
-      const content = await file.text()
-      const events = await dataService.loadEventsFromCSV(content)
+      const fileExtension = file.name.split('.').pop()?.toLowerCase()
+      let events: any[] = []
+
+      if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        events = await dataService.loadEventsFromExcel(file)
+      } else if (fileExtension === 'csv') {
+        const content = await file.text()
+        events = await dataService.loadEventsFromCSV(content)
+      } else {
+        throw new Error('Unsupported file format')
+      }
+
       setPreviewData(events.slice(0, 5)) // Show first 5 rows for preview
     } catch (error) {
       console.error('Error generating preview:', error)
@@ -79,8 +89,18 @@ const Import = () => {
     setImportResult(null)
     
     try {
-      const content = await selectedFile.text()
-      const events = await dataService.loadEventsFromCSV(content)
+      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase()
+      let events: any[] = []
+
+      if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        events = await dataService.loadEventsFromExcel(selectedFile)
+      } else if (fileExtension === 'csv') {
+        const content = await selectedFile.text()
+        events = await dataService.loadEventsFromCSV(content)
+      } else {
+        throw new Error('Unsupported file format')
+      }
+
       const result = await dataService.importEvents(events, tenantId!)
       
       setImportResult(result)
@@ -151,7 +171,10 @@ const Import = () => {
       <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
       <div className="space-y-2">
         <p className="text-lg font-medium">
-          Drop your CSV/JSON files here
+          Drop your CSV/Excel files here
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Supports .csv, .xlsx, and .xls formats
         </p>
         <p className="text-sm text-muted-foreground">
           or click to browse your computer

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client"
+import * as XLSX from 'xlsx'
 
 export interface EventData {
   event_id: number
@@ -29,6 +30,35 @@ export interface ImportResult {
 }
 
 class DataService {
+  async loadEventsFromExcel(file: File): Promise<EventData[]> {
+    const arrayBuffer = await file.arrayBuffer()
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet)
+
+    const events: EventData[] = jsonData.map((row: any) => ({
+      event_id: parseInt(row.event_id || row.EventID || row['Event ID'] || 0),
+      date: row.date || row.Date || '',
+      city: row.city || row.City || '',
+      venue: row.venue || row.Venue || '',
+      artist: row.artist || row.Artist || '',
+      genre: row.genre || row.Genre || '',
+      ticket_price: parseFloat(row.ticket_price || row.TicketPrice || row['Ticket Price'] || 0),
+      marketing_spend: parseFloat(row.marketing_spend || row.MarketingSpend || row['Marketing Spend'] || 0),
+      google_trends_genre: parseFloat(row.google_trends_genre || row.GoogleTrends || row['Google Trends'] || 0),
+      instagram_mentions: parseInt(row.instagram_mentions || row.InstagramMentions || row['Instagram Mentions'] || 0),
+      temp_c: parseFloat(row.temp_c || row.Temperature || row.Temp || 0),
+      precip_mm: parseFloat(row.precip_mm || row.Precipitation || row.Precip || 0),
+      day_of_week: row.day_of_week || row.DayOfWeek || row['Day of Week'] || '',
+      is_holiday_brazil_hint: parseInt(row.is_holiday_brazil_hint || row.IsHoliday || row['Is Holiday'] || 0),
+      capacity: parseInt(row.capacity || row.Capacity || 0),
+      sold_tickets: row.sold_tickets ? parseInt(row.sold_tickets) : undefined,
+      revenue: row.revenue ? parseFloat(row.revenue) : undefined
+    }))
+
+    return events
+  }
+
   async loadEventsFromCSV(csvContent: string): Promise<EventData[]> {
     const lines = csvContent.trim().split('\n')
     const headers = lines[0].split(',')
