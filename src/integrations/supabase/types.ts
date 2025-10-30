@@ -250,34 +250,61 @@ export type Database = {
       }
       customers: {
         Row: {
+          aplicativo_ativo: boolean | null
           birthdate: string
           city: string
+          consumo: number | null
+          cpf: string | null
           email: string
           gender: string
           id: number
+          id_evento: string | null
           name: string
           phone: string
+          presencas: number | null
+          primeira_entrada: string | null
+          primeira_interacao: string | null
+          primeira_utilizacao: boolean | null
           tenant_id: string
+          ultima_visita: string | null
         }
         Insert: {
+          aplicativo_ativo?: boolean | null
           birthdate: string
           city: string
+          consumo?: number | null
+          cpf?: string | null
           email: string
           gender: string
           id?: number
+          id_evento?: string | null
           name: string
           phone: string
+          presencas?: number | null
+          primeira_entrada?: string | null
+          primeira_interacao?: string | null
+          primeira_utilizacao?: boolean | null
           tenant_id: string
+          ultima_visita?: string | null
         }
         Update: {
+          aplicativo_ativo?: boolean | null
           birthdate?: string
           city?: string
+          consumo?: number | null
+          cpf?: string | null
           email?: string
           gender?: string
           id?: number
+          id_evento?: string | null
           name?: string
           phone?: string
+          presencas?: number | null
+          primeira_entrada?: string | null
+          primeira_interacao?: string | null
+          primeira_utilizacao?: boolean | null
           tenant_id?: string
+          ultima_visita?: string | null
         }
         Relationships: [
           {
