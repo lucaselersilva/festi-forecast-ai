@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, TrendingUp, DollarSign, Activity } from "lucide-react";
+import { useTenant } from "@/hooks/useTenant";
 
 interface ClusterData {
   cluster_comportamental: string;
@@ -40,31 +41,38 @@ export function ZigClusters() {
   const [clusters, setClusters] = useState<ClusterData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenantId } = useTenant();
 
   useEffect(() => {
-    loadClusters();
-  }, []);
+    const loadClusters = async () => {
+      if (!tenantId) return;
+      
+      try {
+        // @ts-ignore - Avoid Supabase type recursion issue
+        const { data, error } = await supabase
+          .from('vw_valle_cluster_analysis')
+          .select('*')
+          .eq('tenant_id', tenantId);
 
-  const loadClusters = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('vw_valle_cluster_analysis')
-        .select('*');
+        if (error) throw error;
 
-      if (error) throw error;
+        setClusters(data || []);
+      } catch (error) {
+        console.error('Error loading clusters:', error);
+        toast({
+          title: "Erro ao carregar clusters",
+          description: error instanceof Error ? error.message : "Erro desconhecido",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      setClusters(data || []);
-    } catch (error) {
-      console.error('Error loading clusters:', error);
-      toast({
-        title: "Erro ao carregar clusters",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    if (tenantId) {
+      loadClusters();
     }
-  };
+  }, [tenantId, toast]);
 
   if (loading) {
     return (
