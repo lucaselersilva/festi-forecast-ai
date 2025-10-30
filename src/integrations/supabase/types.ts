@@ -251,16 +251,16 @@ export type Database = {
       customers: {
         Row: {
           aplicativo_ativo: boolean | null
-          birthdate: string
-          city: string
+          birthdate: string | null
+          city: string | null
           consumo: number | null
           cpf: string | null
-          email: string
-          gender: string
+          email: string | null
+          gender: string | null
           id: number
           id_evento: string | null
           name: string
-          phone: string
+          phone: string | null
           presencas: number | null
           primeira_entrada: string | null
           primeira_interacao: string | null
@@ -270,16 +270,16 @@ export type Database = {
         }
         Insert: {
           aplicativo_ativo?: boolean | null
-          birthdate: string
-          city: string
+          birthdate?: string | null
+          city?: string | null
           consumo?: number | null
           cpf?: string | null
-          email: string
-          gender: string
+          email?: string | null
+          gender?: string | null
           id?: number
           id_evento?: string | null
           name: string
-          phone: string
+          phone?: string | null
           presencas?: number | null
           primeira_entrada?: string | null
           primeira_interacao?: string | null
@@ -289,16 +289,16 @@ export type Database = {
         }
         Update: {
           aplicativo_ativo?: boolean | null
-          birthdate?: string
-          city?: string
+          birthdate?: string | null
+          city?: string | null
           consumo?: number | null
           cpf?: string | null
-          email?: string
-          gender?: string
+          email?: string | null
+          gender?: string | null
           id?: number
           id_evento?: string | null
           name?: string
-          phone?: string
+          phone?: string | null
           presencas?: number | null
           primeira_entrada?: string | null
           primeira_interacao?: string | null
