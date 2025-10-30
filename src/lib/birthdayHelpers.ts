@@ -37,11 +37,11 @@ export interface BirthdayFilters {
 }
 
 export async function getMonthBirthdays(filters: BirthdayFilters): Promise<BirthdayCustomer[]> {
-  const { data, error } = await supabase.rpc('get_birthday_customers', {
+  const { data, error } = await supabase.rpc('get_birthday_customers' as any, {
     target_month: filters.month,
     cluster_filter: filters.clusters && filters.clusters.length > 0 ? filters.clusters : null,
     age_range_filter: filters.ageRanges && filters.ageRanges.length > 0 ? filters.ageRanges : null,
-  });
+  } as any);
 
   if (error) {
     throw new Error(`Erro ao buscar aniversariantes: ${error.message}`);
@@ -54,11 +54,11 @@ export async function getMonthBirthdays(filters: BirthdayFilters): Promise<Birth
 }
 
 export async function getBirthdayCustomers(month: number, clusters?: string[], ageRanges?: string[]): Promise<BirthdayCustomer[]> {
-  const { data, error } = await supabase.rpc('get_birthday_customers_unified', {
+  const { data, error } = await supabase.rpc('get_birthday_customers_unified' as any, {
     target_month: month,
     cluster_filter: clusters && clusters.length > 0 ? clusters : null,
     age_range_filter: ageRanges && ageRanges.length > 0 ? ageRanges : null,
-  });
+  } as any);
 
   if (error) {
     throw new Error(`Erro ao buscar aniversariantes: ${error.message}`);
