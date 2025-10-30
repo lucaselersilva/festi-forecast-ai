@@ -365,16 +365,37 @@ serve(async (req) => {
 
     // Fetch features from selected view, filtered by tenant_id
     console.log(`📊 Fetching data from view: ${config.view}`);
-    const { data: features, error: fetchError } = await supabase
-      .from(config.view)
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .limit(50000)
-      .order(config.idField);
-
-    if (fetchError) {
-      throw new Error(`Failed to fetch features: ${fetchError.message}`);
+    
+    // Fetch ALL data for tenant - no limit
+    let allFeatures: any[] = [];
+    let rangeStart = 0;
+    const rangeSize = 1000; // Fetch in batches of 1000
+    let hasMore = true;
+    
+    while (hasMore) {
+      const { data: batch, error: fetchError, count } = await supabase
+        .from(config.view)
+        .select('*', { count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .order(config.idField)
+        .range(rangeStart, rangeStart + rangeSize - 1);
+      
+      if (fetchError) {
+        throw new Error(`Failed to fetch features: ${fetchError.message}`);
+      }
+      
+      if (batch && batch.length > 0) {
+        allFeatures = [...allFeatures, ...batch];
+        rangeStart += rangeSize;
+        hasMore = batch.length === rangeSize;
+        console.log(`📦 Fetched batch: ${batch.length} records (total: ${allFeatures.length})`);
+      } else {
+        hasMore = false;
+      }
     }
+    
+    const features = allFeatures;
+    console.log(`✅ Total features fetched: ${features.length}`);
 
     if (!features || features.length < 10) {
       return new Response(
