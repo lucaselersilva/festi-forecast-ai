@@ -9,6 +9,7 @@ import { Sparkles, Mail, MessageSquare, Bell, RefreshCw, Download, Copy, Users }
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { downloadClusterCustomers, copyToClipboard } from "@/lib/exportHelpers";
 import { Separator } from "@/components/ui/separator";
+import { useTenant } from "@/hooks/useTenant";
 
 interface Strategy {
   id: string;
@@ -41,18 +42,23 @@ export function ZigReactivation() {
   const [downloadingCluster, setDownloadingCluster] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
+  const { tenantId } = useTenant();
 
   useEffect(() => {
-    loadData();
-  }, [refreshKey]);
+    if (tenantId) {
+      loadData();
+    }
+  }, [refreshKey, tenantId]);
 
   const loadData = async () => {
+    if (!tenantId) return [];
+    
     setLoading(true);
     try {
-      const [strategiesRes, clustersRes] = await Promise.all([
-        supabase.from('valle_reactivation_strategies').select('*').order('priority', { ascending: true }),
-        supabase.from('vw_valle_cluster_analysis').select('cluster_comportamental, total_clientes'),
-      ]);
+      // @ts-ignore - Deep type instantiation from Supabase
+      const strategiesRes = await supabase.from('valle_reactivation_strategies').select('*').eq('tenant_id', tenantId).order('priority', { ascending: true });
+      // @ts-ignore - Deep type instantiation from Supabase  
+      const clustersRes = await supabase.from('vw_valle_cluster_analysis').select('cluster_comportamental, total_clientes').eq('tenant_id', tenantId);
 
       if (strategiesRes.error) throw strategiesRes.error;
       if (clustersRes.error) throw clustersRes.error;
@@ -124,9 +130,11 @@ export function ZigReactivation() {
   };
 
   const handleDownloadCustomers = async (clusterName: string) => {
+    if (!tenantId) return;
+    
     setDownloadingCluster(clusterName);
     try {
-      const result = await downloadClusterCustomers(clusterName);
+      const result = await downloadClusterCustomers(clusterName, tenantId);
       toast({
         title: "Lista baixada com sucesso!",
         description: `${result.count} clientes exportados`,

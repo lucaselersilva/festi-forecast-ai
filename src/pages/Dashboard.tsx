@@ -33,6 +33,7 @@ import { dataService } from "@/lib/dataService"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import MLRunner from "@/components/MLRunner"
+import { useTenant } from "@/hooks/useTenant"
 
 interface FilterState {
   dateRange?: DateRange
@@ -62,6 +63,7 @@ const Dashboard = () => {
   const [selectedMetric, setSelectedMetric] = useState('revenue')
   const [breakdownView, setBreakdownView] = useState<'genre' | 'city'>('genre')
   const { toast } = useToast()
+  const { tenantId } = useTenant()
 
   const [filters, setFilters] = useState<FilterState>({
     dateRange: undefined,
@@ -80,11 +82,11 @@ const Dashboard = () => {
     if (dataSource === 'events') {
       loadDashboardData()
       setSelectedMetric('revenue')
-    } else {
+    } else if (tenantId) {
       loadValleClientesData()
       setSelectedMetric('consumo')
     }
-  }, [dataSource])
+  }, [dataSource, tenantId])
 
   useEffect(() => {
     if (dataSource === 'valle_clientes') {
@@ -168,6 +170,8 @@ const Dashboard = () => {
   }
 
   const loadValleClientesData = async () => {
+    if (!tenantId) return;
+    
     try {
       setLoading(true)
       let allData: any[] = []
@@ -179,6 +183,7 @@ const Dashboard = () => {
         const { data, error } = await supabase
           .from('valle_clientes')
           .select('*')
+          .eq('tenant_id', tenantId)
           .order('primeira_entrada', { ascending: false })
           .range(from, from + pageSize - 1)
         

@@ -1,11 +1,17 @@
 import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
 
-export async function downloadClusterCustomers(clusterName: string) {
+export async function downloadClusterCustomers(clusterName: string, tenantId: string) {
   try {
+    if (!tenantId) {
+      throw new Error('Tenant ID não fornecido');
+    }
+
+    // @ts-ignore - Deep type instantiation from Supabase
     const { data, error } = await supabase
       .from('vw_valle_rfm')
       .select('nome, email, telefone, cluster_comportamental, propensity_score, consumo, presencas')
+      .eq('tenant_id', tenantId)
       .eq('cluster_comportamental', clusterName);
 
     if (error) throw error;

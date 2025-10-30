@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { X, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/hooks/useTenant";
 
 interface BirthdayFiltersProps {
   onFilterChange: (filters: {
@@ -39,10 +40,13 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   const [selectedAgeRanges, setSelectedAgeRanges] = useState<string[]>([]);
   const [availableClusters, setAvailableClusters] = useState<string[]>([]);
   const [availableAgeRanges, setAvailableAgeRanges] = useState<string[]>([]);
+  const { tenantId } = useTenant();
 
   useEffect(() => {
-    loadFilterOptions();
-  }, []);
+    if (tenantId) {
+      loadFilterOptions();
+    }
+  }, [tenantId]);
 
   useEffect(() => {
     console.log('📊 Filtros atualizados:', { month, selectedClusters, selectedAgeRanges });
@@ -50,13 +54,19 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   }, [month, selectedClusters, selectedAgeRanges, onFilterChange]);
 
   const loadFilterOptions = async () => {
+    if (!tenantId) return;
+
+    // @ts-ignore - Deep type instantiation from Supabase
     const { data: clusters } = await supabase
       .from('vw_valle_cluster_analysis')
-      .select('cluster_comportamental');
+      .select('cluster_comportamental')
+      .eq('tenant_id', tenantId);
 
+    // @ts-ignore - Deep type instantiation from Supabase
     const { data: rfmData } = await supabase
       .from('vw_valle_rfm')
       .select('faixa_etaria')
+      .eq('tenant_id', tenantId)
       .not('faixa_etaria', 'is', null);
 
     if (clusters) {
