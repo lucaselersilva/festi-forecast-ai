@@ -1207,32 +1207,6 @@ export type Database = {
       }
     }
     Views: {
-      vw_all_customers_birthdays: {
-        Row: {
-          aniversario: string | null
-          aplicativo_ativo: boolean | null
-          cluster_comportamental: string | null
-          cluster_jornada: string | null
-          cluster_valor: string | null
-          consumo: number | null
-          customer_id: string | null
-          email: string | null
-          faixa_etaria: string | null
-          frequency: number | null
-          genero: string | null
-          idade: number | null
-          monetary: number | null
-          nome: string | null
-          presencas: number | null
-          primeira_entrada: string | null
-          propensity_score: number | null
-          recency_days: number | null
-          source_table: string | null
-          telefone: string | null
-          ultima_visita: string | null
-        }
-        Relationships: []
-      }
       vw_consumption_profile: {
         Row: {
           consumption_segment: string | null
@@ -1688,9 +1662,18 @@ export type Database = {
           presencas_media: number | null
           propensity_media: number | null
           recency_media: number | null
+          tenant_id: string | null
           total_clientes: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vw_valle_rfm: {
         Row: {
@@ -1714,6 +1697,7 @@ export type Database = {
           propensity_score: number | null
           recency_days: number | null
           telefone: string | null
+          tenant_id: string | null
           ultima_visita: string | null
         }
         Insert: {
@@ -1737,6 +1721,7 @@ export type Database = {
           propensity_score?: never
           recency_days?: never
           telefone?: string | null
+          tenant_id?: string | null
           ultima_visita?: string | null
         }
         Update: {
@@ -1760,9 +1745,18 @@ export type Database = {
           propensity_score?: never
           recency_days?: never
           telefone?: string | null
+          tenant_id?: string | null
           ultima_visita?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
