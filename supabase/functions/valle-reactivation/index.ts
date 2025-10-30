@@ -19,13 +19,36 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Get user's tenant_id
+    const authHeader = req.headers.get('Authorization')!;
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !user) {
+      throw new Error('Unauthorized');
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      throw new Error('Profile not found');
+    }
+
+    const tenantId = profile.tenant_id;
+    console.log(`🔒 User tenant: ${tenantId}`);
+
     const { action } = await req.json();
 
     if (action === 'generate_strategies') {
-      // Get cluster analysis
+      // Get cluster analysis for this tenant only
       const { data: clusters, error: clustersError } = await supabase
         .from('vw_valle_cluster_analysis')
-        .select('*');
+        .select('*')
+        .eq('tenant_id', tenantId);
 
       if (clustersError) throw clustersError;
 
@@ -49,11 +72,17 @@ serve(async (req) => {
           strategyData = generateDefaultStrategy(cluster);
         }
         
-        strategies.push(strategyData);
+        strategies.push({
+          ...strategyData,
+          tenant_id: tenantId
+        });
       }
 
-      // Delete existing strategies
-      await supabase.from('valle_reactivation_strategies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      // Delete existing strategies for this tenant only
+      await supabase
+        .from('valle_reactivation_strategies')
+        .delete()
+        .eq('tenant_id', tenantId);
 
       // Insert new strategies
       const { error: insertError } = await supabase
@@ -62,7 +91,7 @@ serve(async (req) => {
 
       if (insertError) throw insertError;
 
-      console.log(`✅ Created ${strategies.length} reactivation strategies`);
+      console.log(`✅ Created ${strategies.length} reactivation strategies for tenant ${tenantId}`);
 
       return new Response(
         JSON.stringify({
