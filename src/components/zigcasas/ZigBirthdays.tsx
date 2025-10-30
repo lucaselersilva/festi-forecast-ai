@@ -23,6 +23,7 @@ const INITIAL_FILTERS = {
   clusters: [] as string[],
   ageRanges: [] as string[],
   weeks: [] as number[],
+  presencasRanges: [] as string[],
 };
 
 export function ZigBirthdays() {
@@ -44,7 +45,7 @@ export function ZigBirthdays() {
   const lastFiltersRef = useRef<string>('');
 
   useEffect(() => {
-    const filtersKey = `${rawFilters.month}-${rawFilters.clusters.join(',')}-${rawFilters.ageRanges.join(',')}-${rawFilters.weeks.join(',')}`;
+    const filtersKey = `${rawFilters.month}-${rawFilters.clusters.join(',')}-${rawFilters.ageRanges.join(',')}-${rawFilters.weeks.join(',')}-${rawFilters.presencasRanges.join(',')}`;
     
     // Só carrega se os filtros realmente mudaram
     if (lastFiltersRef.current === filtersKey) {

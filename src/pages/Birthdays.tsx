@@ -20,7 +20,8 @@ export default function Birthdays() {
     month: new Date().getMonth() + 1,
     clusters: [] as string[],
     ageRanges: [] as string[],
-    weeks: [] as number[]
+    weeks: [] as number[],
+    presencasRanges: [] as string[]
   });
 
   useEffect(() => {
@@ -46,6 +47,26 @@ export default function Birthdays() {
     });
   };
 
+  const filterByPresencas = (customers: BirthdayCustomer[]): BirthdayCustomer[] => {
+    if (filters.presencasRanges.length === 0) return customers;
+    
+    const PRESENCAS_RANGES = [
+      { value: 'baixa', min: 1, max: 5 },
+      { value: 'media', min: 6, max: 15 },
+      { value: 'alta', min: 16, max: 999999 },
+    ];
+    
+    return customers.filter(customer => {
+      const presencas = customer.presencas || 0;
+      
+      return filters.presencasRanges.some(rangeValue => {
+        const range = PRESENCAS_RANGES.find(r => r.value === rangeValue);
+        if (!range) return false;
+        return presencas >= range.min && presencas <= range.max;
+      });
+    });
+  };
+
   const loadCustomers = async () => {
     setLoading(true);
     try {
@@ -55,7 +76,8 @@ export default function Birthdays() {
         filters.ageRanges
       );
       
-      const filteredData = filterByWeeks(data);
+      let filteredData = filterByWeeks(data);
+      filteredData = filterByPresencas(filteredData);
       setCustomers(filteredData);
     } catch (error: any) {
       toast({

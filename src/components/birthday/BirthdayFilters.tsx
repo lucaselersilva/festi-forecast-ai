@@ -14,6 +14,7 @@ interface BirthdayFiltersProps {
     clusters: string[];
     ageRanges: string[];
     weeks: number[];
+    presencasRanges: string[];
   }) => void;
 }
 
@@ -42,11 +43,18 @@ const WEEKS = [
   { value: 4, label: '4ª Semana (22+)' },
 ];
 
+const PRESENCAS_RANGES = [
+  { value: 'baixa', label: 'Baixa (1-5)', min: 1, max: 5 },
+  { value: 'media', label: 'Média (6-15)', min: 6, max: 15 },
+  { value: 'alta', label: 'Alta (16+)', min: 16, max: 999999 },
+];
+
 export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   const [month, setMonth] = useState(INITIAL_MONTH);
   const [selectedClusters, setSelectedClusters] = useState<string[]>([]);
   const [selectedAgeRanges, setSelectedAgeRanges] = useState<string[]>([]);
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
+  const [selectedPresencasRanges, setSelectedPresencasRanges] = useState<string[]>([]);
   const [availableClusters, setAvailableClusters] = useState<string[]>([]);
   const [availableAgeRanges, setAvailableAgeRanges] = useState<string[]>([]);
   const { tenantId } = useTenant();
@@ -58,9 +66,15 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
   }, [tenantId]);
 
   useEffect(() => {
-    console.log('📊 Filtros atualizados:', { month, selectedClusters, selectedAgeRanges, selectedWeeks });
-    onFilterChange({ month, clusters: selectedClusters, ageRanges: selectedAgeRanges, weeks: selectedWeeks });
-  }, [month, selectedClusters, selectedAgeRanges, selectedWeeks, onFilterChange]);
+    console.log('📊 Filtros atualizados:', { month, selectedClusters, selectedAgeRanges, selectedWeeks, selectedPresencasRanges });
+    onFilterChange({ 
+      month, 
+      clusters: selectedClusters, 
+      ageRanges: selectedAgeRanges, 
+      weeks: selectedWeeks,
+      presencasRanges: selectedPresencasRanges
+    });
+  }, [month, selectedClusters, selectedAgeRanges, selectedWeeks, selectedPresencasRanges, onFilterChange]);
 
   const loadFilterOptions = async () => {
     if (!tenantId) return;
@@ -106,14 +120,21 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
     );
   };
 
+  const togglePresencasRange = (range: string) => {
+    setSelectedPresencasRanges(prev =>
+      prev.includes(range) ? prev.filter(r => r !== range) : [...prev, range]
+    );
+  };
+
   const clearFilters = () => {
     setMonth(INITIAL_MONTH);
     setSelectedClusters([]);
     setSelectedAgeRanges([]);
     setSelectedWeeks([]);
+    setSelectedPresencasRanges([]);
   };
 
-  const hasActiveFilters = selectedClusters.length > 0 || selectedAgeRanges.length > 0 || selectedWeeks.length > 0;
+  const hasActiveFilters = selectedClusters.length > 0 || selectedAgeRanges.length > 0 || selectedWeeks.length > 0 || selectedPresencasRanges.length > 0;
 
   return (
     <Card>
@@ -195,6 +216,22 @@ export function BirthdayFilters({ onFilterChange }: BirthdayFiltersProps) {
                   onClick={() => toggleWeek(week.value)}
                 >
                   {week.label}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Frequência de Visitas</Label>
+            <div className="flex flex-wrap gap-2">
+              {PRESENCAS_RANGES.map(range => (
+                <Badge
+                  key={range.value}
+                  variant={selectedPresencasRanges.includes(range.value) ? "default" : "outline"}
+                  className="cursor-pointer hover:opacity-80"
+                  onClick={() => togglePresencasRange(range.value)}
+                >
+                  {range.label}
                 </Badge>
               ))}
             </div>

@@ -35,6 +35,7 @@ export interface BirthdayFilters {
   clusters?: string[];
   ageRanges?: string[];
   weeks?: number[];
+  presencasRanges?: string[];
 }
 
 export async function getMonthBirthdays(filters: BirthdayFilters): Promise<BirthdayCustomer[]> {
