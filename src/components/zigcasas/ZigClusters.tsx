@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, TrendingUp, DollarSign, Activity } from "lucide-react";
+import { useTenant } from "@/hooks/useTenant";
 
 interface ClusterData {
   cluster_comportamental: string;
@@ -40,16 +41,23 @@ export function ZigClusters() {
   const [clusters, setClusters] = useState<ClusterData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenantId } = useTenant();
 
   useEffect(() => {
-    loadClusters();
-  }, []);
+    if (tenantId) {
+      loadClusters();
+    }
+  }, [tenantId]);
 
   const loadClusters = async () => {
+    if (!tenantId) return;
+    
     try {
+      // @ts-ignore - Deep type instantiation from Supabase
       const { data, error } = await supabase
         .from('vw_valle_cluster_analysis')
-        .select('*');
+        .select('*')
+        .eq('tenant_id', tenantId);
 
       if (error) throw error;
 
