@@ -233,6 +233,11 @@ function parseDateTime(value: any): string | null {
   
   const str = String(value).trim()
   
+  // 0. Tratar valores textuais que indicam ausência de data
+  if (str.toLowerCase() === 'nunca' || str.toLowerCase() === 'never' || str === '-' || str === 'n/a') {
+    return null
+  }
+  
   // 1. Try DD/MM/YYYY HH:MM:SS (formato completo)
   const ddmmyyyyTime = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})$/)
   if (ddmmyyyyTime) {
