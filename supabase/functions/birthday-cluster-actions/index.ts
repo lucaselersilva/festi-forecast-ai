@@ -51,10 +51,40 @@ serve(async (req) => {
   }
 
   try {
+    // Get authorization header to extract user's tenant_id
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
     );
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Unauthorized');
+    }
+
+    // Get user's tenant_id from profile
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      throw new Error('Profile not found');
+    }
+
+    const tenantId = profile.tenant_id;
 
     const { month, year } = await req.json();
 
@@ -102,9 +132,10 @@ serve(async (req) => {
           year,
           cluster_name: clusterName,
           cluster_size: members.length,
+          tenant_id: tenantId,
           actions
         }, {
-          onConflict: 'month,year,cluster_name'
+          onConflict: 'month,year,cluster_name,tenant_id'
         });
 
       if (saveError) {
