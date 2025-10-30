@@ -67,3 +67,6 @@ verify_jwt = false
 
 [functions.marketing-assistant]
 verify_jwt = false
+
+[functions.valle-smart-upsert]
+verify_jwt = false

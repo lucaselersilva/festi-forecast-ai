@@ -100,6 +100,9 @@ export function ZigImport({ onImportComplete }: ZigImportProps) {
 
       const totalRows = jsonData.length;
       let processed = 0;
+      let totalInserted = 0;
+      let totalUpdated = 0;
+      let totalSkipped = 0;
 
       // Process in batches
       const batchSize = 100;
@@ -124,14 +127,15 @@ export function ZigImport({ onImportComplete }: ZigImportProps) {
           tenant_id: tenantId,
         }));
 
-        const { error } = await supabase
-          .from('valle_clientes')
-          .upsert(clientsData, { 
-            onConflict: 'cpf',
-            ignoreDuplicates: false 
-          });
+        const { data: result, error } = await supabase.functions.invoke('valle-smart-upsert', {
+          body: { clients: clientsData }
+        });
 
         if (error) throw error;
+
+        totalInserted += result.inserted || 0;
+        totalUpdated += result.updated || 0;
+        totalSkipped += result.skipped || 0;
 
         processed += batch.length;
         setProgress((processed / totalRows) * 100);
@@ -139,7 +143,7 @@ export function ZigImport({ onImportComplete }: ZigImportProps) {
 
       toast({
         title: "Importação concluída!",
-        description: `${totalRows} clientes importados com sucesso.`,
+        description: `${totalInserted} novos, ${totalUpdated} atualizados, ${totalSkipped} ignorados.`,
       });
 
       onImportComplete?.();
