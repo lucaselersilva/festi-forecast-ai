@@ -15,9 +15,11 @@ interface ClusterData {
 interface ClusterVisualizationProps {
   clusters: ClusterData[];
   type: 'valle-rfm' | 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
+  onClusterClick?: (clusterName: string, customerIds: string[]) => void;
+  customerIds?: Map<string, string[]>;
 }
 
-export function ClusterVisualization({ clusters, type }: ClusterVisualizationProps) {
+export function ClusterVisualization({ clusters, type, onClusterClick, customerIds }: ClusterVisualizationProps) {
   if (type === 'rfm' || type === 'valle-rfm') {
     // 3D-style scatter plot for RFM
     const scatterData = clusters.map(c => ({
@@ -76,7 +78,18 @@ export function ClusterVisualization({ clusters, type }: ClusterVisualizationPro
                     return null;
                   }}
                 />
-                <Scatter data={scatterData}>
+                <Scatter 
+                  data={scatterData}
+                  cursor={onClusterClick ? "pointer" : "default"}
+                  onClick={(data) => {
+                    if (onClusterClick && data && customerIds) {
+                      const ids = customerIds.get(data.name);
+                      if (ids) {
+                        onClusterClick(data.name, ids);
+                      }
+                    }
+                  }}
+                >
                   {scatterData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
@@ -121,7 +134,19 @@ export function ClusterVisualization({ clusters, type }: ClusterVisualizationPro
                     return null;
                   }}
                 />
-                <Bar dataKey="recency" radius={[8, 8, 0, 0]}>
+                <Bar 
+                  dataKey="recency" 
+                  radius={[8, 8, 0, 0]}
+                  cursor={onClusterClick ? "pointer" : "default"}
+                  onClick={(data) => {
+                    if (onClusterClick && data && customerIds) {
+                      const ids = customerIds.get(data.name);
+                      if (ids) {
+                        onClusterClick(data.name, ids);
+                      }
+                    }
+                  }}
+                >
                   {scatterData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
@@ -173,7 +198,19 @@ export function ClusterVisualization({ clusters, type }: ClusterVisualizationPro
                 return null;
               }}
             />
-            <Bar dataKey="size" radius={[8, 8, 0, 0]}>
+            <Bar 
+              dataKey="size" 
+              radius={[8, 8, 0, 0]}
+              cursor={onClusterClick ? "pointer" : "default"}
+              onClick={(data) => {
+                if (onClusterClick && data && customerIds) {
+                  const ids = customerIds.get(data.name);
+                  if (ids) {
+                    onClusterClick(data.name, ids);
+                  }
+                }
+              }}
+            >
               {clusters.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}

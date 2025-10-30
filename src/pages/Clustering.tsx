@@ -8,7 +8,9 @@ import { ClusterQuality } from "@/components/ClusterQuality";
 import { ClusterVisualization } from "@/components/ClusterVisualization";
 import { SegmentationTypeSelector, SegmentationType } from "@/components/SegmentationTypeSelector";
 import { SegmentInsightCard } from "@/components/SegmentInsightCard";
+import { ClusterCustomersDialog } from "@/components/ClusterCustomersDialog";
 import { Download } from "lucide-react";
+import { useTenant } from "@/hooks/useTenant";
 import { 
   getRFMSegmentName, 
   getDemographicInsight, 
@@ -23,6 +25,7 @@ import {
 
 export default function Clustering() {
   const { toast } = useToast();
+  const { tenantId } = useTenant();
   
   const [segmentationType, setSegmentationType] = useState<SegmentationType>('valle-rfm');
   const [clusteringMethod, setClusteringMethod] = useState<'kmeans' | 'dbscan' | 'gmm'>('kmeans');
@@ -38,6 +41,7 @@ export default function Clustering() {
   const [clusteringResult, setClusteringResult] = useState<any>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [generatedInsights, setGeneratedInsights] = useState<Map<number, any>>(new Map());
+  const [selectedCluster, setSelectedCluster] = useState<{ name: string; customerIds: string[] } | null>(null);
 
   const handleRunClustering = async () => {
     setClusteringLoading(true);
@@ -396,6 +400,15 @@ export default function Clustering() {
               color: c.color || `hsl(${(c.cluster * 360) / clusteringResult.clusters.length}, 70%, 60%)`
             }))}
             type={segmentationType}
+            onClusterClick={(clusterName, customerIds) => {
+              setSelectedCluster({ name: clusterName, customerIds });
+            }}
+            customerIds={new Map(
+              clusteringResult.clusters.map((c: any) => [
+                getClusterName(c, segmentationType),
+                c.customerIds
+              ])
+            )}
           />
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -456,6 +469,14 @@ export default function Clustering() {
           </div>
         </>
       )}
+
+      <ClusterCustomersDialog
+        open={!!selectedCluster}
+        onOpenChange={(open) => !open && setSelectedCluster(null)}
+        clusterName={selectedCluster?.name || ""}
+        customerIds={selectedCluster?.customerIds || []}
+        tenantId={tenantId || ""}
+      />
     </div>
   );
 }
