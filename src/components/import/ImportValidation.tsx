@@ -70,6 +70,26 @@ export function ImportValidation({
     }
   }
 
+  const groupErrorsByType = (errors: Array<{ row: number; field: string; message: string }>) => {
+    const groups = new Map<string, { count: number; rows: number[] }>()
+    
+    errors.forEach(error => {
+      const key = `${error.field}: ${error.message}`
+      if (!groups.has(key)) {
+        groups.set(key, { count: 0, rows: [] })
+      }
+      const group = groups.get(key)!
+      group.count++
+      group.rows.push(error.row)
+    })
+    
+    return Array.from(groups.entries()).map(([key, value]) => ({
+      type: key,
+      count: value.count,
+      rows: value.rows.slice(0, 5) // Apenas primeiras 5 linhas
+    }))
+  }
+
   const handleImport = async () => {
     setIsImporting(true)
     try {
@@ -184,20 +204,22 @@ export function ImportValidation({
 
           {validationResult.errorDetails.length > 0 && (
             <div className="space-y-2">
-              <h4 className="font-semibold">Detalhes dos Erros</h4>
-              <div className="max-h-48 overflow-y-auto space-y-2">
-                {validationResult.errorDetails.slice(0, 10).map((error, idx) => (
+              <h4 className="font-semibold">Detalhes dos Erros (Agrupados)</h4>
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {groupErrorsByType(validationResult.errorDetails).map((errorGroup, idx) => (
                   <Alert key={idx} variant="destructive">
-                    <AlertDescription>
-                      <span className="font-medium">Linha {error.row}</span> - {error.field}: {error.message}
+                    <AlertDescription className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{errorGroup.type}</span>
+                        <Badge variant="destructive">{errorGroup.count} ocorrências</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Linhas: {errorGroup.rows.join(', ')}
+                        {errorGroup.count > 5 && ` ... e mais ${errorGroup.count - 5}`}
+                      </p>
                     </AlertDescription>
                   </Alert>
                 ))}
-                {validationResult.errorDetails.length > 10 && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    ... e mais {validationResult.errorDetails.length - 10} erros
-                  </p>
-                )}
               </div>
             </div>
           )}

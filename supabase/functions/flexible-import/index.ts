@@ -66,8 +66,10 @@ serve(async (req) => {
         
         // Type conversion and validation
         try {
+          console.log(`Row ${index + 1} - ${targetField}:`, value, `(type: ${typeof value})`)
           mappedRow[targetField] = normalizeValue(value, targetField)
         } catch (error) {
+          console.error(`Row ${index + 1} - ${targetField} error:`, error)
           validationErrors.push({
             row: index + 1,
             field: targetField,
@@ -175,8 +177,11 @@ function normalizeValue(value: any, fieldName: string): any {
     return parseDate(value)
   }
 
-  // DateTime fields
-  if (fieldName.includes('timestamp') || fieldName.includes('_entrada') || fieldName.includes('_visita') || fieldName.includes('_interacao') || fieldName.includes('_utilizacao')) {
+  // DateTime fields - usar endsWith() para ser mais específico
+  if (fieldName.includes('timestamp') || 
+      fieldName.endsWith('_entrada') || 
+      fieldName.endsWith('_visita') || 
+      fieldName.endsWith('_interacao')) {
     return parseDateTime(value)
   }
 
@@ -228,15 +233,38 @@ function parseDateTime(value: any): string | null {
   
   const str = String(value).trim()
   
-  // Try DD/MM/YYYY HH:MM:SS
+  // 1. Try DD/MM/YYYY HH:MM:SS (formato completo)
   const ddmmyyyyTime = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})$/)
   if (ddmmyyyyTime) {
     return `${ddmmyyyyTime[3]}-${ddmmyyyyTime[2].padStart(2, '0')}-${ddmmyyyyTime[1].padStart(2, '0')}T${ddmmyyyyTime[4].padStart(2, '0')}:${ddmmyyyyTime[5].padStart(2, '0')}:${ddmmyyyyTime[6].padStart(2, '0')}Z`
   }
   
-  // Try ISO format
-  if (str.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-    return str.endsWith('Z') ? str : str + 'Z'
+  // 2. Try DD/MM/YYYY (apenas data - assumir 00:00:00)
+  const ddmmyyyy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (ddmmyyyy) {
+    return `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}T00:00:00Z`
+  }
+  
+  // 3. Try ISO format (YYYY-MM-DD ou YYYY-MM-DDTHH:MM:SS)
+  if (str.match(/^\d{4}-\d{2}-\d{2}/)) {
+    if (str.includes('T')) {
+      return str.endsWith('Z') ? str : str + 'Z'
+    }
+    return str + 'T00:00:00Z'
+  }
+  
+  // 4. Try Excel serial number (números como 45287 = dias desde 1900-01-01)
+  const num = parseFloat(str)
+  if (!isNaN(num) && num > 0 && num < 100000) {
+    // Excel serial date: days since 1900-01-01 (with bug: 1900 was not a leap year)
+    const excelEpoch = new Date(1900, 0, 1)
+    const days = Math.floor(num) - 2 // -2 corrige bug do Excel (1900 não foi ano bissexto)
+    const fractionalDay = num - Math.floor(num)
+    const milliseconds = fractionalDay * 24 * 60 * 60 * 1000
+    
+    const date = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000 + milliseconds)
+    
+    return date.toISOString()
   }
   
   throw new Error(`Formato de data/hora inválido: ${value}`)
