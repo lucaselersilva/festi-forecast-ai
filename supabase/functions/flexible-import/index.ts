@@ -155,40 +155,87 @@ serve(async (req) => {
       const IMPORT_BATCH_SIZE = 500
       let importedCount = 0
       
-      // Insert valid rows into target table in batches using upsert
+      // Insert valid rows into target table in batches
       for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
         const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
         console.log(`Importing batch ${i}-${i + batch.length} of ${validRows.length}`)
         
-        // Remove duplicates within the batch itself (keep first occurrence)
-        const uniqueKey = targetTable === 'valle_clientes' ? 'cpf' : 'id'
-        const seenKeys = new Set()
-        const deduplicatedBatch = batch.filter(row => {
-          const key = row[uniqueKey]
-          if (seenKeys.has(key)) {
-            console.log(`Skipping duplicate ${uniqueKey} in batch: ${key}`)
-            return false
-          }
-          seenKeys.add(key)
-          return true
-        })
-        
-        console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows (removed ${batch.length - deduplicatedBatch.length} duplicates)`)
-        
-        // Use upsert to handle duplicates with existing data
-        const { error: insertError } = await supabaseClient
-          .from(targetTable)
-          .upsert(deduplicatedBatch, {
-            onConflict: uniqueKey,
-            ignoreDuplicates: false
+        // For valle_clientes, deduplicate by telefone+nome (normalized)
+        if (targetTable === 'valle_clientes') {
+          const seenKeys = new Set()
+          const deduplicatedBatch = batch.filter(row => {
+            // Create composite key: tenant_id + lowercase(nome) + telefone
+            const key = `${row.tenant_id}|${(row.nome || '').toLowerCase().trim()}|${(row.telefone || '').trim()}`
+            if (seenKeys.has(key)) {
+              console.log(`Skipping duplicate in batch: ${row.nome} - ${row.telefone}`)
+              return false
+            }
+            seenKeys.add(key)
+            return true
           })
+          
+          console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows (removed ${batch.length - deduplicatedBatch.length} duplicates)`)
+          
+          // Insert one by one to handle unique constraint violations gracefully
+          for (const row of deduplicatedBatch) {
+            const { error: insertError } = await supabaseClient
+              .from(targetTable)
+              .insert(row)
+              .select()
+            
+            if (insertError) {
+              // If duplicate, try to update instead
+              if (insertError.code === '23505') {
+                console.log(`Duplicate found for ${row.nome}, updating instead...`)
+                const { error: updateError } = await supabaseClient
+                  .from(targetTable)
+                  .update(row)
+                  .eq('tenant_id', row.tenant_id)
+                  .eq('telefone', row.telefone || '')
+                  .ilike('nome', row.nome)
+                
+                if (updateError) {
+                  console.error(`Error updating row:`, updateError)
+                } else {
+                  importedCount++
+                }
+              } else {
+                console.error(`Error inserting row:`, insertError)
+              }
+            } else {
+              importedCount++
+            }
+          }
+        } else {
+          // Other tables: use CPF-based deduplication
+          const uniqueKey = 'cpf'
+          const seenKeys = new Set()
+          const deduplicatedBatch = batch.filter(row => {
+            const key = row[uniqueKey]
+            if (seenKeys.has(key)) {
+              console.log(`Skipping duplicate ${uniqueKey} in batch: ${key}`)
+              return false
+            }
+            seenKeys.add(key)
+            return true
+          })
+          
+          console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows`)
+          
+          const { error: insertError } = await supabaseClient
+            .from(targetTable)
+            .upsert(deduplicatedBatch, {
+              onConflict: uniqueKey,
+              ignoreDuplicates: false
+            })
 
-        if (insertError) {
-          console.error(`Error importing batch ${i}:`, insertError)
-          throw insertError
+          if (insertError) {
+            console.error(`Error importing batch ${i}:`, insertError)
+            throw insertError
+          }
+          
+          importedCount += deduplicatedBatch.length
         }
-        
-        importedCount += deduplicatedBatch.length
       }
 
       console.log(`Import complete: ${importedCount} rows imported`)
