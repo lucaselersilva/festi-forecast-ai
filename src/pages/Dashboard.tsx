@@ -340,7 +340,7 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
           </TabsTrigger>
           <TabsTrigger value="database" className="gap-2">
             <TableIcon className="w-4 h-4" />
-            Banco de Dados
+            Banco de Dados de Clientes
           </TabsTrigger>
         </TabsList>
 

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,8 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Search, Edit, Trash2, CheckCircle2, XCircle } from "lucide-react"
+import { Search, Edit, Trash2, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { useTenant } from "@/hooks/useTenant"
@@ -35,18 +34,31 @@ const ClientsTable = ({ clients, onRefresh }: ClientsTableProps) => {
   const [editingClient, setEditingClient] = useState<any>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<any>(null)
   const [formData, setFormData] = useState<any>({})
+  const [currentPage, setCurrentPage] = useState(1)
   const { toast } = useToast()
   const { tenantId } = useTenant()
 
-  const filteredClients = clients.filter(client => {
-    const search = searchTerm.toLowerCase()
-    return (
-      client.nome?.toLowerCase().includes(search) ||
-      client.email?.toLowerCase().includes(search) ||
-      client.telefone?.includes(search) ||
-      client.cpf?.includes(search)
-    )
-  })
+  const itemsPerPage = 50
+
+  const filteredClients = useMemo(() => {
+    return clients.filter(client => {
+      const search = searchTerm.toLowerCase()
+      return (
+        client.nome?.toLowerCase().includes(search) ||
+        client.email?.toLowerCase().includes(search) ||
+        client.telefone?.includes(search) ||
+        client.cpf?.includes(search)
+      )
+    })
+  }, [clients, searchTerm])
+
+  const totalPages = Math.ceil(filteredClients.length / itemsPerPage)
+  
+  const paginatedClients = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    const end = start + itemsPerPage
+    return filteredClients.slice(start, end)
+  }, [filteredClients, currentPage, itemsPerPage])
 
   const handleEdit = (client: any) => {
     setEditingClient(client)
@@ -137,7 +149,10 @@ const ClientsTable = ({ clients, onRefresh }: ClientsTableProps) => {
                 <Input
                   placeholder="Buscar por nome, email, telefone ou CPF..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setCurrentPage(1)
+                  }}
                   className="pl-10"
                 />
               </div>
@@ -147,8 +162,8 @@ const ClientsTable = ({ clients, onRefresh }: ClientsTableProps) => {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[600px]">
+        <CardContent className="space-y-4">
+          <div className="border rounded-lg">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -164,7 +179,7 @@ const ClientsTable = ({ clients, onRefresh }: ClientsTableProps) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.map((client) => (
+                {paginatedClients.map((client) => (
                   <TableRow key={client.id}>
                     <TableCell className="font-medium">{client.nome}</TableCell>
                     <TableCell className="text-muted-foreground">{client.email || "-"}</TableCell>
@@ -202,7 +217,37 @@ const ClientsTable = ({ clients, onRefresh }: ClientsTableProps) => {
                 ))}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredClients.length)} de {filteredClients.length} clientes
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Próxima
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
