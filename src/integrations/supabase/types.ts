@@ -1279,6 +1279,89 @@ export type Database = {
       }
     }
     Views: {
+      vw_all_customers_birthdays: {
+        Row: {
+          aniversario: string | null
+          aplicativo_ativo: boolean | null
+          cluster_comportamental: string | null
+          cluster_jornada: string | null
+          cluster_valor: string | null
+          consumo: number | null
+          customer_id: string | null
+          email: string | null
+          faixa_etaria: string | null
+          frequency: number | null
+          genero: string | null
+          idade: number | null
+          monetary: number | null
+          nome: string | null
+          presencas: number | null
+          primeira_entrada: string | null
+          propensity_score: number | null
+          recency_days: number | null
+          source_table: string | null
+          telefone: string | null
+          tenant_id: string | null
+          ultima_visita: string | null
+        }
+        Insert: {
+          aniversario?: string | null
+          aplicativo_ativo?: boolean | null
+          cluster_comportamental?: never
+          cluster_jornada?: never
+          cluster_valor?: never
+          consumo?: number | null
+          customer_id?: never
+          email?: string | null
+          faixa_etaria?: never
+          frequency?: number | null
+          genero?: string | null
+          idade?: never
+          monetary?: number | null
+          nome?: string | null
+          presencas?: number | null
+          primeira_entrada?: string | null
+          propensity_score?: never
+          recency_days?: never
+          source_table?: never
+          telefone?: string | null
+          tenant_id?: string | null
+          ultima_visita?: string | null
+        }
+        Update: {
+          aniversario?: string | null
+          aplicativo_ativo?: boolean | null
+          cluster_comportamental?: never
+          cluster_jornada?: never
+          cluster_valor?: never
+          consumo?: number | null
+          customer_id?: never
+          email?: string | null
+          faixa_etaria?: never
+          frequency?: number | null
+          genero?: string | null
+          idade?: never
+          monetary?: number | null
+          nome?: string | null
+          presencas?: number | null
+          primeira_entrada?: string | null
+          propensity_score?: never
+          recency_days?: never
+          source_table?: never
+          telefone?: string | null
+          tenant_id?: string | null
+          ultima_visita?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vw_consumption_profile: {
         Row: {
           consumption_segment: string | null
