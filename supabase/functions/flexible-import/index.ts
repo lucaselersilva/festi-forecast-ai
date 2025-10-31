@@ -160,11 +160,26 @@ serve(async (req) => {
         const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
         console.log(`Importing batch ${i}-${i + batch.length} of ${validRows.length}`)
         
-        // Use upsert to handle duplicates - for valle_clientes use cpf as unique key
+        // Remove duplicates within the batch itself (keep first occurrence)
+        const uniqueKey = targetTable === 'valle_clientes' ? 'cpf' : 'id'
+        const seenKeys = new Set()
+        const deduplicatedBatch = batch.filter(row => {
+          const key = row[uniqueKey]
+          if (seenKeys.has(key)) {
+            console.log(`Skipping duplicate ${uniqueKey} in batch: ${key}`)
+            return false
+          }
+          seenKeys.add(key)
+          return true
+        })
+        
+        console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows (removed ${batch.length - deduplicatedBatch.length} duplicates)`)
+        
+        // Use upsert to handle duplicates with existing data
         const { error: insertError } = await supabaseClient
           .from(targetTable)
-          .upsert(batch, {
-            onConflict: targetTable === 'valle_clientes' ? 'cpf' : 'id',
+          .upsert(deduplicatedBatch, {
+            onConflict: uniqueKey,
             ignoreDuplicates: false
           })
 
@@ -173,7 +188,7 @@ serve(async (req) => {
           throw insertError
         }
         
-        importedCount += batch.length
+        importedCount += deduplicatedBatch.length
       }
 
       console.log(`Import complete: ${importedCount} rows imported`)
