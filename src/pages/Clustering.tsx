@@ -41,7 +41,7 @@ export default function Clustering() {
   const [clusteringResult, setClusteringResult] = useState<any>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [generatedInsights, setGeneratedInsights] = useState<Map<number, any>>(new Map());
-  const [selectedCluster, setSelectedCluster] = useState<{ name: string; customerIds: string[] } | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<{ name: string; customerIds: number[] } | null>(null);
 
   const handleRunClustering = async () => {
     setClusteringLoading(true);
@@ -62,6 +62,17 @@ export default function Clustering() {
       }
 
       if (response.data.success) {
+        console.log('✅ Clustering result:', {
+          totalCustomers: response.data.totalCustomers,
+          clustersCount: response.data.clusters.length,
+          sampleCluster: response.data.clusters[0] ? {
+            cluster: response.data.clusters[0].cluster,
+            size: response.data.clusters[0].size,
+            customerIdsCount: response.data.clusters[0].customerIds?.length || 0,
+            hasCustomerIds: !!response.data.clusters[0].customerIds
+          } : null
+        });
+        
         setClusteringResult(response.data);
         toast({
           title: "Clustering concluído!",
@@ -401,6 +412,11 @@ export default function Clustering() {
             }))}
             type={segmentationType}
             onClusterClick={(clusterName, customerIds) => {
+              console.log('🎯 Cluster clicked:', {
+                clusterName,
+                customerIdsCount: customerIds.length,
+                sampleIds: customerIds.slice(0, 3)
+              });
               setSelectedCluster({ name: clusterName, customerIds });
             }}
             customerIds={new Map(

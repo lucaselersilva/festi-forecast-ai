@@ -15,8 +15,8 @@ interface ClusterData {
 interface ClusterVisualizationProps {
   clusters: ClusterData[];
   type: 'valle-rfm' | 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
-  onClusterClick?: (clusterName: string, customerIds: string[]) => void;
-  customerIds?: Map<string, string[]>;
+  onClusterClick?: (clusterName: string, customerIds: number[]) => void;
+  customerIds?: Map<string, number[]>;
 }
 
 export function ClusterVisualization({ clusters, type, onClusterClick, customerIds }: ClusterVisualizationProps) {

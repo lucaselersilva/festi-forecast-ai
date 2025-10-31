@@ -12,20 +12,17 @@ interface ClusterCustomersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clusterName: string;
-  customerIds: string[];
+  customerIds: number[];
   tenantId: string;
 }
 
 interface Customer {
-  id: string;
-  nome: string;
+  id: number;
+  name: string;
   email: string;
-  telefone: string;
+  phone: string;
   consumo: number;
   presencas: number;
-  recency_days: number;
-  frequency: number;
-  monetary: number;
 }
 
 export function ClusterCustomersDialog({ 
@@ -40,21 +37,37 @@ export function ClusterCustomersDialog({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (open && customerIds.length > 0) {
-      loadCustomers();
+    if (open) {
+      console.log('🔍 Dialog opened with:', {
+        clusterName,
+        customerIdsCount: customerIds.length,
+        tenantId,
+        sampleIds: customerIds.slice(0, 3)
+      });
+      
+      if (customerIds.length > 0) {
+        loadCustomers();
+      } else {
+        console.warn('⚠️ No customer IDs provided to dialog');
+        setCustomers([]);
+      }
     }
   }, [open, customerIds]);
 
   const loadCustomers = async () => {
     setLoading(true);
     try {
+      console.log('📊 Fetching customers:', { customerIds: customerIds.slice(0, 5), tenantId });
+      
       const { data, error } = await supabase
-        .from('vw_valle_rfm')
-        .select('id, nome, email, telefone, consumo, presencas, recency_days, frequency, monetary')
+        .from('customers')
+        .select('id, name, email, phone, consumo, presencas')
         .eq('tenant_id', tenantId)
         .in('id', customerIds);
 
       if (error) throw error;
+      
+      console.log('✅ Loaded customers:', data?.length || 0);
       setCustomers(data || []);
     } catch (error) {
       console.error('Error loading customers:', error);
@@ -71,15 +84,12 @@ export function ClusterCustomersDialog({
   const handleExportCSV = () => {
     try {
       const formattedData = customers.map(customer => ({
-        'Nome': customer.nome || '',
+        'Nome': customer.name || '',
         'Email': customer.email || '',
-        'Telefone': customer.telefone || '',
+        'Telefone': customer.phone || '',
         'Cluster': clusterName,
         'Consumo Total': customer.consumo ? `R$ ${customer.consumo.toFixed(2)}` : 'R$ 0,00',
         'Presenças': customer.presencas || 0,
-        'Recência (dias)': customer.recency_days?.toFixed(0) || '0',
-        'Frequência': customer.frequency || 0,
-        'Valor Monetário': customer.monetary ? `R$ ${customer.monetary.toFixed(2)}` : 'R$ 0,00',
       }));
 
       const wb = XLSX.utils.book_new();
@@ -92,9 +102,6 @@ export function ClusterCustomersDialog({
         { wch: 25 }, // Cluster
         { wch: 15 }, // Consumo
         { wch: 10 }, // Presenças
-        { wch: 15 }, // Recência
-        { wch: 12 }, // Frequência
-        { wch: 15 }  // Valor Monetário
       ];
       ws['!cols'] = colWidths;
 
@@ -148,22 +155,18 @@ export function ClusterCustomersDialog({
                   <TableHead>Telefone</TableHead>
                   <TableHead className="text-right">Consumo</TableHead>
                   <TableHead className="text-right">Presenças</TableHead>
-                  <TableHead className="text-right">Recência</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {customers.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.nome}</TableCell>
+                    <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell className="text-sm">{customer.email || '-'}</TableCell>
-                    <TableCell className="text-sm">{customer.telefone || '-'}</TableCell>
+                    <TableCell className="text-sm">{customer.phone || '-'}</TableCell>
                     <TableCell className="text-right">
                       {customer.consumo ? `R$ ${customer.consumo.toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right">{customer.presencas || 0}</TableCell>
-                    <TableCell className="text-right">
-                      {customer.recency_days ? `${customer.recency_days.toFixed(0)} dias` : '-'}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
