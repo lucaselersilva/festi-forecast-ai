@@ -25,6 +25,11 @@ interface ValidationResult {
     field: string
     message: string
   }>
+  warningDetails?: Array<{
+    row: number
+    field: string
+    message: string
+  }>
 }
 
 export function ImportValidation({ 
@@ -70,17 +75,17 @@ export function ImportValidation({
     }
   }
 
-  const groupErrorsByType = (errors: Array<{ row: number; field: string; message: string }>) => {
+  const groupMessagesByType = (messages: Array<{ row: number; field: string; message: string }>) => {
     const groups = new Map<string, { count: number; rows: number[] }>()
     
-    errors.forEach(error => {
-      const key = `${error.field}: ${error.message}`
+    messages.forEach(msg => {
+      const key = `${msg.field}: ${msg.message}`
       if (!groups.has(key)) {
         groups.set(key, { count: 0, rows: [] })
       }
       const group = groups.get(key)!
       group.count++
-      group.rows.push(error.row)
+      group.rows.push(msg.row)
     })
     
     return Array.from(groups.entries()).map(([key, value]) => ({
@@ -202,11 +207,31 @@ export function ImportValidation({
             </div>
           </div>
 
+          {validationResult.warnings > 0 && validationResult.warningDetails && (
+            <div className="space-y-2">
+              <h4 className="font-semibold">Avisos (Agrupados)</h4>
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {groupMessagesByType(validationResult.warningDetails).map((warningGroup, idx) => (
+                  <Alert key={idx} className="border-yellow-600/50 bg-yellow-50 dark:bg-yellow-950/20">
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    <AlertDescription className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                          {warningGroup.count} linhas com aviso de {warningGroup.type}
+                        </span>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            </div>
+          )}
+
           {validationResult.errorDetails.length > 0 && (
             <div className="space-y-2">
-              <h4 className="font-semibold">Detalhes dos Erros (Agrupados)</h4>
+              <h4 className="font-semibold">Erros (Agrupados)</h4>
               <div className="max-h-64 overflow-y-auto space-y-2">
-                {groupErrorsByType(validationResult.errorDetails).map((errorGroup, idx) => (
+                {groupMessagesByType(validationResult.errorDetails).map((errorGroup, idx) => (
                   <Alert key={idx} variant="destructive">
                     <AlertDescription className="space-y-1">
                       <div className="flex items-center justify-between">

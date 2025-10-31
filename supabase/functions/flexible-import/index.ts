@@ -17,6 +17,7 @@ interface ValidationResult {
   warnings: number
   errors: number
   errorDetails: ValidationError[]
+  warningDetails?: ValidationError[]
 }
 
 serve(async (req) => {
@@ -50,6 +51,7 @@ serve(async (req) => {
 
     const rawData = staging.raw_data as any[]
     const validationErrors: ValidationError[] = []
+    const warningDetails: ValidationError[] = []
     const validRows: any[] = []
     let warnings = 0
 
@@ -108,8 +110,16 @@ serve(async (req) => {
 
         // Count warnings (optional fields empty)
         const optionalFields = Object.keys(mappedRow).filter(k => !requiredFields.includes(k))
-        if (optionalFields.some(f => !mappedRow[f])) {
+        const emptyOptionalFields = optionalFields.filter(f => !mappedRow[f])
+        if (emptyOptionalFields.length > 0) {
           warnings++
+          emptyOptionalFields.forEach(field => {
+            warningDetails.push({
+              row: index + 1,
+              field,
+              message: 'Campo opcional vazio'
+            })
+          })
         }
       })
     }
@@ -120,7 +130,8 @@ serve(async (req) => {
       valid: validRows.length,
       warnings,
       errors: validationErrors.length,
-      errorDetails: validationErrors.slice(0, 100) // Limit to first 100 errors
+      errorDetails: validationErrors.slice(0, 100), // Limit to first 100 errors
+      warningDetails: warningDetails.slice(0, 100) // Limit to first 100 warnings
     }
 
     if (action === 'validate') {
@@ -144,14 +155,18 @@ serve(async (req) => {
       const IMPORT_BATCH_SIZE = 500
       let importedCount = 0
       
-      // Insert valid rows into target table in batches
+      // Insert valid rows into target table in batches using upsert
       for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
         const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
         console.log(`Importing batch ${i}-${i + batch.length} of ${validRows.length}`)
         
+        // Use upsert to handle duplicates - for valle_clientes use cpf as unique key
         const { error: insertError } = await supabaseClient
           .from(targetTable)
-          .insert(batch)
+          .upsert(batch, {
+            onConflict: targetTable === 'valle_clientes' ? 'cpf' : 'id',
+            ignoreDuplicates: false
+          })
 
         if (insertError) {
           console.error(`Error importing batch ${i}:`, insertError)
