@@ -153,7 +153,9 @@ serve(async (req) => {
     if (action === 'import') {
       console.log(`Importing ${validRows.length} rows in batches...`)
       const IMPORT_BATCH_SIZE = 500
-      let importedCount = 0
+      let insertedCount = 0
+      let updatedCount = 0
+      let skippedCount = 0
       
       // Insert valid rows into target table in batches
       for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
@@ -168,6 +170,7 @@ serve(async (req) => {
             const key = `${row.tenant_id}|${(row.nome || '').toLowerCase().trim()}|${(row.telefone || '').trim()}`
             if (seenKeys.has(key)) {
               console.log(`Skipping duplicate in batch: ${row.nome} - ${row.telefone}`)
+              skippedCount++
               return false
             }
             seenKeys.add(key)
@@ -197,13 +200,13 @@ serve(async (req) => {
                 if (updateError) {
                   console.error(`Error updating row:`, updateError)
                 } else {
-                  importedCount++
+                  updatedCount++
                 }
               } else {
                 console.error(`Error inserting row:`, insertError)
               }
             } else {
-              importedCount++
+              insertedCount++
             }
           }
         } else {
@@ -214,6 +217,7 @@ serve(async (req) => {
             const key = row[uniqueKey]
             if (seenKeys.has(key)) {
               console.log(`Skipping duplicate ${uniqueKey} in batch: ${key}`)
+              skippedCount++
               return false
             }
             seenKeys.add(key)
@@ -234,11 +238,12 @@ serve(async (req) => {
             throw insertError
           }
           
-          importedCount += deduplicatedBatch.length
+          insertedCount += deduplicatedBatch.length
         }
       }
 
-      console.log(`Import complete: ${importedCount} rows imported`)
+      const totalProcessed = insertedCount + updatedCount + skippedCount
+      console.log(`Import complete: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped`)
 
       // Update staging status
       await supabaseClient
@@ -249,7 +254,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          imported: importedCount 
+          inserted: insertedCount,
+          updated: updatedCount,
+          skipped: skippedCount,
+          total: totalProcessed
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

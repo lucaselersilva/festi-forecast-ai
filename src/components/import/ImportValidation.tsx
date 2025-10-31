@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle, XCircle, Loader2, UserPlus, RefreshCw, ChevronRight } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 
@@ -42,6 +42,13 @@ export function ImportValidation({
   const [isValidating, setIsValidating] = useState(true)
   const [isImporting, setIsImporting] = useState(false)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const [importResult, setImportResult] = useState<{
+    inserted: number
+    updated: number
+    skipped: number
+    total: number
+  } | null>(null)
+  const [showDetails, setShowDetails] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -98,6 +105,8 @@ export function ImportValidation({
   const handleImport = async () => {
     setIsImporting(true)
     try {
+      const startTime = Date.now()
+      
       const { data, error } = await supabase.functions.invoke('flexible-import', {
         body: {
           action: 'import',
@@ -109,12 +118,19 @@ export function ImportValidation({
 
       if (error) throw error
 
-      toast({
-        title: 'Importação concluída!',
-        description: `${data.imported} registros importados com sucesso.`
+      const processingTime = ((Date.now() - startTime) / 1000).toFixed(1)
+      
+      setImportResult({
+        inserted: data.inserted || 0,
+        updated: data.updated || 0,
+        skipped: data.skipped || 0,
+        total: data.total || 0
       })
 
-      onComplete()
+      toast({
+        title: 'Importação concluída com sucesso',
+        description: `${data.inserted} novos, ${data.updated} atualizados em ${processingTime}s`
+      })
     } catch (error) {
       console.error('Import error:', error)
       toast({
@@ -125,6 +141,99 @@ export function ImportValidation({
     } finally {
       setIsImporting(false)
     }
+  }
+
+  if (importResult) {
+    const successRate = importResult.total > 0 
+      ? ((importResult.inserted + importResult.updated) / importResult.total * 100).toFixed(1)
+      : '0'
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-6 w-6" />
+              Importação Concluída
+            </CardTitle>
+            <CardDescription>
+              Processo finalizado com sucesso
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-green-200 bg-green-50 dark:bg-green-950/20">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <UserPlus className="h-8 w-8 text-green-600" />
+                    <div>
+                      <p className="text-3xl font-bold text-green-700">{importResult.inserted}</p>
+                      <p className="text-sm text-green-600">Novos Clientes</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <RefreshCw className="h-8 w-8 text-blue-600" />
+                    <div>
+                      <p className="text-3xl font-bold text-blue-700">{importResult.updated}</p>
+                      <p className="text-sm text-blue-600">Atualizados</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-gray-200 bg-gray-50 dark:bg-gray-950/20">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="h-8 w-8 text-gray-600" />
+                    <div>
+                      <p className="text-3xl font-bold text-gray-700">{importResult.skipped}</p>
+                      <p className="text-sm text-gray-600">Ignorados</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full"
+            >
+              {showDetails ? 'Ocultar Detalhes' : 'Ver Detalhes'}
+              <ChevronRight className={`ml-2 h-4 w-4 transition-transform ${showDetails ? 'rotate-90' : ''}`} />
+            </Button>
+
+            {showDetails && (
+              <Card className="bg-muted">
+                <CardContent className="pt-6 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Processado:</span>
+                    <span className="font-semibold">{importResult.total}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Taxa de Sucesso:</span>
+                    <span className="font-semibold text-green-600">{successRate}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tabela:</span>
+                    <span className="font-mono text-xs">{targetTable}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Button onClick={onComplete} className="w-full" size="lg">
+              Concluir
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (isValidating) {
