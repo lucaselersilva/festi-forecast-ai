@@ -12,9 +12,12 @@ import {
   Activity,
   Workflow,
   Sparkles,
-  Cake
+  Cake,
+  Shield
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
+import { useTenantFeatures } from "@/hooks/useTenantFeatures"
+import { useUserRoles } from "@/hooks/useUserRoles"
 
 import {
   Sidebar,
@@ -30,21 +33,21 @@ import {
 } from "@/components/ui/sidebar"
 
 const mainItems = [
-  { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
-  { title: "Import Data", url: "/import", icon: Upload },
-  { title: "Insights Planner", url: "/insights-planner", icon: Target },
-  { title: "Clustering", url: "/clustering", icon: Activity },
-  { title: "Orquestrador", url: "/orchestrator", icon: Workflow },
-  { title: "Assistente Marketing", url: "/marketing-assistant", icon: Sparkles },
-  { title: "Aniversariantes", url: "/birthdays", icon: Cake },
-  { title: "Zig Casas", url: "/zig-casas", icon: Users },
-  { title: "Events", url: "/events", icon: Calendar },
-  { title: "Sponsors", url: "/sponsors", icon: Briefcase },
+  { title: "Dashboard", url: "/dashboard", icon: BarChart3, featureKey: "dashboard" },
+  { title: "Import Data", url: "/import", icon: Upload, featureKey: "import" },
+  { title: "Insights Planner", url: "/insights-planner", icon: Target, featureKey: "insights" },
+  { title: "Clustering", url: "/clustering", icon: Activity, featureKey: "clustering" },
+  { title: "Orquestrador", url: "/orchestrator", icon: Workflow, featureKey: "orchestrator" },
+  { title: "Assistente Marketing", url: "/marketing-assistant", icon: Sparkles, featureKey: "marketing" },
+  { title: "Aniversariantes", url: "/birthdays", icon: Cake, featureKey: "birthdays" },
+  { title: "Zig Casas", url: "/zig-casas", icon: Users, featureKey: "zig-casas" },
+  { title: "Events", url: "/events", icon: Calendar, featureKey: "events" },
+  { title: "Sponsors", url: "/sponsors", icon: Briefcase, featureKey: "sponsors" },
 ]
 
 const adminItems = [
-  { title: "Logs", url: "/admin/logs", icon: FileText },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Logs", url: "/admin/logs", icon: FileText, featureKey: "settings" },
+  { title: "Settings", url: "/settings", icon: Settings, featureKey: "settings" },
 ]
 
 export function AppSidebar() {
@@ -52,6 +55,8 @@ export function AppSidebar() {
   const location = useLocation()
   const currentPath = location.pathname
   const isCollapsed = state === "collapsed"
+  const { isFeatureEnabled, isLoading } = useTenantFeatures()
+  const { isAdmin, isLoading: rolesLoading } = useUserRoles()
 
   const isActive = (path: string) => {
     if (path === "/dashboard") return currentPath === "/dashboard"
@@ -62,6 +67,15 @@ export function AppSidebar() {
     isActive 
       ? "bg-primary/10 text-primary border-r-2 border-primary font-medium" 
       : "text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+
+  // Filter items based on features
+  const filteredMainItems = mainItems.filter((item) =>
+    isLoading ? true : isFeatureEnabled(item.featureKey)
+  )
+
+  const filteredAdminItems = adminItems.filter((item) =>
+    isLoading ? true : isFeatureEnabled(item.featureKey)
+  )
 
   return (
     <Sidebar className={`${isCollapsed ? "w-16" : "w-64"} border-r border-border/50`} collapsible="icon">
@@ -88,7 +102,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
+              {filteredMainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink 
@@ -113,7 +127,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {adminItems.map((item) => (
+              {filteredAdminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>
@@ -126,6 +140,27 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Super Admin Section */}
+        {!rolesLoading && isAdmin && (
+          <SidebarGroup className="border-t border-border/20 mt-2 pt-2">
+            <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
+              Super Admin
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/admin" className={getNavCls}>
+                      <Shield className="w-4 h-4" />
+                      {!isCollapsed && <span>Admin Panel</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   )

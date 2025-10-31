@@ -14,6 +14,7 @@ import Segments from "./pages/Segments";
 import Events from "./pages/Events";
 import Sponsors from "./pages/Sponsors";
 import AdminLogs from "./pages/AdminLogs";
+import AdminPanel from "./pages/AdminPanel";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Forecast from "./pages/Forecast";
@@ -53,6 +54,7 @@ const App = () => (
               <Route element={<AppLayout><Forecast /></AppLayout>} path="/forecast" />
               <Route element={<AppLayout><Segments /></AppLayout>} path="/segments" />
               <Route element={<AppLayout><AdminLogs /></AppLayout>} path="/admin/logs" />
+              <Route element={<AppLayout><AdminPanel /></AppLayout>} path="/admin" />
               <Route element={<AppLayout><Settings /></AppLayout>} path="/settings" />
             </Route>
             
