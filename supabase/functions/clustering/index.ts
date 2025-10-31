@@ -419,30 +419,42 @@ serve(async (req) => {
 
     // Prepare feature matrix based on segmentation type
     let data: number[][];
+
+    // Remove duplicates by keeping only unique customer IDs
+    const seenIds = new Set();
+    const uniqueFeatures: any[] = [];
+    features.forEach((f: any) => {
+      const id = f[config.idField];
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueFeatures.push(f);
+      }
+    });
     
+    console.log(`🔍 Removed ${features.length - uniqueFeatures.length} duplicate customer records`);
+    const dedupedFeatures = uniqueFeatures;
+    
+    // Rebuild data and customerIds with unique features only
     if ('encodeFields' in config && config.encodeFields && config.encodeFields.length > 0) {
-      // For segmentations with categorical fields
       const numericFeatures = config.featureFields.map((field: string) => 
-        features.map((f: any) => f[field] || 0)
+        dedupedFeatures.map((f: any) => f[field] || 0)
       );
       
       const encodedFeatures = config.encodeFields.map((field: string) =>
-        encodeCategorical(features.map((f: any) => f[field] || ''))
+        encodeCategorical(dedupedFeatures.map((f: any) => f[field] || ''))
       );
       
-      // Transpose to get rows per customer
-      data = features.map((_, idx) => [
+      data = dedupedFeatures.map((_, idx) => [
         ...numericFeatures.map((feat: number[]) => feat[idx]),
         ...encodedFeatures.map((feat: number[]) => feat[idx])
       ]);
     } else {
-      // For purely numeric segmentations
-      data = features.map((f: any) => 
+      data = dedupedFeatures.map((f: any) => 
         config.featureFields.map(field => f[field] || 0)
       );
     }
-
-    const customerIds = features.map((f: any) => f[config.idField]);
+    
+    const customerIds = dedupedFeatures.map((f: any) => f[config.idField]);
 
     // Calculate percentiles BEFORE standardization (on original data)
     const featureIndices = config.featureFields.map((_, idx) => idx);
@@ -526,7 +538,7 @@ serve(async (req) => {
       const clusterObj: any = {
         cluster: clusterNum,
         size: members.length,
-        percentage: (members.length / features.length) * 100,
+        percentage: (members.length / customerIds.length) * 100,
         customerIds: members.map(m => m.customer_id),
       };
 
@@ -643,7 +655,7 @@ serve(async (req) => {
         },
         clusters,
         percentiles,
-        totalCustomers: features.length,
+        totalCustomers: customerIds.length,
         timestamp: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

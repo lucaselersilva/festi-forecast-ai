@@ -73,25 +73,31 @@ Deno.serve(async (req) => {
     for (const client of clients) {
       try {
         const cpf = client.cpf?.trim();
+        const telefone = client.telefone?.trim();
+        const nome = client.nome?.trim().toLowerCase();
         
-        // Se não tem CPF, apenas insere
-        if (!cpf) {
-          const { error } = await supabase
+        // Buscar cliente existente por CPF (se tiver) ou telefone+nome
+        let existing = null;
+        
+        if (cpf) {
+          const { data } = await supabase
             .from('valle_clientes')
-            .insert({ ...client, tenant_id: tenantId });
-          
-          if (error) throw error;
-          result.inserted++;
-          continue;
+            .select('*')
+            .eq('cpf', cpf)
+            .eq('tenant_id', tenantId)
+            .single();
+          existing = data;
+        } else if (telefone && nome) {
+          // Se não tem CPF, busca por telefone + nome
+          const { data } = await supabase
+            .from('valle_clientes')
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .ilike('nome', nome)
+            .eq('telefone', telefone)
+            .single();
+          existing = data;
         }
-
-        // Buscar cliente existente por CPF + tenant
-        const { data: existing } = await supabase
-          .from('valle_clientes')
-          .select('*')
-          .eq('cpf', cpf)
-          .eq('tenant_id', tenantId)
-          .single();
 
         if (!existing) {
           // Cliente novo - INSERT
