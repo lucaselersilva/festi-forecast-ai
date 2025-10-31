@@ -53,55 +53,68 @@ serve(async (req) => {
     const validRows: any[] = []
     let warnings = 0
 
-    // Apply mappings and validate
-    rawData.forEach((row, index) => {
-      const mappedRow: any = { tenant_id: staging.tenant_id }
-      let hasError = false
+    console.log(`Processing ${rawData.length} rows in batches...`)
+    const BATCH_SIZE = 500
 
-      // Apply column mappings
-      for (const [sourceCol, targetField] of Object.entries(mappings as Record<string, string>)) {
-        if (!targetField) continue // Ignored column
+    // Process in batches to avoid CPU timeout
+    for (let batchStart = 0; batchStart < rawData.length; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, rawData.length)
+      const batch = rawData.slice(batchStart, batchEnd)
+      
+      console.log(`Processing batch ${batchStart}-${batchEnd} of ${rawData.length}`)
 
-        const value = row[sourceCol]
-        
-        // Type conversion and validation
-        try {
-          console.log(`Row ${index + 1} - ${targetField}:`, value, `(type: ${typeof value})`)
-          mappedRow[targetField] = normalizeValue(value, targetField)
-        } catch (error) {
-          console.error(`Row ${index + 1} - ${targetField} error:`, error)
-          validationErrors.push({
-            row: index + 1,
-            field: targetField,
-            message: error instanceof Error ? error.message : 'Erro desconhecido'
-          })
-          hasError = true
+      // Apply mappings and validate
+      batch.forEach((row, batchIndex) => {
+        const index = batchStart + batchIndex
+        const mappedRow: any = { tenant_id: staging.tenant_id }
+        let hasError = false
+
+        // Apply column mappings
+        for (const [sourceCol, targetField] of Object.entries(mappings as Record<string, string>)) {
+          if (!targetField) continue // Ignored column
+
+          const value = row[sourceCol]
+          
+          // Type conversion and validation
+          try {
+            mappedRow[targetField] = normalizeValue(value, targetField)
+          } catch (error) {
+            console.error(`Row ${index + 1} - ${targetField} error:`, error)
+            validationErrors.push({
+              row: index + 1,
+              field: targetField,
+              message: error instanceof Error ? error.message : 'Erro desconhecido'
+            })
+            hasError = true
+          }
         }
-      }
 
-      // Required field validation (basic)
-      const requiredFields = getRequiredFields(targetTable)
-      for (const field of requiredFields) {
-        if (!mappedRow[field] && field !== 'tenant_id') {
-          validationErrors.push({
-            row: index + 1,
-            field,
-            message: 'Campo obrigatório não preenchido'
-          })
-          hasError = true
+        // Required field validation (basic)
+        const requiredFields = getRequiredFields(targetTable)
+        for (const field of requiredFields) {
+          if (!mappedRow[field] && field !== 'tenant_id') {
+            validationErrors.push({
+              row: index + 1,
+              field,
+              message: 'Campo obrigatório não preenchido'
+            })
+            hasError = true
+          }
         }
-      }
 
-      if (!hasError) {
-        validRows.push(mappedRow)
-      }
+        if (!hasError) {
+          validRows.push(mappedRow)
+        }
 
-      // Count warnings (optional fields empty)
-      const optionalFields = Object.keys(mappedRow).filter(k => !requiredFields.includes(k))
-      if (optionalFields.some(f => !mappedRow[f])) {
-        warnings++
-      }
-    })
+        // Count warnings (optional fields empty)
+        const optionalFields = Object.keys(mappedRow).filter(k => !requiredFields.includes(k))
+        if (optionalFields.some(f => !mappedRow[f])) {
+          warnings++
+        }
+      })
+    }
+
+    console.log(`Validation complete: ${validRows.length} valid, ${validationErrors.length} errors`)
 
     const result: ValidationResult = {
       valid: validRows.length,
@@ -127,14 +140,28 @@ serve(async (req) => {
     }
 
     if (action === 'import') {
-      // Insert valid rows into target table
-      const { error: insertError } = await supabaseClient
-        .from(targetTable)
-        .insert(validRows)
+      console.log(`Importing ${validRows.length} rows in batches...`)
+      const IMPORT_BATCH_SIZE = 500
+      let importedCount = 0
+      
+      // Insert valid rows into target table in batches
+      for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
+        const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
+        console.log(`Importing batch ${i}-${i + batch.length} of ${validRows.length}`)
+        
+        const { error: insertError } = await supabaseClient
+          .from(targetTable)
+          .insert(batch)
 
-      if (insertError) {
-        throw insertError
+        if (insertError) {
+          console.error(`Error importing batch ${i}:`, insertError)
+          throw insertError
+        }
+        
+        importedCount += batch.length
       }
+
+      console.log(`Import complete: ${importedCount} rows imported`)
 
       // Update staging status
       await supabaseClient
@@ -145,7 +172,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          imported: validRows.length 
+          imported: importedCount 
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
