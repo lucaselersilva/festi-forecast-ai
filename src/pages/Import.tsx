@@ -1,8 +1,7 @@
 import { useState } from "react"
-import { Upload, FileText, CheckCircle, Users, ShoppingCart } from "lucide-react"
+import { Upload, CheckCircle, Users } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { ColumnMapper } from "@/components/import/ColumnMapper"
@@ -21,7 +20,6 @@ export default function Import() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [mappings, setMappings] = useState<Record<string, string>>({})
   const [currentStep, setCurrentStep] = useState<ImportStep>('upload')
-  const [selectedImportType, setSelectedImportType] = useState<string>('valle_clientes')
   const { toast } = useToast()
   const { tenantId } = useTenant()
 
@@ -62,7 +60,7 @@ export default function Import() {
       const id = await dataService.uploadToStaging({
         file: selectedFile,
         tenantId,
-        sourceName: selectedImportType as any
+        sourceName: 'valle_clientes' as any
       })
       
       setSessionId(id)
@@ -115,38 +113,15 @@ export default function Import() {
     }
   }
 
-  const importTypes = [
-    {
-      id: "valle_clientes",
-      title: "Valle Clientes",
-      icon: Users,
-      description: "Importar dados de clientes do Valle",
-      schema: getSchemaByName('valle_clientes')!
-    },
-    {
-      id: "customers",
-      title: "Customers",
-      icon: Users,
-      description: "Importar dados de clientes",
-      schema: getSchemaByName('customers')!
-    },
-    {
-      id: "events",
-      title: "Events",
-      icon: FileText,
-      description: "Importar dados de eventos",
-      schema: getSchemaByName('events')!
-    },
-    {
-      id: "consumptions",
-      title: "Consumptions",
-      icon: ShoppingCart,
-      description: "Importar dados de consumo",
-      schema: getSchemaByName('consumptions')!
-    }
-  ]
+  const importType = {
+    id: "valle_clientes",
+    title: "Importação de Clientes",
+    icon: Users,
+    description: "Importar dados de clientes",
+    schema: getSchemaByName('valle_clientes')!
+  }
 
-  const currentImportType = importTypes.find(t => t.id === selectedImportType)
+  const currentImportType = importType
 
   // File upload zone component
   const FileUploadZone = ({ 
@@ -194,13 +169,13 @@ export default function Import() {
     </Card>
   )
 
-  if (currentStep === 'mapping' && rawData && sessionId && currentImportType) {
+  if (currentStep === 'mapping' && rawData && sessionId) {
     return (
       <div className="container mx-auto py-8">
         <ColumnMapper
           columns={rawData.columns}
           sampleData={rawData.sampleData}
-          targetSchema={currentImportType.schema}
+          targetSchema={importType.schema}
           sessionId={sessionId}
           onMappingComplete={handleMappingComplete}
           onBack={() => setCurrentStep('upload')}
@@ -209,13 +184,13 @@ export default function Import() {
     )
   }
 
-  if (currentStep === 'validation' && sessionId && currentImportType) {
+  if (currentStep === 'validation' && sessionId) {
     return (
       <div className="container mx-auto py-8">
         <ImportValidation
           sessionId={sessionId}
           mappings={mappings}
-          targetTable={currentImportType.schema.tableName}
+          targetTable={importType.schema.tableName}
           onBack={() => setCurrentStep('mapping')}
           onComplete={handleValidationComplete}
         />
@@ -247,104 +222,92 @@ export default function Import() {
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight">Importação de Dados</h1>
+        <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3">
+          <Users className="h-10 w-10 text-primary" />
+          {importType.title}
+        </h1>
         <p className="text-muted-foreground">
-          Importe seus dados de arquivos CSV ou Excel
+          {importType.description} a partir de arquivos CSV ou Excel
         </p>
       </div>
 
-      <Tabs value={selectedImportType} onValueChange={setSelectedImportType} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          {importTypes.map(type => (
-            <TabsTrigger key={type.id} value={type.id}>
-              <type.icon className="w-4 h-4 mr-2" />
-              {type.title}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        {importTypes.map(type => (
-          <TabsContent key={type.id} value={type.id} className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-6">
-                <FileUploadZone
-                  isDragging={isDragging}
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  onChange={handleFileChange}
-                />
-                
-                {rawData && selectedFile && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Preview dos Dados</CardTitle>
-                      <CardDescription>
-                        {selectedFile.name} - {rawData.totalRows} linhas detectadas
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {rawData.columns.map(col => (
-                                <TableHead key={col}>{col}</TableHead>
-                              ))}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {rawData.sampleData.map((row, idx) => (
-                              <TableRow key={idx}>
-                                {rawData.columns.map(col => (
-                                  <TableCell key={col} className="max-w-[200px] truncate">
-                                    {String(row[col] || '')}
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      {rawData.sampleData.length < rawData.totalRows && (
-                        <p className="text-sm text-muted-foreground mt-4 text-center">
-                          Mostrando {rawData.sampleData.length} de {rawData.totalRows} linhas
-                        </p>
-                      )}
-                    </CardContent>
-                    <CardFooter>
-                      <Button onClick={handleContinueToMapping} className="w-full">
-                        Continuar para Mapeamento
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                )}
-              </div>
-
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Sobre {type.title}</CardTitle>
-                    <CardDescription>{type.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-sm space-y-2">
-                      <p className="font-medium">Campos obrigatórios:</p>
-                      <ul className="list-disc list-inside space-y-1">
-                        {type.schema.fields
-                          .filter(f => f.required)
-                          .map(f => (
-                            <li key={f.name}>{f.label}</li>
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          <FileUploadZone
+            isDragging={isDragging}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
+            onChange={handleFileChange}
+          />
+          
+          {rawData && selectedFile && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Preview dos Dados</CardTitle>
+                <CardDescription>
+                  {selectedFile.name} - {rawData.totalRows} linhas detectadas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {rawData.columns.map(col => (
+                          <TableHead key={col}>{col}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rawData.sampleData.map((row, idx) => (
+                        <TableRow key={idx}>
+                          {rawData.columns.map(col => (
+                            <TableCell key={col} className="max-w-[200px] truncate">
+                              {String(row[col] || '')}
+                            </TableCell>
                           ))}
-                      </ul>
-                    </div>
-                  </CardContent>
-                </Card>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {rawData.sampleData.length < rawData.totalRows && (
+                  <p className="text-sm text-muted-foreground mt-4 text-center">
+                    Mostrando {rawData.sampleData.length} de {rawData.totalRows} linhas
+                  </p>
+                )}
+              </CardContent>
+              <CardFooter>
+                <Button onClick={handleContinueToMapping} className="w-full">
+                  Continuar para Mapeamento
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações da Importação</CardTitle>
+              <CardDescription>{importType.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm space-y-2">
+                <p className="font-medium">Campos obrigatórios:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {importType.schema.fields
+                    .filter(f => f.required)
+                    .map(f => (
+                      <li key={f.name}>{f.label}</li>
+                    ))}
+                </ul>
               </div>
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
