@@ -39,7 +39,7 @@ function standardScaler(data: number[][]): { scaled: number[][], means: number[]
   return { scaled, means, stds };
 }
 
-function kMeans(data: number[][], k: number, maxIter: number = 100, randomState: number = 42): any {
+function kMeans(data: number[][], k: number, maxIter: number = 50, randomState: number = 42): any {
   const n = data.length;
   const m = data[0].length;
 
@@ -69,6 +69,7 @@ function kMeans(data: number[][], k: number, maxIter: number = 100, randomState:
   let labels = new Array(n).fill(0);
   let converged = false;
   let iter = 0;
+  let prevCentroids = centroids.map(c => [...c]);
 
   while (!converged && iter < maxIter) {
     const newLabels = data.map(point => {
@@ -79,6 +80,7 @@ function kMeans(data: number[][], k: number, maxIter: number = 100, randomState:
     converged = newLabels.every((label, i) => label === labels[i]);
     labels = newLabels;
 
+    // Update centroids
     for (let i = 0; i < k; i++) {
       const clusterPoints = data.filter((_, idx) => labels[idx] === i);
       if (clusterPoints.length > 0) {
@@ -88,6 +90,18 @@ function kMeans(data: number[][], k: number, maxIter: number = 100, randomState:
       }
     }
 
+    // Early stopping: check if centroids barely moved
+    if (iter > 5) {
+      const centroidShift = centroids.reduce((sum, c, i) => 
+        sum + euclideanDistance(c, prevCentroids[i]), 0
+      ) / k;
+      
+      if (centroidShift < 0.001) {
+        converged = true;
+      }
+    }
+    
+    prevCentroids = centroids.map(c => [...c]);
     iter++;
   }
 
@@ -279,8 +293,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  const MAX_EXECUTION_TIME = 50000; // 50 seconds (leave 10s buffer)
+
   try {
-    const { method, params, segmentationType = 'rfm' } = await req.json();
+    const { method, params, segmentationType = 'rfm', calculateMetrics = false } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -369,7 +386,7 @@ serve(async (req) => {
     // Fetch ALL data for tenant - no limit
     let allFeatures: any[] = [];
     let rangeStart = 0;
-    const rangeSize = 1000; // Fetch in batches of 1000
+    const rangeSize = 2000; // Fetch in batches of 2000 (optimized)
     let hasMore = true;
     
     while (hasMore) {
@@ -494,10 +511,24 @@ serve(async (req) => {
       processedData = scaled.scaled;
     }
 
-    // Run clustering
+    // Check time before running clustering
+    const timeBeforeClustering = Date.now() - startTime;
+    if (timeBeforeClustering > MAX_EXECUTION_TIME * 0.8) {
+      console.log(`⚠️ Time warning: ${timeBeforeClustering}ms elapsed, returning early`);
+      return new Response(
+        JSON.stringify({
+          error: 'Processing time exceeded during data preparation',
+          warning: 'Too many customers to process in time limit',
+          suggestion: 'Try with a smaller dataset or contact support'
+        }),
+        { status: 408, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Run clustering with optimized parameters
     let result: any;
     if (method === 'kmeans') {
-      result = kMeans(processedData, params.k || 4, 100, params.randomState || 42);
+      result = kMeans(processedData, params.k || 4, 50, params.randomState || 42);
     } else if (method === 'dbscan') {
       result = dbscan(processedData, params.eps || 0.6, params.minSamples || 10);
     } else if (method === 'gmm') {
@@ -506,10 +537,20 @@ serve(async (req) => {
       throw new Error(`Unknown clustering method: ${method}`);
     }
 
-    // Calculate metrics
-    const silhouette = silhouetteScore(processedData, result.labels);
-    const daviesBouldin = result.centroids ? 
-      daviesBouldinIndex(processedData, result.labels, result.centroids) : undefined;
+    // Calculate metrics only if requested (computationally expensive)
+    let silhouette = undefined;
+    let daviesBouldin = undefined;
+    
+    if (calculateMetrics) {
+      const timeBeforeMetrics = Date.now() - startTime;
+      if (timeBeforeMetrics < MAX_EXECUTION_TIME * 0.9) {
+        silhouette = silhouetteScore(processedData, result.labels);
+        daviesBouldin = result.centroids ? 
+          daviesBouldinIndex(processedData, result.labels, result.centroids) : undefined;
+      } else {
+        console.log(`⚠️ Skipping metrics calculation due to time constraints`);
+      }
+    }
 
     // Create cluster summary
     const clusterMap: { [key: number]: any[] } = {};
@@ -642,7 +683,8 @@ serve(async (req) => {
       return clusterObj;
     });
 
-    console.log(`✅ Clustering complete: ${clusters.length} clusters found`);
+    const executionTime = Date.now() - startTime;
+    console.log(`✅ Clustering complete: ${clusters.length} clusters found in ${executionTime}ms`);
 
     return new Response(
       JSON.stringify({
@@ -652,11 +694,13 @@ serve(async (req) => {
           silhouetteScore: silhouette,
           daviesBouldinScore: daviesBouldin,
           clusterSizes: result.clusterSizes,
+          executionTime,
         },
         clusters,
         percentiles,
         totalCustomers: customerIds.length,
         timestamp: new Date().toISOString(),
+        warnings: silhouette === undefined ? ['Metrics calculation skipped for performance'] : undefined,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
