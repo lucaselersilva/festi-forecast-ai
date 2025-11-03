@@ -4,9 +4,19 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { AlertCircle, CheckCircle, XCircle, Loader2, UserPlus, RefreshCw, ChevronRight } from 'lucide-react'
+import { AlertCircle, CheckCircle, XCircle, Loader2, UserPlus, RefreshCw, ChevronRight, XOctagon } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface ImportValidationProps {
   sessionId: string
@@ -50,11 +60,48 @@ export function ImportValidation({
     total: number
   } | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
-    validateData()
+    // Check if there's an ongoing import first
+    checkImportStatus()
   }, [])
+
+  const checkImportStatus = async () => {
+    try {
+      const { data: statusData, error: statusError } = await supabase.functions.invoke('flexible-import', {
+        body: {
+          action: 'status',
+          sessionId
+        }
+      })
+
+      if (!statusError && statusData) {
+        if (statusData.job_status === 'processing') {
+          // Resume polling
+          setIsImporting(true)
+          setImportProgress(statusData.job_progress || 0)
+          startPolling()
+          return
+        } else if (statusData.job_status === 'completed') {
+          // Show results
+          setImportResult({
+            inserted: statusData.job_result?.inserted || 0,
+            updated: statusData.job_result?.updated || 0,
+            skipped: statusData.job_result?.skipped || 0,
+            total: statusData.job_result?.total || 0
+          })
+          return
+        }
+      }
+    } catch (err) {
+      // No status found, proceed with validation
+    }
+    
+    validateData()
+  }
 
   const validateData = async () => {
     setIsValidating(true)
@@ -103,6 +150,74 @@ export function ImportValidation({
     }))
   }
 
+  const startPolling = () => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data: statusData, error: statusError } = await supabase.functions.invoke('flexible-import', {
+          body: {
+            action: 'status',
+            sessionId
+          }
+        })
+
+        if (statusError) {
+          clearInterval(pollInterval)
+          throw statusError
+        }
+
+        console.log('Job status:', statusData)
+
+        // Update progress
+        setImportProgress(statusData.job_progress || 0)
+
+        if (statusData.job_status === 'completed') {
+          clearInterval(pollInterval)
+          setIsImporting(false)
+          setImportProgress(100)
+          
+          setImportResult({
+            inserted: statusData.job_result?.inserted || 0,
+            updated: statusData.job_result?.updated || 0,
+            skipped: statusData.job_result?.skipped || 0,
+            total: statusData.job_result?.total || 0
+          })
+
+          toast({
+            title: 'Importação concluída',
+            description: `${statusData.job_result?.inserted || 0} novos, ${statusData.job_result?.updated || 0} atualizados`
+          })
+        } else if (statusData.job_status === 'failed') {
+          clearInterval(pollInterval)
+          setIsImporting(false)
+          
+          toast({
+            title: 'Erro na importação',
+            description: statusData.job_error || 'Erro desconhecido',
+            variant: 'destructive'
+          })
+        } else if (statusData.job_status === 'cancelled') {
+          clearInterval(pollInterval)
+          setIsImporting(false)
+          
+          toast({
+            title: 'Importação cancelada',
+            description: 'A importação foi cancelada pelo usuário'
+          })
+        }
+      } catch (pollError) {
+        console.error('Status poll error:', pollError)
+        clearInterval(pollInterval)
+        setIsImporting(false)
+        
+        toast({
+          title: 'Erro ao verificar status',
+          description: 'Não foi possível verificar o progresso da importação.',
+          variant: 'destructive'
+        })
+      }
+    }, 3000) // Poll every 3 seconds
+  }
+
   const handleImport = async () => {
     setIsImporting(true)
     try {
@@ -123,64 +238,7 @@ export function ImportValidation({
         description: 'Processando dados em segundo plano...'
       })
 
-      // Poll for status
-      const pollInterval = setInterval(async () => {
-        try {
-          const { data: statusData, error: statusError } = await supabase.functions.invoke('flexible-import', {
-            body: {
-              action: 'status',
-              sessionId
-            }
-          })
-
-          if (statusError) {
-            clearInterval(pollInterval)
-            throw statusError
-          }
-
-          console.log('Job status:', statusData)
-
-          // Update progress
-          setImportProgress(statusData.job_progress || 0)
-
-          if (statusData.job_status === 'completed') {
-            clearInterval(pollInterval)
-            setIsImporting(false)
-            setImportProgress(100)
-            
-            setImportResult({
-              inserted: statusData.job_result?.inserted || 0,
-              updated: statusData.job_result?.updated || 0,
-              skipped: statusData.job_result?.skipped || 0,
-              total: statusData.job_result?.total || 0
-            })
-
-            toast({
-              title: 'Importação concluída',
-              description: `${statusData.job_result?.inserted || 0} novos, ${statusData.job_result?.updated || 0} atualizados`
-            })
-          } else if (statusData.job_status === 'failed') {
-            clearInterval(pollInterval)
-            setIsImporting(false)
-            
-            toast({
-              title: 'Erro na importação',
-              description: statusData.job_error || 'Erro desconhecido',
-              variant: 'destructive'
-            })
-          }
-        } catch (pollError) {
-          console.error('Status poll error:', pollError)
-          clearInterval(pollInterval)
-          setIsImporting(false)
-          
-          toast({
-            title: 'Erro ao verificar status',
-            description: 'Não foi possível verificar o progresso da importação.',
-            variant: 'destructive'
-          })
-        }
-      }, 3000) // Poll every 3 seconds
+      startPolling()
 
     } catch (error) {
       console.error('Import error:', error)
@@ -190,6 +248,37 @@ export function ImportValidation({
         description: 'Não foi possível iniciar a importação. Tente novamente.',
         variant: 'destructive'
       })
+    }
+  }
+
+  const handleCancelImport = async () => {
+    setIsCancelling(true)
+    try {
+      const { error } = await supabase.functions.invoke('flexible-import', {
+        body: {
+          action: 'cancel',
+          sessionId
+        }
+      })
+
+      if (error) throw error
+
+      setIsImporting(false)
+      setShowCancelDialog(false)
+      
+      toast({
+        title: 'Importação cancelada',
+        description: 'A importação foi cancelada com sucesso'
+      })
+    } catch (error) {
+      console.error('Cancel error:', error)
+      toast({
+        title: 'Erro ao cancelar',
+        description: 'Não foi possível cancelar a importação',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -298,17 +387,56 @@ export function ImportValidation({
 
   if (isImporting) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 space-y-6">
-        <Loader2 className="w-12 h-12 animate-spin text-primary" />
-        <div className="text-center space-y-2">
-          <h3 className="text-xl font-semibold">Importando dados...</h3>
-          <p className="text-muted-foreground">Processando em segundo plano</p>
+      <>
+        <div className="flex flex-col items-center justify-center py-12 space-y-6">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          <div className="text-center space-y-2">
+            <h3 className="text-xl font-semibold">Importando dados...</h3>
+            <p className="text-muted-foreground">Processando em segundo plano</p>
+            <p className="text-xs text-muted-foreground">Você pode sair desta página, a importação continuará</p>
+          </div>
+          <div className="w-full max-w-md space-y-2">
+            <Progress value={importProgress} className="h-3" />
+            <p className="text-center text-sm text-muted-foreground">{importProgress}% concluído</p>
+          </div>
+          <Button 
+            variant="destructive" 
+            onClick={() => setShowCancelDialog(true)}
+            disabled={isCancelling}
+          >
+            <XOctagon className="w-4 h-4 mr-2" />
+            Cancelar Importação
+          </Button>
         </div>
-        <div className="w-full max-w-md space-y-2">
-          <Progress value={importProgress} className="h-3" />
-          <p className="text-center text-sm text-muted-foreground">{importProgress}% concluído</p>
-        </div>
-      </div>
+
+        <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancelar importação?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja cancelar a importação? Os dados já processados não serão salvos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isCancelling}>Voltar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleCancelImport}
+                disabled={isCancelling}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Cancelando...
+                  </>
+                ) : (
+                  'Sim, cancelar'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     )
   }
 

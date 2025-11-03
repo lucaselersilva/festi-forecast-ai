@@ -92,7 +92,7 @@ serve(async (req) => {
       const backgroundImportJob = async () => {
         try {
           console.log(`Starting background import of ${rawData.length} rows...`)
-          const IMPORT_BATCH_SIZE = 100
+          const IMPORT_BATCH_SIZE = 500
           let insertedCount = 0
           let updatedCount = 0
           let skippedCount = 0
@@ -103,6 +103,25 @@ serve(async (req) => {
             const progress = Math.round((i / rawData.length) * 100)
             
             console.log(`Processing batch ${i}-${i + batch.length} of ${rawData.length} (${progress}%)`)
+            
+            // Check if job was cancelled
+            const { data: jobCheck } = await supabaseClient
+              .from('import_staging')
+              .select('job_status')
+              .eq('session_id', sessionId)
+              .single()
+
+            if (!jobCheck || jobCheck.job_status === 'cancelled') {
+              console.log('Job cancelled by user, stopping...')
+              await supabaseClient
+                .from('import_staging')
+                .update({
+                  job_completed_at: new Date().toISOString(),
+                  job_error: 'Cancelado pelo usuário'
+                })
+                .eq('session_id', sessionId)
+              return
+            }
             
             // Update progress
             await supabaseClient
@@ -275,6 +294,25 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify(stagingStatus),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    // Handle cancel requests
+    if (action === 'cancel') {
+      await supabaseClient
+        .from('import_staging')
+        .update({ 
+          job_status: 'cancelled',
+          job_error: 'Cancelado pelo usuário',
+          job_completed_at: new Date().toISOString()
+        })
+        .eq('session_id', sessionId)
+
+      return new Response(
+        JSON.stringify({ success: true, message: 'Importação cancelada' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }

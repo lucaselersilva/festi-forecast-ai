@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Upload, CheckCircle, Users } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { dataService, RawFileData } from "@/lib/dataService"
 import { useToast } from "@/hooks/use-toast"
 import { useTenant } from "@/hooks/useTenant"
 import { getSchemaByName } from "@/lib/schemas/import-targets"
+import { supabase } from "@/integrations/supabase/client"
 
 type ImportStep = 'upload' | 'mapping' | 'validation' | 'complete'
 
@@ -22,6 +23,37 @@ export default function Import() {
   const [currentStep, setCurrentStep] = useState<ImportStep>('upload')
   const { toast } = useToast()
   const { tenantId } = useTenant()
+
+  // Check for ongoing imports on mount
+  useEffect(() => {
+    const checkOngoingImport = async () => {
+      if (!tenantId) return
+      
+      try {
+        const { data, error } = await supabase
+          .from('import_staging')
+          .select('session_id, job_status, job_progress')
+          .eq('tenant_id', tenantId)
+          .in('job_status', ['processing', 'pending'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (!error && data) {
+          toast({
+            title: "Importação em andamento detectada",
+            description: `${data.job_progress || 0}% concluído. Redirecionando...`
+          })
+          setSessionId(data.session_id)
+          setCurrentStep('validation')
+        }
+      } catch (err) {
+        // No ongoing import found, ignore
+      }
+    }
+
+    checkOngoingImport()
+  }, [tenantId])
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
