@@ -265,33 +265,68 @@ serve(async (req) => {
             if (processedBatch.length === 0) continue
             
             try {
-              // Single upsert operation with onConflict
-              // Postgres will automatically handle insert vs update
-              const upsertConflict = targetTable === 'valle_clientes' 
-                ? 'telefone,tenant_id' 
-                : 'email,tenant_id'
-              
-              const { error: upsertError, data: upsertedData } = await supabaseClient
-                .from(targetTable)
-                .upsert(processedBatch, { 
-                  onConflict: upsertConflict,
-                  ignoreDuplicates: false 
-                })
-                .select('id')
-              
-              if (upsertError) {
-                console.error('Upsert error:', upsertError)
-                skippedCount += processedBatch.length
-              } else {
-                // Count as inserts (new records will have IDs returned)
-                const returnedCount = upsertedData?.length || 0
-                if (returnedCount > 0) {
-                  insertedCount += returnedCount
-                } else {
-                  // If no IDs returned, assume updates
-                  updatedCount += processedBatch.length
+              // Para valle_clientes: separar registros com CPF dos sem CPF
+              // Registros com CPF usam cpf+tenant_id como conflito
+              // Registros sem CPF usam telefone+tenant_id
+              if (targetTable === 'valle_clientes') {
+                const withCpf = processedBatch.filter(row => row.cpf)
+                const withoutCpf = processedBatch.filter(row => !row.cpf)
+                
+                // Upsert registros com CPF
+                if (withCpf.length > 0) {
+                  const { error: cpfError } = await supabaseClient
+                    .from(targetTable)
+                    .upsert(withCpf, { 
+                      onConflict: 'cpf,tenant_id',
+                      ignoreDuplicates: false 
+                    })
+                  
+                  if (cpfError) {
+                    console.error('[IMPORT] Error upserting with CPF:', cpfError)
+                    throw cpfError
+                  }
+                  insertedCount += withCpf.length
                 }
-                console.log(`[UPSERT] Processed: ${processedBatch.length} records`)
+                
+                // Upsert registros sem CPF (usa telefone)
+                if (withoutCpf.length > 0) {
+                  const { error: phoneError } = await supabaseClient
+                    .from(targetTable)
+                    .upsert(withoutCpf, { 
+                      onConflict: 'telefone,tenant_id',
+                      ignoreDuplicates: false 
+                    })
+                  
+                  if (phoneError) {
+                    console.error('[IMPORT] Error upserting without CPF:', phoneError)
+                    throw phoneError
+                  }
+                  insertedCount += withoutCpf.length
+                }
+              } else {
+                // Para outras tabelas, usa email+tenant_id
+                const { error: upsertError, data: upsertedData } = await supabaseClient
+                  .from(targetTable)
+                  .upsert(processedBatch, { 
+                    onConflict: 'email,tenant_id',
+                    ignoreDuplicates: false 
+                  })
+                  .select('id')
+                
+                if (upsertError) {
+                  console.error('Upsert error:', upsertError)
+                  skippedCount += processedBatch.length
+                } else {
+                  // Count as inserts (new records will have IDs returned)
+                  const returnedCount = upsertedData?.length || 0
+                  if (returnedCount > 0) {
+                    insertedCount += returnedCount
+                  } else {
+                    // If no IDs returned, assume updates
+                    updatedCount += processedBatch.length
+                  }
+                  console.log(`[UPSERT] Processed: ${processedBatch.length} records`)
+                }
               }
               
             } catch (error) {

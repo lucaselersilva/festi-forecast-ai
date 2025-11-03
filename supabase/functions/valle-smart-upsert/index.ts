@@ -101,9 +101,16 @@ Deno.serve(async (req) => {
 
         if (!existing) {
           // Cliente novo - INSERT
+          // Usar upsert para evitar conflitos de constraint
+          const upsertData = { ...client, tenant_id: tenantId };
+          const onConflict = cpf ? 'cpf,tenant_id' : 'telefone,tenant_id';
+          
           const { error } = await supabase
             .from('valle_clientes')
-            .insert({ ...client, tenant_id: tenantId });
+            .upsert(upsertData, {
+              onConflict: onConflict,
+              ignoreDuplicates: false
+            });
           
           if (error) throw error;
           result.inserted++;
