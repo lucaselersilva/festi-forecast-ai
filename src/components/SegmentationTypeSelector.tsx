@@ -19,13 +19,14 @@ export function SegmentationTypeSelector({ value, onChange }: SegmentationTypeSe
       icon: TrendingUp,
       features: ['Recência de visita', 'Presenças', 'Consumo total']
     },
-    {
-      value: 'rfm' as const,
-      label: 'RFM Clássico',
-      description: 'RFM baseado em interações',
-      icon: TrendingUp,
-      features: ['Recência de compra', 'Frequência de interações', 'Valor monetário total']
-    },
+    // Temporarily disabled
+    // {
+    //   value: 'rfm' as const,
+    //   label: 'RFM Clássico',
+    //   description: 'RFM baseado em interações',
+    //   icon: TrendingUp,
+    //   features: ['Recência de compra', 'Frequência de interações', 'Valor monetário total']
+    // },
     {
       value: 'demographic' as const,
       label: 'Demográfica',

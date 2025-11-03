@@ -247,13 +247,6 @@ export type Database = {
             referencedColumns: ["customer_id"]
           },
           {
-            foreignKeyName: "consumptions_customerid_fkey"
-            columns: ["customerid"]
-            isOneToOne: false
-            referencedRelation: "vw_valle_rfm_customer"
-            referencedColumns: ["customer_id"]
-          },
-          {
             foreignKeyName: "consumptions_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -704,13 +697,6 @@ export type Database = {
             referencedColumns: ["customer_id"]
           },
           {
-            foreignKeyName: "fk_interactions_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_valle_rfm_customer"
-            referencedColumns: ["customer_id"]
-          },
-          {
             foreignKeyName: "fk_interactions_event"
             columns: ["event_id"]
             isOneToOne: false
@@ -996,13 +982,6 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "vw_rfm_customer"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_scoring_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_valle_rfm_customer"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1572,13 +1551,6 @@ export type Database = {
             referencedRelation: "vw_rfm_customer"
             referencedColumns: ["customer_id"]
           },
-          {
-            foreignKeyName: "fk_interactions_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_valle_rfm_customer"
-            referencedColumns: ["customer_id"]
-          },
         ]
       }
       vw_customers_preferred_days: {
@@ -2033,7 +2005,7 @@ export type Database = {
           tenant_id: string | null
         }
         Insert: {
-          customer_id?: number | null
+          customer_id?: never
           f?: never
           frequency_interactions?: never
           last_interaction_at?: string | null
@@ -2045,7 +2017,7 @@ export type Database = {
           tenant_id?: string | null
         }
         Update: {
-          customer_id?: number | null
+          customer_id?: never
           f?: never
           frequency_interactions?: never
           last_interaction_at?: string | null
@@ -2058,7 +2030,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "customers_tenant_id_fkey"
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
