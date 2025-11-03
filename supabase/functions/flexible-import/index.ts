@@ -52,24 +52,11 @@ serve(async (req) => {
     // If importing, process raw_data directly with mappings
     if (action === 'import') {
       const rawData = staging.raw_data as any[]
-      const importMappings = staging.mappings as Record<string, string>
       
       if (!rawData || rawData.length === 0) {
         return new Response(
           JSON.stringify({ 
             error: 'Nenhum dado encontrado na sessão.' 
-          }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        )
-      }
-      
-      if (!importMappings) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Mapeamentos não encontrados. Execute a validação primeiro.' 
           }),
           { 
             status: 400,
@@ -116,7 +103,7 @@ serve(async (req) => {
                 const row: any = { tenant_id: staging.tenant_id }
                 
                 // Apply mappings
-                for (const [sourceCol, targetField] of Object.entries(importMappings)) {
+                for (const [sourceCol, targetField] of Object.entries(mappings as Record<string, string>)) {
                   if (!targetField) continue
                   const value = rawRow[sourceCol]
                   try {
