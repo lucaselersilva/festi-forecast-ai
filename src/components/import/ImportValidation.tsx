@@ -78,7 +78,19 @@ export function ImportValidation({
         }
       })
 
-      if (!statusError && statusData) {
+      // Check for 404 - staging data not found
+      if (statusError || (statusData?.error && statusData.error.includes('não encontrados'))) {
+        console.log('Staging data not found, resetting import state')
+        toast({
+          title: "Sessão expirada",
+          description: "A sessão de importação não foi encontrada. Por favor, inicie uma nova importação.",
+          variant: "destructive",
+        })
+        onBack()
+        return
+      }
+
+      if (statusData) {
         if (statusData.job_status === 'processing') {
           // Resume polling
           setIsImporting(true)
@@ -97,7 +109,8 @@ export function ImportValidation({
         }
       }
     } catch (err) {
-      // No status found, proceed with validation
+      console.error('Error checking import status:', err)
+      // If error, proceed with validation
     }
     
     validateData()
@@ -115,6 +128,17 @@ export function ImportValidation({
         }
       })
 
+      // Check for 404 - staging data not found
+      if (data?.error && data.error.includes('não encontrados')) {
+        toast({
+          title: 'Sessão expirada',
+          description: 'A sessão de importação não foi encontrada. Por favor, inicie uma nova importação.',
+          variant: 'destructive'
+        })
+        onBack()
+        return
+      }
+
       if (error) throw error
 
       setValidationResult(data)
@@ -125,6 +149,7 @@ export function ImportValidation({
         description: 'Não foi possível validar os dados. Tente novamente.',
         variant: 'destructive'
       })
+      onBack()
     } finally {
       setIsValidating(false)
     }
@@ -204,10 +229,21 @@ export function ImportValidation({
             description: 'A importação foi cancelada pelo usuário'
           })
         }
-      } catch (pollError) {
+      } catch (pollError: any) {
         console.error('Status poll error:', pollError)
         clearInterval(pollInterval)
         setIsImporting(false)
+        
+        // Check if it's a 404 - staging data not found
+        if (pollError?.message?.includes('404') || pollError?.message?.includes('não encontrados')) {
+          toast({
+            title: 'Sessão expirada',
+            description: 'A sessão de importação não foi encontrada. Voltando para o início.',
+            variant: 'destructive'
+          })
+          onBack()
+          return
+        }
         
         toast({
           title: 'Erro ao verificar status',
