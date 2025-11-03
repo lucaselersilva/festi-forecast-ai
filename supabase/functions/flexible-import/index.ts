@@ -43,10 +43,16 @@ serve(async (req) => {
       .from('import_staging')
       .select('*')
       .eq('session_id', sessionId)
-      .single()
+      .maybeSingle()
 
     if (stagingError || !staging) {
-      throw new Error('Dados de staging não encontrados')
+      return new Response(
+        JSON.stringify({ error: 'Dados de staging não encontrados' }),
+        { 
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     // If importing, process raw_data directly with mappings
