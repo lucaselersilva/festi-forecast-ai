@@ -49,14 +49,14 @@ serve(async (req) => {
       throw new Error('Dados de staging não encontrados')
     }
 
-    // If importing, skip validation and use already validated data
+    // If importing, process raw_data directly with mappings
     if (action === 'import') {
-      const validRows = (staging.mapped_data as any[]) || []
+      const rawData = staging.raw_data as any[]
       
-      if (validRows.length === 0) {
+      if (!rawData || rawData.length === 0) {
         return new Response(
           JSON.stringify({ 
-            error: 'Nenhum dado válido encontrado. Execute a validação primeiro.' 
+            error: 'Nenhum dado encontrado na sessão.' 
           }),
           { 
             status: 400,
@@ -78,18 +78,18 @@ serve(async (req) => {
       // Process import in background
       const backgroundImportJob = async () => {
         try {
-          console.log(`Starting background import of ${validRows.length} rows...`)
+          console.log(`Starting background import of ${rawData.length} rows...`)
           const IMPORT_BATCH_SIZE = 100
           let insertedCount = 0
           let updatedCount = 0
           let skippedCount = 0
           
-          // Insert valid rows into target table in batches
-          for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
-            const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
-            const progress = Math.round((i / validRows.length) * 100)
+          // Process raw_data with mappings in batches
+          for (let i = 0; i < rawData.length; i += IMPORT_BATCH_SIZE) {
+            const batch = rawData.slice(i, Math.min(i + IMPORT_BATCH_SIZE, rawData.length))
+            const progress = Math.round((i / rawData.length) * 100)
             
-            console.log(`Processing batch ${i}-${i + batch.length} of ${validRows.length} (${progress}%)`)
+            console.log(`Processing batch ${i}-${i + batch.length} of ${rawData.length} (${progress}%)`)
             
             // Update progress
             await supabaseClient
@@ -97,8 +97,37 @@ serve(async (req) => {
               .update({ job_progress: progress })
               .eq('session_id', sessionId)
 
-            // Process each row in batch
-            for (const row of batch) {
+            // Apply mappings to each raw row in batch
+            const processedBatch = batch
+              .map((rawRow) => {
+                const row: any = { tenant_id: staging.tenant_id }
+                
+                // Apply mappings
+                for (const [sourceCol, targetField] of Object.entries(mappings as Record<string, string>)) {
+                  if (!targetField) continue
+                  const value = rawRow[sourceCol]
+                  try {
+                    row[targetField] = normalizeValue(value, targetField)
+                  } catch (error) {
+                    console.error(`Error normalizing ${targetField}:`, error)
+                    return null
+                  }
+                }
+                
+                // Validate required fields
+                const requiredFields = getRequiredFields(targetTable)
+                for (const field of requiredFields) {
+                  if (!row[field] && field !== 'tenant_id') {
+                    return null
+                  }
+                }
+                
+                return row
+              })
+              .filter(row => row !== null)
+
+            // Process each valid row in batch
+            for (const row of processedBatch) {
               try {
                 // Check for duplicates based on target table
                 let duplicateCheckResult
@@ -313,11 +342,10 @@ serve(async (req) => {
 
     // Only runs for action === 'validate'
     if (action === 'validate') {
-      // Update staging with validation results
+      // Update staging with validation results (não salvar mapped_data)
       await supabaseClient
         .from('import_staging')
         .update({
-          mapped_data: validRows,
           validation_results: result,
           status: 'validated'
         })
