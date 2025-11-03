@@ -157,114 +157,181 @@ serve(async (req) => {
     }
 
     if (action === 'import') {
-      console.log(`Importing ${validRows.length} rows in batches...`)
-      const IMPORT_BATCH_SIZE = 500
-      let insertedCount = 0
-      let updatedCount = 0
-      let skippedCount = 0
-      
-      // Insert valid rows into target table in batches
-      for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
-        const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
-        console.log(`Importing batch ${i}-${i + batch.length} of ${validRows.length}`)
-        
-        // For valle_clientes, deduplicate by telefone+nome (normalized)
-        if (targetTable === 'valle_clientes') {
-          const seenKeys = new Set()
-          const deduplicatedBatch = batch.filter(row => {
-            // Create composite key: tenant_id + lowercase(nome) + telefone
-            const key = `${row.tenant_id}|${(row.nome || '').toLowerCase().trim()}|${(row.telefone || '').trim()}`
-            if (seenKeys.has(key)) {
-              console.log(`Skipping duplicate in batch: ${row.nome} - ${row.telefone}`)
-              skippedCount++
-              return false
-            }
-            seenKeys.add(key)
-            return true
-          })
+      // Start background job
+      await supabaseClient
+        .from('import_staging')
+        .update({
+          job_status: 'processing',
+          job_started_at: new Date().toISOString(),
+          job_progress: 0
+        })
+        .eq('session_id', sessionId)
+
+      // Process import in background
+      const backgroundImportJob = async () => {
+        try {
+          console.log(`Starting background import of ${validRows.length} rows...`)
+          const IMPORT_BATCH_SIZE = 100
+          let insertedCount = 0
+          let updatedCount = 0
+          let skippedCount = 0
           
-          console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows (removed ${batch.length - deduplicatedBatch.length} duplicates)`)
-          
-          // Insert one by one to handle unique constraint violations gracefully
-          for (const row of deduplicatedBatch) {
-            const { error: insertError } = await supabaseClient
-              .from(targetTable)
-              .insert(row)
-              .select()
+          // Insert valid rows into target table in batches
+          for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
+            const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
+            const progress = Math.floor(((i + batch.length) / validRows.length) * 100)
             
-            if (insertError) {
-              // If duplicate, try to update instead
-              if (insertError.code === '23505') {
-                console.log(`Duplicate found for ${row.nome}, updating instead...`)
-                const { error: updateError } = await supabaseClient
-                  .from(targetTable)
-                  .update(row)
-                  .eq('tenant_id', row.tenant_id)
-                  .eq('telefone', row.telefone || '')
-                  .ilike('nome', row.nome)
-                
-                if (updateError) {
-                  console.error(`Error updating row:`, updateError)
-                } else {
-                  updatedCount++
+            console.log(`Processing batch ${i}-${i + batch.length} of ${validRows.length} (${progress}%)`)
+            
+            // Update progress
+            await supabaseClient
+              .from('import_staging')
+              .update({ job_progress: progress })
+              .eq('session_id', sessionId)
+            
+            // For valle_clientes, deduplicate by telefone+nome (normalized)
+            if (targetTable === 'valle_clientes') {
+              const seenKeys = new Set()
+              const deduplicatedBatch = batch.filter(row => {
+                // Create composite key: tenant_id + lowercase(nome) + telefone
+                const key = `${row.tenant_id}|${(row.nome || '').toLowerCase().trim()}|${(row.telefone || '').trim()}`
+                if (seenKeys.has(key)) {
+                  console.log(`Skipping duplicate in batch: ${row.nome} - ${row.telefone}`)
+                  skippedCount++
+                  return false
                 }
-              } else {
-                console.error(`Error inserting row:`, insertError)
+                seenKeys.add(key)
+                return true
+              })
+              
+              console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows (removed ${batch.length - deduplicatedBatch.length} duplicates)`)
+              
+              // Insert one by one to handle unique constraint violations gracefully
+              for (const row of deduplicatedBatch) {
+                const { error: insertError } = await supabaseClient
+                  .from(targetTable)
+                  .insert(row)
+                  .select()
+                
+                if (insertError) {
+                  // If duplicate, try to update instead
+                  if (insertError.code === '23505') {
+                    console.log(`Duplicate found for ${row.nome}, updating instead...`)
+                    const { error: updateError } = await supabaseClient
+                      .from(targetTable)
+                      .update(row)
+                      .eq('tenant_id', row.tenant_id)
+                      .eq('telefone', row.telefone || '')
+                      .ilike('nome', row.nome)
+                    
+                    if (updateError) {
+                      console.error(`Error updating row:`, updateError)
+                    } else {
+                      updatedCount++
+                    }
+                  } else {
+                    console.error(`Error inserting row:`, insertError)
+                  }
+                } else {
+                  insertedCount++
+                }
               }
             } else {
-              insertedCount++
-            }
-          }
-        } else {
-          // Other tables: use CPF-based deduplication
-          const uniqueKey = 'cpf'
-          const seenKeys = new Set()
-          const deduplicatedBatch = batch.filter(row => {
-            const key = row[uniqueKey]
-            if (seenKeys.has(key)) {
-              console.log(`Skipping duplicate ${uniqueKey} in batch: ${key}`)
-              skippedCount++
-              return false
-            }
-            seenKeys.add(key)
-            return true
-          })
-          
-          console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows`)
-          
-          const { error: insertError } = await supabaseClient
-            .from(targetTable)
-            .upsert(deduplicatedBatch, {
-              onConflict: uniqueKey,
-              ignoreDuplicates: false
-            })
+              // Other tables: use CPF-based deduplication
+              const uniqueKey = 'cpf'
+              const seenKeys = new Set()
+              const deduplicatedBatch = batch.filter(row => {
+                const key = row[uniqueKey]
+                if (seenKeys.has(key)) {
+                  console.log(`Skipping duplicate ${uniqueKey} in batch: ${key}`)
+                  skippedCount++
+                  return false
+                }
+                seenKeys.add(key)
+                return true
+              })
+              
+              console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows`)
+              
+              const { error: insertError } = await supabaseClient
+                .from(targetTable)
+                .upsert(deduplicatedBatch, {
+                  onConflict: uniqueKey,
+                  ignoreDuplicates: false
+                })
 
-          if (insertError) {
-            console.error(`Error importing batch ${i}:`, insertError)
-            throw insertError
+              if (insertError) {
+                console.error(`Error importing batch ${i}:`, insertError)
+                throw insertError
+              }
+              
+              insertedCount += deduplicatedBatch.length
+            }
           }
-          
-          insertedCount += deduplicatedBatch.length
+
+          const totalProcessed = insertedCount + updatedCount + skippedCount
+          console.log(`Import complete: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped`)
+
+          // Update staging with success status
+          await supabaseClient
+            .from('import_staging')
+            .update({ 
+              status: 'imported',
+              job_status: 'completed',
+              job_progress: 100,
+              job_completed_at: new Date().toISOString(),
+              job_result: {
+                inserted: insertedCount,
+                updated: updatedCount,
+                skipped: skippedCount,
+                total: totalProcessed
+              }
+            })
+            .eq('session_id', sessionId)
+        } catch (error) {
+          console.error('Background import error:', error)
+          // Update staging with error status
+          await supabaseClient
+            .from('import_staging')
+            .update({ 
+              job_status: 'failed',
+              job_error: error instanceof Error ? error.message : 'Erro desconhecido',
+              job_completed_at: new Date().toISOString()
+            })
+            .eq('session_id', sessionId)
         }
       }
 
-      const totalProcessed = insertedCount + updatedCount + skippedCount
-      console.log(`Import complete: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped`)
+      // Start background job without waiting (Deno keeps instance alive)
+      backgroundImportJob()
 
-      // Update staging status
-      await supabaseClient
-        .from('import_staging')
-        .update({ status: 'imported' })
-        .eq('session_id', sessionId)
-
+      // Return immediately
       return new Response(
         JSON.stringify({ 
-          success: true, 
-          inserted: insertedCount,
-          updated: updatedCount,
-          skipped: skippedCount,
-          total: totalProcessed
+          success: true,
+          message: 'Import job started',
+          sessionId
         }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    if (action === 'status') {
+      // Get job status
+      const { data: staging, error: statusError } = await supabaseClient
+        .from('import_staging')
+        .select('job_status, job_progress, job_error, job_result, job_started_at, job_completed_at')
+        .eq('session_id', sessionId)
+        .single()
+
+      if (statusError || !staging) {
+        throw new Error('Job not found')
+      }
+
+      return new Response(
+        JSON.stringify(staging),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }

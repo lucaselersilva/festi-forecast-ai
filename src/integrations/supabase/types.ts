@@ -489,6 +489,12 @@ export type Database = {
           created_at: string | null
           file_name: string | null
           id: string
+          job_completed_at: string | null
+          job_error: string | null
+          job_progress: number | null
+          job_result: Json | null
+          job_started_at: string | null
+          job_status: string | null
           mapped_data: Json | null
           raw_data: Json
           session_id: string
@@ -503,6 +509,12 @@ export type Database = {
           created_at?: string | null
           file_name?: string | null
           id?: string
+          job_completed_at?: string | null
+          job_error?: string | null
+          job_progress?: number | null
+          job_result?: Json | null
+          job_started_at?: string | null
+          job_status?: string | null
           mapped_data?: Json | null
           raw_data: Json
           session_id: string
@@ -517,6 +529,12 @@ export type Database = {
           created_at?: string | null
           file_name?: string | null
           id?: string
+          job_completed_at?: string | null
+          job_error?: string | null
+          job_progress?: number | null
+          job_result?: Json | null
+          job_started_at?: string | null
+          job_status?: string | null
           mapped_data?: Json | null
           raw_data?: Json
           session_id?: string

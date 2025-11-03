@@ -41,6 +41,7 @@ export function ImportValidation({
 }: ImportValidationProps) {
   const [isValidating, setIsValidating] = useState(true)
   const [isImporting, setIsImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState(0)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [importResult, setImportResult] = useState<{
     inserted: number
@@ -105,9 +106,8 @@ export function ImportValidation({
   const handleImport = async () => {
     setIsImporting(true)
     try {
-      const startTime = Date.now()
-      
-      const { data, error } = await supabase.functions.invoke('flexible-import', {
+      // Start the import job
+      const { data: startData, error: startError } = await supabase.functions.invoke('flexible-import', {
         body: {
           action: 'import',
           sessionId,
@@ -116,30 +116,80 @@ export function ImportValidation({
         }
       })
 
-      if (error) throw error
-
-      const processingTime = ((Date.now() - startTime) / 1000).toFixed(1)
-      
-      setImportResult({
-        inserted: data.inserted || 0,
-        updated: data.updated || 0,
-        skipped: data.skipped || 0,
-        total: data.total || 0
-      })
+      if (startError) throw startError
 
       toast({
-        title: 'Importação concluída com sucesso',
-        description: `${data.inserted} novos, ${data.updated} atualizados em ${processingTime}s`
+        title: 'Importação iniciada',
+        description: 'Processando dados em segundo plano...'
       })
+
+      // Poll for status
+      const pollInterval = setInterval(async () => {
+        try {
+          const { data: statusData, error: statusError } = await supabase.functions.invoke('flexible-import', {
+            body: {
+              action: 'status',
+              sessionId
+            }
+          })
+
+          if (statusError) {
+            clearInterval(pollInterval)
+            throw statusError
+          }
+
+          console.log('Job status:', statusData)
+
+          // Update progress
+          setImportProgress(statusData.job_progress || 0)
+
+          if (statusData.job_status === 'completed') {
+            clearInterval(pollInterval)
+            setIsImporting(false)
+            setImportProgress(100)
+            
+            setImportResult({
+              inserted: statusData.job_result?.inserted || 0,
+              updated: statusData.job_result?.updated || 0,
+              skipped: statusData.job_result?.skipped || 0,
+              total: statusData.job_result?.total || 0
+            })
+
+            toast({
+              title: 'Importação concluída',
+              description: `${statusData.job_result?.inserted || 0} novos, ${statusData.job_result?.updated || 0} atualizados`
+            })
+          } else if (statusData.job_status === 'failed') {
+            clearInterval(pollInterval)
+            setIsImporting(false)
+            
+            toast({
+              title: 'Erro na importação',
+              description: statusData.job_error || 'Erro desconhecido',
+              variant: 'destructive'
+            })
+          }
+        } catch (pollError) {
+          console.error('Status poll error:', pollError)
+          clearInterval(pollInterval)
+          setIsImporting(false)
+          
+          toast({
+            title: 'Erro ao verificar status',
+            description: 'Não foi possível verificar o progresso da importação.',
+            variant: 'destructive'
+          })
+        }
+      }, 3000) // Poll every 3 seconds
+
     } catch (error) {
       console.error('Import error:', error)
+      setIsImporting(false)
       toast({
-        title: 'Erro na importação',
-        description: 'Não foi possível importar os dados. Tente novamente.',
+        title: 'Erro ao iniciar importação',
+        description: 'Não foi possível iniciar a importação. Tente novamente.',
         variant: 'destructive'
       })
-    } finally {
-      setIsImporting(false)
     }
   }
 
@@ -242,6 +292,22 @@ export function ImportValidation({
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
         <h3 className="text-xl font-semibold">Validando dados...</h3>
         <p className="text-muted-foreground">Verificando formatos e campos obrigatórios</p>
+      </div>
+    )
+  }
+
+  if (isImporting) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-6">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+        <div className="text-center space-y-2">
+          <h3 className="text-xl font-semibold">Importando dados...</h3>
+          <p className="text-muted-foreground">Processando em segundo plano</p>
+        </div>
+        <div className="w-full max-w-md space-y-2">
+          <Progress value={importProgress} className="h-3" />
+          <p className="text-center text-sm text-muted-foreground">{importProgress}% concluído</p>
+        </div>
       </div>
     )
   }
