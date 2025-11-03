@@ -1,10 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
+// Declare EdgeRuntime global
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<any>): void
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Listen for function shutdown
+addEventListener('beforeunload', (ev: any) => {
+  console.log('Function shutdown due to:', ev.detail?.reason)
+})
 
 interface ValidationError {
   row: number
@@ -108,7 +118,7 @@ serve(async (req) => {
             const batch = rawData.slice(i, Math.min(i + IMPORT_BATCH_SIZE, rawData.length))
             const progress = Math.round((i / rawData.length) * 100)
             
-            console.log(`Processing batch ${i}-${i + batch.length} of ${rawData.length} (${progress}%)`)
+            console.log(`[IMPORT] Processing batch ${i}-${i + batch.length} of ${rawData.length} (${progress}%) - Session: ${sessionId}`)
             
             // Check if job was cancelled
             const { data: jobCheck } = await supabaseClient
@@ -256,7 +266,7 @@ serve(async (req) => {
             })
             .eq('session_id', sessionId)
 
-          console.log(`Import completed: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped`)
+          console.log(`[IMPORT] ✓ Completed successfully: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped - Session: ${sessionId}`)
         } catch (error) {
           console.error('Background import job failed:', error)
           await supabaseClient
@@ -270,8 +280,8 @@ serve(async (req) => {
         }
       }
 
-      // Start background job without awaiting
-      backgroundImportJob()
+      // Start background job with EdgeRuntime.waitUntil to keep function alive
+      EdgeRuntime.waitUntil(backgroundImportJob())
 
       return new Response(
         JSON.stringify({ 
