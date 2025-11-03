@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -9,7 +9,8 @@ import { ClusterVisualization } from "@/components/ClusterVisualization";
 import { SegmentationTypeSelector, SegmentationType } from "@/components/SegmentationTypeSelector";
 import { SegmentInsightCard } from "@/components/SegmentInsightCard";
 import { ClusterCustomersDialog } from "@/components/ClusterCustomersDialog";
-import { Download } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Download, AlertCircle } from "lucide-react";
 import { useTenant } from "@/hooks/useTenant";
 import { 
   getRFMSegmentName, 
@@ -42,6 +43,28 @@ export default function Clustering() {
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [generatedInsights, setGeneratedInsights] = useState<Map<number, any>>(new Map());
   const [selectedCluster, setSelectedCluster] = useState<{ name: string; customerIds: number[] } | null>(null);
+  const [activeImport, setActiveImport] = useState<{ job_status: string; job_progress: number } | null>(null);
+
+  // Verificar importações ativas periodicamente
+  useEffect(() => {
+    const checkActiveImport = async () => {
+      if (!tenantId) return;
+      
+      const { data } = await supabase
+        .from('import_staging')
+        .select('job_status, job_progress')
+        .eq('tenant_id', tenantId)
+        .in('job_status', ['processing', 'pending'])
+        .maybeSingle();
+      
+      setActiveImport(data);
+    };
+
+    checkActiveImport();
+    const interval = setInterval(checkActiveImport, 5000); // Verificar a cada 5 segundos
+    
+    return () => clearInterval(interval);
+  }, [tenantId]);
 
   const handleRunClustering = async () => {
     setClusteringLoading(true);
@@ -58,6 +81,25 @@ export default function Clustering() {
         setTimeout(() => {
           window.location.href = '/auth';
         }, 2000);
+        setClusteringLoading(false);
+        return;
+      }
+
+      // Verificar se há importação em andamento
+      const { data: activeImportCheck } = await supabase
+        .from('import_staging')
+        .select('job_status, job_progress')
+        .eq('tenant_id', tenantId)
+        .in('job_status', ['processing', 'pending'])
+        .maybeSingle();
+
+      if (activeImportCheck) {
+        toast({
+          title: "Importação em andamento",
+          description: `Aguarde a conclusão da importação (${activeImportCheck.job_progress || 0}%) antes de executar clustering`,
+          variant: "destructive",
+        });
+        setClusteringLoading(false);
         return;
       }
       
@@ -363,6 +405,17 @@ export default function Clustering() {
           </p>
         </div>
       </div>
+
+      {activeImport && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Importação em andamento</AlertTitle>
+          <AlertDescription>
+            Uma importação está em processamento ({activeImport.job_progress || 0}%). 
+            O clustering ficará disponível após a conclusão da importação.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader>
