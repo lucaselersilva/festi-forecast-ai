@@ -383,16 +383,24 @@ serve(async (req) => {
     // Fetch features from selected view, filtered by tenant_id
     console.log(`📊 Fetching data from view: ${config.view}`);
     
-    // Fetch ALL data for tenant - no limit
+    // Get total count first
+    const { count: totalRecords } = await supabase
+      .from(config.view)
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId);
+
+    const totalCount = totalRecords || 0;
+    console.log(`📊 Total records available for tenant: ${totalCount}`);
+
+    // Fetch ALL data for tenant in batches
     let allFeatures: any[] = [];
     let rangeStart = 0;
-    const rangeSize = 2000; // Fetch in batches of 2000 (optimized)
-    let hasMore = true;
+    const rangeSize = 1000; // Supabase default limit
     
-    while (hasMore) {
-      const { data: batch, error: fetchError, count } = await supabase
+    while (rangeStart < totalCount) {
+      const { data: batch, error: fetchError } = await supabase
         .from(config.view)
-        .select('*', { count: 'exact' })
+        .select('*')
         .eq('tenant_id', tenantId)
         .order(config.idField)
         .range(rangeStart, rangeStart + rangeSize - 1);
@@ -403,11 +411,10 @@ serve(async (req) => {
       
       if (batch && batch.length > 0) {
         allFeatures = [...allFeatures, ...batch];
-        rangeStart += rangeSize;
-        hasMore = batch.length === rangeSize;
-        console.log(`📦 Fetched batch: ${batch.length} records (total: ${allFeatures.length})`);
+        console.log(`📦 Fetched batch: ${batch.length} records (${allFeatures.length}/${totalCount})`);
+        rangeStart += batch.length;
       } else {
-        hasMore = false;
+        break;
       }
     }
     
