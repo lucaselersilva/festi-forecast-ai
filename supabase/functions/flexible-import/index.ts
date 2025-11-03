@@ -46,6 +46,11 @@ serve(async (req) => {
       }
     )
 
+    const CHUNK_SIZE = 300 // Process 300 records per chunk to avoid timeout
+    const IMPORT_BATCH_SIZE = 100 // Insert 100 records at a time within each chunk
+    const CHUNK_TIMEOUT_MS = 20000 // 20 seconds timeout per chunk
+    const SESSION_EXPIRY_MINUTES = 5 // Consider sessions older than 5 minutes as expired
+
     const { action, sessionId, mappings, targetTable, startIndex } = await req.json()
 
     // Get staging data
@@ -67,6 +72,28 @@ serve(async (req) => {
 
     // If importing, process raw_data directly with mappings
     if (action === 'import') {
+      const chunkStartTime = Date.now()
+      console.log(`[IMPORT ${new Date().toISOString()}] Starting chunk for session: ${sessionId}, startIndex: ${startIndex || 0}`)
+      
+      // Clean old processing sessions for this tenant (older than SESSION_EXPIRY_MINUTES)
+      if (!startIndex || startIndex === 0) {
+        const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MINUTES * 60 * 1000).toISOString()
+        console.log(`[IMPORT] Cleaning old sessions before ${expiryTime}`)
+        
+        const { error: cleanupError } = await supabaseClient
+          .from('import_staging')
+          .delete()
+          .eq('tenant_id', staging.tenant_id)
+          .eq('job_status', 'processing')
+          .lt('created_at', expiryTime)
+        
+        if (cleanupError) {
+          console.error('[IMPORT] Error cleaning old sessions:', cleanupError)
+        } else {
+          console.log('[IMPORT] Old sessions cleaned successfully')
+        }
+      }
+
       const rawData = staging.raw_data as any[]
       const importMappings = mappings as Record<string, string>
       
@@ -106,10 +133,9 @@ serve(async (req) => {
 
       // Process import in chunks - only process CHUNK_SIZE records per call
       try {
-        const CHUNK_SIZE = 1500 // Process 1500 records per call
         const currentStartIndex = startIndex || 0
         
-        console.log(`Starting chunk import from index ${currentStartIndex} of ${rawData.length} total rows...`)
+        console.log(`[IMPORT ${new Date().toISOString()}] Starting chunk import from index ${currentStartIndex} of ${rawData.length} total rows...`)
         
         // Get existing progress from database
         const { data: existingProgress } = await supabaseClient
@@ -127,16 +153,31 @@ serve(async (req) => {
         const chunkEnd = Math.min(currentStartIndex + CHUNK_SIZE, rawData.length)
         const chunk = rawData.slice(currentStartIndex, chunkEnd)
         
-        console.log(`Processing chunk: ${currentStartIndex}-${chunkEnd} (${chunk.length} rows)`)
+        console.log(`[IMPORT ${new Date().toISOString()}] Processing chunk: ${currentStartIndex}-${chunkEnd} (${chunk.length} rows)`)
         
         // Process this chunk in smaller batches for DB operations
-        const IMPORT_BATCH_SIZE = 100
         for (let i = 0; i < chunk.length; i += IMPORT_BATCH_SIZE) {
+            // Check chunk timeout
+            const chunkElapsedTime = Date.now() - chunkStartTime
+            if (chunkElapsedTime > CHUNK_TIMEOUT_MS) {
+              console.error(`[IMPORT] Chunk timeout exceeded: ${chunkElapsedTime}ms`)
+              return new Response(
+                JSON.stringify({ 
+                  error: 'Timeout ao processar chunk. Tente novamente com menos registros.',
+                  progress: Math.round((currentStartIndex / rawData.length) * 100),
+                  insertedCount,
+                  updatedCount,
+                  skippedCount
+                }),
+                { status: 408, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              )
+            }
+
             const batch = chunk.slice(i, Math.min(i + IMPORT_BATCH_SIZE, chunk.length))
             const absoluteIndex = currentStartIndex + i
             const progress = Math.round((absoluteIndex / rawData.length) * 100)
             
-            console.log(`[IMPORT] Processing batch at index ${absoluteIndex} - Progress: ${progress}% - Session: ${sessionId}`)
+            console.log(`[IMPORT ${new Date().toISOString()}] Processing batch at index ${absoluteIndex} - Progress: ${progress}% - Session: ${sessionId}`)
             
             // Check if job was cancelled
             const { data: jobCheck } = await supabaseClient
@@ -279,49 +320,42 @@ serve(async (req) => {
             }
           }
 
-          // Mark job as completed
-          await supabaseClient
-            .from('import_staging')
-            .update({
-              job_status: 'completed',
-              job_progress: 100,
-              job_completed_at: new Date().toISOString(),
-              job_result: {
-                inserted: insertedCount,
-                updated: updatedCount,
-                skipped: skippedCount
-              }
-            })
-            .eq('session_id', sessionId)
-
         const nextIndex = chunkEnd
         const hasMore = nextIndex < rawData.length
+        const progress = Math.round((nextIndex / rawData.length) * 100)
         
-        console.log(`[IMPORT] Chunk complete: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped - hasMore: ${hasMore} - nextIndex: ${nextIndex} - Session: ${sessionId}`)
+        // Update job progress in database
+        await supabaseClient
+          .from('import_staging')
+          .update({
+            job_status: hasMore ? 'processing' : 'completed',
+            job_progress: progress,
+            job_completed_at: hasMore ? null : new Date().toISOString(),
+            job_result: {
+              inserted: insertedCount,
+              updated: updatedCount,
+              skipped: skippedCount
+            }
+          })
+          .eq('session_id', sessionId)
+
+        const chunkDuration = Date.now() - chunkStartTime
+        const recordsPerSecond = (chunk.length / (chunkDuration / 1000)).toFixed(2)
         
-        // If completed, mark as done
-        if (!hasMore) {
-          await supabaseClient
-            .from('import_staging')
-            .update({
-              job_status: 'completed',
-              job_completed_at: new Date().toISOString()
-            })
-            .eq('session_id', sessionId)
-        }
+        console.log(`[IMPORT ${new Date().toISOString()}] Chunk completed in ${chunkDuration}ms (${recordsPerSecond} records/sec)`)
+        console.log(`[IMPORT] Inserted: ${insertedCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}`)
+        console.log(`[IMPORT] Has more: ${hasMore}, Next index: ${nextIndex}, Progress: ${progress}%`)
         
         return new Response(
           JSON.stringify({ 
             success: true, 
             message: hasMore ? 'Chunk processed successfully' : 'Import completed successfully',
-            result: {
-              inserted: insertedCount,
-              updated: updatedCount,
-              skipped: skippedCount
-            },
+            insertedCount,
+            updatedCount,
+            skippedCount,
             hasMore,
             nextIndex,
-            progress: Math.round((nextIndex / rawData.length) * 100)
+            progress
           }),
           { 
             status: 200,

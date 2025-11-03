@@ -175,6 +175,14 @@ export function ImportValidation({
     }))
   }
 
+  const resetImportState = () => {
+    setIsImporting(false)
+    setImportProgress(0)
+    setValidationResult(null)
+    setImportResult(null)
+    onBack()
+  }
+
   const startPolling = () => {
     const pollInterval = setInterval(async () => {
       try {
@@ -255,22 +263,30 @@ export function ImportValidation({
   }
 
   const handleImport = async () => {
+    if (!validationResult || validationResult.valid === 0) {
+      toast({
+        title: "Nenhum registro válido",
+        description: "Não há registros válidos para importar.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsImporting(true)
+    setImportProgress(0)
+
     try {
       let currentIndex = 0
       let hasMore = true
-      let totalInserted = 0
-      let totalUpdated = 0
-      let totalSkipped = 0
 
       toast({
         title: 'Importação iniciada',
-        description: 'Processando dados em chunks...'
+        description: 'Processando em lotes de 300 registros...'
       })
 
       // Process in chunks until complete
       while (hasMore) {
-        const { data: chunkData, error: chunkError } = await supabase.functions.invoke('flexible-import', {
+        const { data, error } = await supabase.functions.invoke('flexible-import', {
           body: {
             action: 'import',
             sessionId,
@@ -280,52 +296,80 @@ export function ImportValidation({
           }
         })
 
-        if (chunkError) throw chunkError
-
-        // Update totals
-        totalInserted = chunkData.result.inserted
-        totalUpdated = chunkData.result.updated
-        totalSkipped = chunkData.result.skipped
+        if (error) {
+          // Detectar erro 404 (sessão expirada)
+          if (error.message?.includes('Dados de staging não encontrados') || error.message?.includes('404')) {
+            toast({
+              title: "Sessão expirada",
+              description: "A sessão de importação expirou. Por favor, faça um novo upload.",
+              variant: "destructive",
+              action: (
+                <Button variant="outline" size="sm" onClick={resetImportState}>
+                  Fazer novo upload
+                </Button>
+              ),
+            })
+            return
+          }
+          throw error
+        }
 
         // Update progress
-        setImportProgress(chunkData.progress)
+        setImportProgress(data.progress || 0)
 
         // Check if more chunks to process
-        hasMore = chunkData.hasMore
-        currentIndex = chunkData.nextIndex
+        hasMore = data.hasMore || false
+        currentIndex = data.nextIndex || currentIndex + 300
 
-        console.log(`Chunk processed: ${chunkData.progress}% - hasMore: ${hasMore}`)
+        console.log(`Chunk processed: ${data.progress}% - hasMore: ${hasMore}`)
 
-        // Small delay between chunks to avoid overwhelming the server
+        // Small delay between chunks
         if (hasMore) {
           await new Promise(resolve => setTimeout(resolve, 500))
+        } else {
+          // Import complete
+          setImportResult({
+            inserted: data.insertedCount || 0,
+            updated: data.updatedCount || 0,
+            skipped: data.skippedCount || 0,
+            total: (data.insertedCount || 0) + (data.updatedCount || 0) + (data.skippedCount || 0)
+          })
+
+          toast({
+            title: 'Importação concluída',
+            description: `${data.insertedCount || 0} novos, ${data.updatedCount || 0} atualizados`
+          })
         }
       }
-
-      // Import complete
-      setIsImporting(false)
-      setImportProgress(100)
-      
-      setImportResult({
-        inserted: totalInserted,
-        updated: totalUpdated,
-        skipped: totalSkipped,
-        total: totalInserted + totalUpdated + totalSkipped
-      })
-
-      toast({
-        title: 'Importação concluída',
-        description: `${totalInserted} novos, ${totalUpdated} atualizados`
-      })
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Import error:', error)
+      
+      // Verificar se é timeout
+      if (error.message?.includes('Timeout') || error.message?.includes('408')) {
+        toast({
+          title: "Timeout na importação",
+          description: "O processo demorou muito. Tente novamente ou reduza a quantidade de registros.",
+          variant: "destructive",
+          action: (
+            <Button variant="outline" size="sm" onClick={() => setIsImporting(false)}>
+              Tentar novamente
+            </Button>
+          ),
+        })
+      } else {
+        toast({
+          title: "Erro na importação",
+          description: error.message || "Não foi possível iniciar a importação.",
+          variant: "destructive",
+          action: (
+            <Button variant="outline" size="sm" onClick={resetImportState}>
+              Fazer novo upload
+            </Button>
+          ),
+        })
+      }
+    } finally {
       setIsImporting(false)
-      toast({
-        title: 'Erro ao iniciar importação',
-        description: 'Não foi possível iniciar a importação. Tente novamente.',
-        variant: 'destructive'
-      })
     }
   }
 
@@ -470,7 +514,7 @@ export function ImportValidation({
           <Loader2 className="w-12 h-12 animate-spin text-primary" />
           <div className="text-center space-y-2">
             <h3 className="text-xl font-semibold">Importando dados...</h3>
-            <p className="text-muted-foreground">Processando em chunks progressivos</p>
+            <p className="text-muted-foreground">Processando em lotes de 300 registros. Cada lote leva ~5-10 segundos.</p>
             <p className="text-xs text-muted-foreground">Por favor, aguarde até a conclusão</p>
           </div>
           <div className="w-full max-w-md space-y-2">
