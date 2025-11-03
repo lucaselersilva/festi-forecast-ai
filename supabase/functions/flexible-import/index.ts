@@ -104,17 +104,16 @@ serve(async (req) => {
         })
         .eq('session_id', sessionId)
 
-      // Process import in background
-      const backgroundImportJob = async () => {
-        try {
-          console.log(`Starting background import of ${rawData.length} rows...`)
-          const IMPORT_BATCH_SIZE = 500
-          let insertedCount = 0
-          let updatedCount = 0
-          let skippedCount = 0
-          
-          // Process raw_data with mappings in batches
-          for (let i = 0; i < rawData.length; i += IMPORT_BATCH_SIZE) {
+      // Process import synchronously to avoid early_drop shutdown
+      try {
+        console.log(`Starting import of ${rawData.length} rows...`)
+        const IMPORT_BATCH_SIZE = 100
+        let insertedCount = 0
+        let updatedCount = 0
+        let skippedCount = 0
+        
+        // Process raw_data with mappings in batches
+        for (let i = 0; i < rawData.length; i += IMPORT_BATCH_SIZE) {
             const batch = rawData.slice(i, Math.min(i + IMPORT_BATCH_SIZE, rawData.length))
             const progress = Math.round((i / rawData.length) * 100)
             
@@ -136,7 +135,17 @@ serve(async (req) => {
                   job_error: 'Cancelado pelo usuário'
                 })
                 .eq('session_id', sessionId)
-              return
+              
+              return new Response(
+                JSON.stringify({ 
+                  success: false, 
+                  message: 'Import cancelled by user' 
+                }),
+                { 
+                  status: 200,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                }
+              )
             }
             
             // Update progress
@@ -266,34 +275,36 @@ serve(async (req) => {
             })
             .eq('session_id', sessionId)
 
-          console.log(`[IMPORT] ✓ Completed successfully: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped - Session: ${sessionId}`)
-        } catch (error) {
-          console.error('Background import job failed:', error)
-          await supabaseClient
-            .from('import_staging')
-            .update({
-              job_status: 'failed',
-              job_error: error instanceof Error ? error.message : String(error),
-              job_completed_at: new Date().toISOString()
-            })
-            .eq('session_id', sessionId)
-        }
+        console.log(`[IMPORT] ✓ Completed successfully: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped - Session: ${sessionId}`)
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Import completed successfully',
+            result: {
+              inserted: insertedCount,
+              updated: updatedCount,
+              skipped: skippedCount
+            }
+          }),
+          { 
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      } catch (error) {
+        console.error('Import job failed:', error)
+        await supabaseClient
+          .from('import_staging')
+          .update({
+            job_status: 'failed',
+            job_error: error instanceof Error ? error.message : String(error),
+            job_completed_at: new Date().toISOString()
+          })
+          .eq('session_id', sessionId)
+        
+        throw error
       }
-
-      // Start background job with EdgeRuntime.waitUntil to keep function alive
-      EdgeRuntime.waitUntil(backgroundImportJob())
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Import job started',
-          sessionId 
-        }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
     }
 
     // Check for status requests first
@@ -302,10 +313,16 @@ serve(async (req) => {
         .from('import_staging')
         .select('job_status, job_progress, job_error, job_result, job_started_at, job_completed_at')
         .eq('session_id', sessionId)
-        .single()
+        .maybeSingle()
 
       if (statusError || !stagingStatus) {
-        throw new Error('Job not found')
+        return new Response(
+          JSON.stringify({ error: 'Sessão não encontrada ou expirada' }),
+          { 
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
       }
 
       return new Response(
