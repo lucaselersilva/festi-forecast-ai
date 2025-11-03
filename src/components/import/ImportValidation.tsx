@@ -257,24 +257,66 @@ export function ImportValidation({
   const handleImport = async () => {
     setIsImporting(true)
     try {
-      // Start the import job
-      const { data: startData, error: startError } = await supabase.functions.invoke('flexible-import', {
-        body: {
-          action: 'import',
-          sessionId,
-          mappings,
-          targetTable
-        }
-      })
-
-      if (startError) throw startError
+      let currentIndex = 0
+      let hasMore = true
+      let totalInserted = 0
+      let totalUpdated = 0
+      let totalSkipped = 0
 
       toast({
         title: 'Importação iniciada',
-        description: 'Processando dados em segundo plano...'
+        description: 'Processando dados em chunks...'
       })
 
-      startPolling()
+      // Process in chunks until complete
+      while (hasMore) {
+        const { data: chunkData, error: chunkError } = await supabase.functions.invoke('flexible-import', {
+          body: {
+            action: 'import',
+            sessionId,
+            mappings,
+            targetTable,
+            startIndex: currentIndex
+          }
+        })
+
+        if (chunkError) throw chunkError
+
+        // Update totals
+        totalInserted = chunkData.result.inserted
+        totalUpdated = chunkData.result.updated
+        totalSkipped = chunkData.result.skipped
+
+        // Update progress
+        setImportProgress(chunkData.progress)
+
+        // Check if more chunks to process
+        hasMore = chunkData.hasMore
+        currentIndex = chunkData.nextIndex
+
+        console.log(`Chunk processed: ${chunkData.progress}% - hasMore: ${hasMore}`)
+
+        // Small delay between chunks to avoid overwhelming the server
+        if (hasMore) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      }
+
+      // Import complete
+      setIsImporting(false)
+      setImportProgress(100)
+      
+      setImportResult({
+        inserted: totalInserted,
+        updated: totalUpdated,
+        skipped: totalSkipped,
+        total: totalInserted + totalUpdated + totalSkipped
+      })
+
+      toast({
+        title: 'Importação concluída',
+        description: `${totalInserted} novos, ${totalUpdated} atualizados`
+      })
 
     } catch (error) {
       console.error('Import error:', error)
@@ -428,8 +470,8 @@ export function ImportValidation({
           <Loader2 className="w-12 h-12 animate-spin text-primary" />
           <div className="text-center space-y-2">
             <h3 className="text-xl font-semibold">Importando dados...</h3>
-            <p className="text-muted-foreground">Processando em segundo plano</p>
-            <p className="text-xs text-muted-foreground">Você pode sair desta página, a importação continuará</p>
+            <p className="text-muted-foreground">Processando em chunks progressivos</p>
+            <p className="text-xs text-muted-foreground">Por favor, aguarde até a conclusão</p>
           </div>
           <div className="w-full max-w-md space-y-2">
             <Progress value={importProgress} className="h-3" />

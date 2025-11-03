@@ -46,7 +46,7 @@ serve(async (req) => {
       }
     )
 
-    const { action, sessionId, mappings, targetTable } = await req.json()
+    const { action, sessionId, mappings, targetTable, startIndex } = await req.json()
 
     // Get staging data
     const { data: staging, error: stagingError } = await supabaseClient
@@ -104,20 +104,39 @@ serve(async (req) => {
         })
         .eq('session_id', sessionId)
 
-      // Process import synchronously to avoid early_drop shutdown
+      // Process import in chunks - only process CHUNK_SIZE records per call
       try {
-        console.log(`Starting import of ${rawData.length} rows...`)
-        const IMPORT_BATCH_SIZE = 100
-        let insertedCount = 0
-        let updatedCount = 0
-        let skippedCount = 0
+        const CHUNK_SIZE = 1500 // Process 1500 records per call
+        const currentStartIndex = startIndex || 0
         
-        // Process raw_data with mappings in batches
-        for (let i = 0; i < rawData.length; i += IMPORT_BATCH_SIZE) {
-            const batch = rawData.slice(i, Math.min(i + IMPORT_BATCH_SIZE, rawData.length))
-            const progress = Math.round((i / rawData.length) * 100)
+        console.log(`Starting chunk import from index ${currentStartIndex} of ${rawData.length} total rows...`)
+        
+        // Get existing progress from database
+        const { data: existingProgress } = await supabaseClient
+          .from('import_staging')
+          .select('job_result')
+          .eq('session_id', sessionId)
+          .maybeSingle()
+        
+        const previousResult = existingProgress?.job_result || { inserted: 0, updated: 0, skipped: 0 }
+        let insertedCount = previousResult.inserted || 0
+        let updatedCount = previousResult.updated || 0
+        let skippedCount = previousResult.skipped || 0
+        
+        // Calculate chunk boundaries
+        const chunkEnd = Math.min(currentStartIndex + CHUNK_SIZE, rawData.length)
+        const chunk = rawData.slice(currentStartIndex, chunkEnd)
+        
+        console.log(`Processing chunk: ${currentStartIndex}-${chunkEnd} (${chunk.length} rows)`)
+        
+        // Process this chunk in smaller batches for DB operations
+        const IMPORT_BATCH_SIZE = 100
+        for (let i = 0; i < chunk.length; i += IMPORT_BATCH_SIZE) {
+            const batch = chunk.slice(i, Math.min(i + IMPORT_BATCH_SIZE, chunk.length))
+            const absoluteIndex = currentStartIndex + i
+            const progress = Math.round((absoluteIndex / rawData.length) * 100)
             
-            console.log(`[IMPORT] Processing batch ${i}-${i + batch.length} of ${rawData.length} (${progress}%) - Session: ${sessionId}`)
+            console.log(`[IMPORT] Processing batch at index ${absoluteIndex} - Progress: ${progress}% - Session: ${sessionId}`)
             
             // Check if job was cancelled
             const { data: jobCheck } = await supabaseClient
@@ -275,17 +294,34 @@ serve(async (req) => {
             })
             .eq('session_id', sessionId)
 
-        console.log(`[IMPORT] ✓ Completed successfully: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped - Session: ${sessionId}`)
+        const nextIndex = chunkEnd
+        const hasMore = nextIndex < rawData.length
+        
+        console.log(`[IMPORT] Chunk complete: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped - hasMore: ${hasMore} - nextIndex: ${nextIndex} - Session: ${sessionId}`)
+        
+        // If completed, mark as done
+        if (!hasMore) {
+          await supabaseClient
+            .from('import_staging')
+            .update({
+              job_status: 'completed',
+              job_completed_at: new Date().toISOString()
+            })
+            .eq('session_id', sessionId)
+        }
         
         return new Response(
           JSON.stringify({ 
             success: true, 
-            message: 'Import completed successfully',
+            message: hasMore ? 'Chunk processed successfully' : 'Import completed successfully',
             result: {
               inserted: insertedCount,
               updated: updatedCount,
               skipped: skippedCount
-            }
+            },
+            hasMore,
+            nextIndex,
+            progress: Math.round((nextIndex / rawData.length) * 100)
           }),
           { 
             status: 200,
