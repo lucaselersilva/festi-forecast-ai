@@ -318,64 +318,99 @@ export function ImportValidation({
 
       toast({
         title: 'Importação iniciada',
-        description: 'Processando em lotes de 300 registros...'
+        description: 'Processando em micro-lotes de 20 registros para garantir confiabilidade...'
       })
 
       // Process in chunks until complete
       while (hasMore) {
-        const { data, error } = await supabase.functions.invoke('flexible-import', {
-          body: {
-            action: 'import',
-            sessionId,
-            mappings,
-            targetTable,
-            startIndex: currentIndex
-          }
-        })
+        let retryCount = 0
+        let success = false
+        const maxRetries = 3
 
-        if (error) {
-          // Detectar erro 404 (sessão expirada)
-          if (error.message?.includes('Dados de staging não encontrados') || error.message?.includes('404')) {
-            toast({
-              title: "Sessão expirada",
-              description: "A sessão de importação expirou. Por favor, faça um novo upload.",
-              variant: "destructive",
-              action: (
-                <Button variant="outline" size="sm" onClick={resetImportState}>
-                  Fazer novo upload
-                </Button>
-              ),
+        // Retry logic for 408/500 errors
+        while (!success && retryCount < maxRetries) {
+          try {
+            const { data, error } = await supabase.functions.invoke('flexible-import', {
+              body: {
+                action: 'import',
+                sessionId,
+                mappings,
+                targetTable,
+                startIndex: currentIndex
+              }
             })
-            return
+
+            if (error) {
+              // Detectar erro 404 (sessão expirada)
+              if (error.message?.includes('Dados de staging não encontrados') || error.message?.includes('404')) {
+                toast({
+                  title: "Sessão expirada",
+                  description: "A sessão de importação expirou. Por favor, faça um novo upload.",
+                  variant: "destructive",
+                  action: (
+                    <Button variant="outline" size="sm" onClick={resetImportState}>
+                      Fazer novo upload
+                    </Button>
+                  ),
+                })
+                return
+              }
+
+              // Retry on 408/500 errors
+              if (error.message?.includes('408') || error.message?.includes('500') || error.message?.includes('Timeout')) {
+                retryCount++
+                if (retryCount < maxRetries) {
+                  console.log(`Retry ${retryCount}/${maxRetries} for chunk at index ${currentIndex}`)
+                  await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2s before retry
+                  continue
+                }
+              }
+              throw error
+            }
+
+            // Update progress with detailed info
+            setImportProgress(data.progress || 0)
+            const totalRecords = validationResult?.valid || 0
+            const processedRecords = Math.round((data.progress || 0) / 100 * totalRecords)
+            
+            toast({
+              title: `Progresso: ${data.progress || 0}%`,
+              description: `Registro ${processedRecords} de ${totalRecords} processado`,
+            })
+
+            // Check if more chunks to process
+            hasMore = data.hasMore || false
+            currentIndex = data.nextIndex || currentIndex + 20
+
+            console.log(`Chunk processed: ${data.progress}% - hasMore: ${hasMore}`)
+
+            success = true
+
+            // Longer delay between chunks for stability
+            if (hasMore) {
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            } else {
+              // Import complete
+              setImportResult({
+                inserted: data.insertedCount || 0,
+                updated: data.updatedCount || 0,
+                skipped: data.skippedCount || 0,
+                total: (data.insertedCount || 0) + (data.updatedCount || 0) + (data.skippedCount || 0)
+              })
+
+              toast({
+                title: 'Importação concluída',
+                description: `${data.insertedCount || 0} novos, ${data.updatedCount || 0} atualizados`
+              })
+            }
+          } catch (chunkError) {
+            retryCount++
+            if (retryCount >= maxRetries) {
+              throw chunkError
+            }
+            console.log(`Retry ${retryCount}/${maxRetries} after error:`, chunkError)
+            await new Promise(resolve => setTimeout(resolve, 2000))
           }
-          throw error
-        }
-
-        // Update progress
-        setImportProgress(data.progress || 0)
-
-        // Check if more chunks to process
-        hasMore = data.hasMore || false
-        currentIndex = data.nextIndex || currentIndex + 300
-
-        console.log(`Chunk processed: ${data.progress}% - hasMore: ${hasMore}`)
-
-        // Small delay between chunks
-        if (hasMore) {
-          await new Promise(resolve => setTimeout(resolve, 500))
-        } else {
-          // Import complete
-          setImportResult({
-            inserted: data.insertedCount || 0,
-            updated: data.updatedCount || 0,
-            skipped: data.skippedCount || 0,
-            total: (data.insertedCount || 0) + (data.updatedCount || 0) + (data.skippedCount || 0)
-          })
-
-          toast({
-            title: 'Importação concluída',
-            description: `${data.insertedCount || 0} novos, ${data.updatedCount || 0} atualizados`
-          })
         }
       }
     } catch (error: any) {
