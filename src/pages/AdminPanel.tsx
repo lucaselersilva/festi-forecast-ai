@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Shield, Building2, AlertCircle } from "lucide-react";
+import { Loader2, Shield, Building2, AlertCircle, Users, Calendar, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { format, formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -16,6 +18,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+
+interface TenantStats {
+  id: string;
+  name: string;
+  created_at: string;
+  total_clientes: number;
+  total_usuarios: number;
+  ultima_atividade: string | null;
+  features_habilitadas: number;
+  total_features: number;
+}
 
 const FEATURE_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
@@ -66,6 +79,39 @@ export default function AdminPanel() {
 
       if (error) throw error;
       return data;
+    },
+    enabled: !!selectedTenantId && isAdmin,
+  });
+
+  const { data: tenantStats, isLoading: statsLoading } = useQuery<TenantStats | null>({
+    queryKey: ["tenant-stats", selectedTenantId],
+    queryFn: async () => {
+      if (!selectedTenantId) return null;
+
+      const [tenantData, clientesCount, profilesCount, featuresData] = await Promise.all([
+        supabase.from("tenants").select("id, name, created_at").eq("id", selectedTenantId).single(),
+        supabase.from("valle_clientes").select("id, ultima_visita", { count: "exact" }).eq("tenant_id", selectedTenantId),
+        supabase.from("profiles").select("id", { count: "exact" }).eq("tenant_id", selectedTenantId),
+        supabase.from("tenant_features").select("id, enabled").eq("tenant_id", selectedTenantId),
+      ]);
+
+      const ultimaVisita = clientesCount.data?.reduce((latest, cliente) => {
+        if (!latest || (cliente.ultima_visita && new Date(cliente.ultima_visita) > new Date(latest))) {
+          return cliente.ultima_visita;
+        }
+        return latest;
+      }, null as string | null);
+
+      return {
+        id: tenantData.data?.id || "",
+        name: tenantData.data?.name || "",
+        created_at: tenantData.data?.created_at || "",
+        total_clientes: clientesCount.count || 0,
+        total_usuarios: profilesCount.count || 0,
+        ultima_atividade: ultimaVisita,
+        features_habilitadas: featuresData.data?.filter(f => f.enabled).length || 0,
+        total_features: featuresData.data?.length || 0,
+      };
     },
     enabled: !!selectedTenantId && isAdmin,
   });
@@ -156,6 +202,82 @@ export default function AdminPanel() {
           </Select>
         </CardContent>
       </Card>
+
+      {selectedTenantId && tenantStats && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Estatísticas da Tenant
+            </CardTitle>
+            <CardDescription>
+              Visão geral dos dados da tenant selecionada
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center gap-3 p-4 border rounded-lg bg-accent/20">
+                    <Users className="w-8 h-8 text-primary" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total de Clientes</p>
+                      <p className="text-2xl font-bold">{tenantStats.total_clientes?.toLocaleString('pt-BR') || 0}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 border rounded-lg bg-accent/20">
+                    <Users className="w-8 h-8 text-primary" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total de Usuários</p>
+                      <p className="text-2xl font-bold">{tenantStats.total_usuarios || 0}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 border rounded-lg bg-accent/20">
+                    <Shield className="w-8 h-8 text-primary" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Features Ativas</p>
+                      <p className="text-2xl font-bold">
+                        {tenantStats.features_habilitadas} de {tenantStats.total_features}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Última Atividade:</span>
+                    <span className="text-sm font-medium">
+                      {tenantStats.ultima_atividade 
+                        ? formatDistanceToNow(new Date(tenantStats.ultima_atividade), { 
+                            addSuffix: true, 
+                            locale: ptBR 
+                          })
+                        : 'Sem atividade registrada'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Tenant desde:</span>
+                    <span className="text-sm font-medium">
+                      {tenantStats.created_at 
+                        ? format(new Date(tenantStats.created_at), "dd/MM/yyyy", { locale: ptBR })
+                        : 'Data não disponível'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {selectedTenantId && (
         <Card>
