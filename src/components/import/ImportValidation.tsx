@@ -440,7 +440,7 @@ export function ImportValidation({
         <Button 
           size="lg"
           onClick={handleImport}
-          disabled={isImporting || validationResult.valid === 0}
+          disabled={isImporting || !validationResult || validationResult.valid === 0}
         >
           {isImporting ? (
             <>
