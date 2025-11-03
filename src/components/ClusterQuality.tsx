@@ -40,7 +40,7 @@ export function ClusterQuality({
           Qualidade da Segmentação
         </CardTitle>
         <CardDescription>
-          Métricas de avaliação do clustering {method.toUpperCase()}
+          Métricas de avaliação da segmentação {method.toUpperCase()}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

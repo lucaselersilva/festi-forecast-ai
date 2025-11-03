@@ -36,7 +36,7 @@ const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: BarChart3, featureKey: "dashboard" },
   { title: "Import Data", url: "/import", icon: Upload, featureKey: "import" },
   { title: "Insights Planner", url: "/insights-planner", icon: Target, featureKey: "insights" },
-  { title: "Clustering", url: "/clustering", icon: Activity, featureKey: "clustering" },
+  { title: "Segmentação de Clientes", url: "/clustering", icon: Activity, featureKey: "clustering" },
   { title: "Orquestrador", url: "/orchestrator", icon: Workflow, featureKey: "orchestrator" },
   { title: "Assistente Marketing", url: "/marketing-assistant", icon: Sparkles, featureKey: "marketing" },
   { title: "Aniversariantes", url: "/birthdays", icon: Cake, featureKey: "birthdays" },

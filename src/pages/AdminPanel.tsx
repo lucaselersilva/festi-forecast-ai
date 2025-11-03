@@ -37,7 +37,7 @@ const FEATURE_LABELS: Record<string, string> = {
   events: "Eventos",
   segments: "Segmentos",
   birthdays: "Aniversários",
-  clustering: "Clustering",
+  clustering: "Segmentação de Clientes",
   insights: "Insights",
   marketing: "Marketing",
   sponsors: "Patrocínios",

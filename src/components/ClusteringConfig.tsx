@@ -35,7 +35,7 @@ export function ClusteringConfig({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Settings className="h-5 w-5" />
-          Configuração de Clustering
+          Configuração de Segmentação
         </CardTitle>
         <CardDescription>
           Configure os parâmetros do algoritmo de segmentação
