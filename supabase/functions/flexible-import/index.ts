@@ -157,6 +157,21 @@ serve(async (req) => {
     }
 
     if (action === 'import') {
+      // Usar dados já validados do staging
+      const validRows = (staging.mapped_data as any[]) || []
+      
+      if (validRows.length === 0) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Nenhum dado válido encontrado. Execute a validação primeiro.' 
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
       // Start background job
       await supabaseClient
         .from('import_staging')
