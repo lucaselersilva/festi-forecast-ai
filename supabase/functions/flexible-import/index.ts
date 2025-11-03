@@ -49,6 +49,177 @@ serve(async (req) => {
       throw new Error('Dados de staging não encontrados')
     }
 
+    // If importing, skip validation and use already validated data
+    if (action === 'import') {
+      const validRows = (staging.mapped_data as any[]) || []
+      
+      if (validRows.length === 0) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Nenhum dado válido encontrado. Execute a validação primeiro.' 
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
+      // Start background job
+      await supabaseClient
+        .from('import_staging')
+        .update({
+          job_status: 'processing',
+          job_started_at: new Date().toISOString(),
+          job_progress: 0
+        })
+        .eq('session_id', sessionId)
+
+      // Process import in background
+      const backgroundImportJob = async () => {
+        try {
+          console.log(`Starting background import of ${validRows.length} rows...`)
+          const IMPORT_BATCH_SIZE = 100
+          let insertedCount = 0
+          let updatedCount = 0
+          let skippedCount = 0
+          
+          // Insert valid rows into target table in batches
+          for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
+            const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
+            const progress = Math.round((i / validRows.length) * 100)
+            
+            console.log(`Processing batch ${i}-${i + batch.length} of ${validRows.length} (${progress}%)`)
+            
+            // Update progress
+            await supabaseClient
+              .from('import_staging')
+              .update({ job_progress: progress })
+              .eq('session_id', sessionId)
+
+            // Process each row in batch
+            for (const row of batch) {
+              try {
+                // Check for duplicates based on target table
+                let duplicateCheckResult
+                
+                if (targetTable === 'valle_clientes') {
+                  // For valle_clientes: check by telefone + nome (lowercase)
+                  const normalizedPhone = row.telefone?.toString().trim()
+                  const normalizedName = row.nome?.toString().toLowerCase().trim()
+                  
+                  duplicateCheckResult = await supabaseClient
+                    .from(targetTable)
+                    .select('id')
+                    .eq('tenant_id', staging.tenant_id)
+                    .eq('telefone', normalizedPhone)
+                    .ilike('nome', normalizedName)
+                    .maybeSingle()
+                } else {
+                  // For other tables: check by cpf if available
+                  if (row.cpf) {
+                    duplicateCheckResult = await supabaseClient
+                      .from(targetTable)
+                      .select('id')
+                      .eq('tenant_id', staging.tenant_id)
+                      .eq('cpf', row.cpf)
+                      .maybeSingle()
+                  }
+                }
+
+                const existingRecord = duplicateCheckResult?.data
+
+                if (existingRecord) {
+                  // Update existing record
+                  console.log(`Duplicate found for ${row.nome}, updating instead...`)
+                  const { error: updateError } = await supabaseClient
+                    .from(targetTable)
+                    .update(row)
+                    .eq('id', existingRecord.id)
+                  
+                  if (updateError) throw updateError
+                  updatedCount++
+                } else {
+                  // Insert new record
+                  const { error: insertError } = await supabaseClient
+                    .from(targetTable)
+                    .insert({ ...row, tenant_id: staging.tenant_id })
+                  
+                  if (insertError) {
+                    // If unique constraint violation, try to update
+                    if (insertError.code === '23505') {
+                      console.log(`Unique constraint violation for ${row.nome}, attempting update...`)
+                      const { error: updateError } = await supabaseClient
+                        .from(targetTable)
+                        .update(row)
+                        .eq('tenant_id', staging.tenant_id)
+                        .eq('telefone', row.telefone)
+                      
+                      if (!updateError) {
+                        updatedCount++
+                      } else {
+                        skippedCount++
+                      }
+                    } else {
+                      throw insertError
+                    }
+                  } else {
+                    insertedCount++
+                  }
+                }
+              } catch (error) {
+                console.error(`Error processing row:`, error)
+                skippedCount++
+              }
+            }
+          }
+
+          // Mark job as completed
+          await supabaseClient
+            .from('import_staging')
+            .update({
+              job_status: 'completed',
+              job_progress: 100,
+              job_completed_at: new Date().toISOString(),
+              job_result: {
+                inserted: insertedCount,
+                updated: updatedCount,
+                skipped: skippedCount
+              }
+            })
+            .eq('session_id', sessionId)
+
+          console.log(`Import completed: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped`)
+        } catch (error) {
+          console.error('Background import job failed:', error)
+          await supabaseClient
+            .from('import_staging')
+            .update({
+              job_status: 'failed',
+              job_error: error instanceof Error ? error.message : String(error),
+              job_completed_at: new Date().toISOString()
+            })
+            .eq('session_id', sessionId)
+        }
+      }
+
+      // Start background job without awaiting
+      backgroundImportJob()
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Import job started',
+          sessionId 
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    // Validation logic (only runs for action === 'validate')
     const rawData = staging.raw_data as any[]
     const validationErrors: ValidationError[] = []
     const warningDetails: ValidationError[] = []
@@ -140,6 +311,7 @@ serve(async (req) => {
       warningDetails: warningDetails.slice(0, 100) // Limit to first 100 warnings
     }
 
+    // Only runs for action === 'validate'
     if (action === 'validate') {
       // Update staging with validation results
       await supabaseClient
@@ -154,183 +326,6 @@ serve(async (req) => {
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-    }
-
-    if (action === 'import') {
-      // Usar dados já validados do staging
-      const validRows = (staging.mapped_data as any[]) || []
-      
-      if (validRows.length === 0) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Nenhum dado válido encontrado. Execute a validação primeiro.' 
-          }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        )
-      }
-
-      // Start background job
-      await supabaseClient
-        .from('import_staging')
-        .update({
-          job_status: 'processing',
-          job_started_at: new Date().toISOString(),
-          job_progress: 0
-        })
-        .eq('session_id', sessionId)
-
-      // Process import in background
-      const backgroundImportJob = async () => {
-        try {
-          console.log(`Starting background import of ${validRows.length} rows...`)
-          const IMPORT_BATCH_SIZE = 100
-          let insertedCount = 0
-          let updatedCount = 0
-          let skippedCount = 0
-          
-          // Insert valid rows into target table in batches
-          for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
-            const batch = validRows.slice(i, Math.min(i + IMPORT_BATCH_SIZE, validRows.length))
-            const progress = Math.floor(((i + batch.length) / validRows.length) * 100)
-            
-            console.log(`Processing batch ${i}-${i + batch.length} of ${validRows.length} (${progress}%)`)
-            
-            // Update progress
-            await supabaseClient
-              .from('import_staging')
-              .update({ job_progress: progress })
-              .eq('session_id', sessionId)
-            
-            // For valle_clientes, deduplicate by telefone+nome (normalized)
-            if (targetTable === 'valle_clientes') {
-              const seenKeys = new Set()
-              const deduplicatedBatch = batch.filter(row => {
-                // Create composite key: tenant_id + lowercase(nome) + telefone
-                const key = `${row.tenant_id}|${(row.nome || '').toLowerCase().trim()}|${(row.telefone || '').trim()}`
-                if (seenKeys.has(key)) {
-                  console.log(`Skipping duplicate in batch: ${row.nome} - ${row.telefone}`)
-                  skippedCount++
-                  return false
-                }
-                seenKeys.add(key)
-                return true
-              })
-              
-              console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows (removed ${batch.length - deduplicatedBatch.length} duplicates)`)
-              
-              // Insert one by one to handle unique constraint violations gracefully
-              for (const row of deduplicatedBatch) {
-                const { error: insertError } = await supabaseClient
-                  .from(targetTable)
-                  .insert(row)
-                  .select()
-                
-                if (insertError) {
-                  // If duplicate, try to update instead
-                  if (insertError.code === '23505') {
-                    console.log(`Duplicate found for ${row.nome}, updating instead...`)
-                    const { error: updateError } = await supabaseClient
-                      .from(targetTable)
-                      .update(row)
-                      .eq('tenant_id', row.tenant_id)
-                      .eq('telefone', row.telefone || '')
-                      .ilike('nome', row.nome)
-                    
-                    if (updateError) {
-                      console.error(`Error updating row:`, updateError)
-                    } else {
-                      updatedCount++
-                    }
-                  } else {
-                    console.error(`Error inserting row:`, insertError)
-                  }
-                } else {
-                  insertedCount++
-                }
-              }
-            } else {
-              // Other tables: use CPF-based deduplication
-              const uniqueKey = 'cpf'
-              const seenKeys = new Set()
-              const deduplicatedBatch = batch.filter(row => {
-                const key = row[uniqueKey]
-                if (seenKeys.has(key)) {
-                  console.log(`Skipping duplicate ${uniqueKey} in batch: ${key}`)
-                  skippedCount++
-                  return false
-                }
-                seenKeys.add(key)
-                return true
-              })
-              
-              console.log(`Batch after deduplication: ${deduplicatedBatch.length} rows`)
-              
-              const { error: insertError } = await supabaseClient
-                .from(targetTable)
-                .upsert(deduplicatedBatch, {
-                  onConflict: uniqueKey,
-                  ignoreDuplicates: false
-                })
-
-              if (insertError) {
-                console.error(`Error importing batch ${i}:`, insertError)
-                throw insertError
-              }
-              
-              insertedCount += deduplicatedBatch.length
-            }
-          }
-
-          const totalProcessed = insertedCount + updatedCount + skippedCount
-          console.log(`Import complete: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped`)
-
-          // Update staging with success status
-          await supabaseClient
-            .from('import_staging')
-            .update({ 
-              status: 'imported',
-              job_status: 'completed',
-              job_progress: 100,
-              job_completed_at: new Date().toISOString(),
-              job_result: {
-                inserted: insertedCount,
-                updated: updatedCount,
-                skipped: skippedCount,
-                total: totalProcessed
-              }
-            })
-            .eq('session_id', sessionId)
-        } catch (error) {
-          console.error('Background import error:', error)
-          // Update staging with error status
-          await supabaseClient
-            .from('import_staging')
-            .update({ 
-              job_status: 'failed',
-              job_error: error instanceof Error ? error.message : 'Erro desconhecido',
-              job_completed_at: new Date().toISOString()
-            })
-            .eq('session_id', sessionId)
-        }
-      }
-
-      // Start background job without waiting (Deno keeps instance alive)
-      backgroundImportJob()
-
-      // Return immediately
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          message: 'Import job started',
-          sessionId
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
     }
 
     if (action === 'status') {
