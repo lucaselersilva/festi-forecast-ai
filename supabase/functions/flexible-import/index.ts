@@ -261,31 +261,52 @@ serve(async (req) => {
       )
     }
 
+    // Check for status requests first
+    if (action === 'status') {
+      const { data: stagingStatus, error: statusError } = await supabaseClient
+        .from('import_staging')
+        .select('job_status, job_progress, job_error, job_result, job_started_at, job_completed_at')
+        .eq('session_id', sessionId)
+        .single()
+
+      if (statusError || !stagingStatus) {
+        throw new Error('Job not found')
+      }
+
+      return new Response(
+        JSON.stringify(stagingStatus),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     // Validation logic (only runs for action === 'validate')
-    const rawData = staging.raw_data as any[]
-    const validationErrors: ValidationError[] = []
-    const warningDetails: ValidationError[] = []
-    const validRows: any[] = []
-    let warnings = 0
+    if (action === 'validate') {
+      const rawData = staging.raw_data as any[]
+      const validationErrors: ValidationError[] = []
+      const warningDetails: ValidationError[] = []
+      const validRows: any[] = []
+      let warnings = 0
 
-    console.log(`Processing ${rawData.length} rows in batches...`)
-    const BATCH_SIZE = 500
+      console.log(`Processing ${rawData.length} rows in batches...`)
+      const BATCH_SIZE = 500
 
-    // Process in batches to avoid CPU timeout
-    for (let batchStart = 0; batchStart < rawData.length; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, rawData.length)
-      const batch = rawData.slice(batchStart, batchEnd)
-      
-      console.log(`Processing batch ${batchStart}-${batchEnd} of ${rawData.length}`)
+      // Process in batches to avoid CPU timeout
+      for (let batchStart = 0; batchStart < rawData.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, rawData.length)
+        const batch = rawData.slice(batchStart, batchEnd)
+        
+        console.log(`Processing batch ${batchStart}-${batchEnd} of ${rawData.length}`)
 
-      // Apply mappings and validate
-      batch.forEach((row, batchIndex) => {
-        const index = batchStart + batchIndex
-        const mappedRow: any = { tenant_id: staging.tenant_id }
-        let hasError = false
+        // Apply mappings and validate
+        batch.forEach((row, batchIndex) => {
+          const index = batchStart + batchIndex
+          const mappedRow: any = { tenant_id: staging.tenant_id }
+          let hasError = false
 
-        // Apply column mappings
-        for (const [sourceCol, targetField] of Object.entries(mappings as Record<string, string>)) {
+          // Apply column mappings
+          for (const [sourceCol, targetField] of Object.entries(mappings as Record<string, string>)) {
           if (!targetField) continue // Ignored column
 
           const value = row[sourceCol]
@@ -343,18 +364,16 @@ serve(async (req) => {
       })
     }
 
-    console.log(`Validation complete: ${validRows.length} valid, ${validationErrors.length} errors`)
+      console.log(`Validation complete: ${validRows.length} valid, ${validationErrors.length} errors`)
 
-    const result: ValidationResult = {
-      valid: validRows.length,
-      warnings,
-      errors: validationErrors.length,
-      errorDetails: validationErrors.slice(0, 100), // Limit to first 100 errors
-      warningDetails: warningDetails.slice(0, 100) // Limit to first 100 warnings
-    }
+      const result: ValidationResult = {
+        valid: validRows.length,
+        warnings,
+        errors: validationErrors.length,
+        errorDetails: validationErrors.slice(0, 100), // Limit to first 100 errors
+        warningDetails: warningDetails.slice(0, 100) // Limit to first 100 warnings
+      }
 
-    // Only runs for action === 'validate'
-    if (action === 'validate') {
       // Update staging with validation results (não salvar mapped_data)
       await supabaseClient
         .from('import_staging')
@@ -367,26 +386,6 @@ serve(async (req) => {
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-    }
-
-    if (action === 'status') {
-      // Get job status
-      const { data: staging, error: statusError } = await supabaseClient
-        .from('import_staging')
-        .select('job_status, job_progress, job_error, job_result, job_started_at, job_completed_at')
-        .eq('session_id', sessionId)
-        .single()
-
-      if (statusError || !staging) {
-        throw new Error('Job not found')
-      }
-
-      return new Response(
-        JSON.stringify(staging),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
     }
 
     throw new Error('Ação inválida')
