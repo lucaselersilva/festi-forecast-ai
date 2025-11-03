@@ -41,19 +41,20 @@ export function SegmentationTypeSelector({ value, onChange }: SegmentationTypeSe
       icon: Activity,
       features: ['Dias entre compras', 'Antecedência de compra', 'Padrões de consumo']
     },
-    {
-      value: 'musical' as const,
-      label: 'Musical',
-      description: 'Preferências de gênero',
-      icon: Music,
-      features: ['Gênero preferido', 'Diversidade', 'Frequência por gênero']
-    },
+    // Temporarily disabled
+    // {
+    //   value: 'musical' as const,
+    //   label: 'Musical',
+    //   description: 'Preferências de gênero',
+    //   icon: Music,
+    //   features: ['Gênero preferido', 'Diversidade', 'Frequência por gênero']
+    // },
     {
       value: 'multi-dimensional' as const,
       label: 'Multi-Dimensional',
-      description: 'Análise combinada RFM + Demografia + Comportamento + Música',
+      description: 'Análise combinada RFM + Demografia + Comportamento',
       icon: Target,
-      features: ['RFM completo', 'Perfil demográfico', 'Padrão comportamental', 'Preferência musical']
+      features: ['RFM completo', 'Perfil demográfico', 'Padrão comportamental']
     }
   ];
 
