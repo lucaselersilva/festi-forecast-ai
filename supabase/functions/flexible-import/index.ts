@@ -53,6 +53,22 @@ serve(async (req) => {
 
     const { action, sessionId, mappings, targetTable, startIndex } = await req.json()
 
+    // Clean stuck/old processing sessions BEFORE fetching staging data
+    const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MINUTES * 60 * 1000).toISOString()
+    console.log(`[${action.toUpperCase()}] Cleaning stuck sessions started before ${expiryTime}`)
+    
+    const { error: cleanupError } = await supabaseClient
+      .from('import_staging')
+      .delete()
+      .eq('job_status', 'processing')
+      .lt('job_started_at', expiryTime)
+    
+    if (cleanupError) {
+      console.error('[CLEANUP] Error cleaning stuck sessions:', cleanupError)
+    } else {
+      console.log('[CLEANUP] Stuck sessions cleaned successfully')
+    }
+
     // Get staging data
     const { data: staging, error: stagingError } = await supabaseClient
       .from('import_staging')
@@ -61,6 +77,7 @@ serve(async (req) => {
       .maybeSingle()
 
     if (stagingError || !staging) {
+      console.log(`[ERROR] Staging data not found for session ${sessionId}`)
       return new Response(
         JSON.stringify({ error: 'Dados de staging não encontrados' }),
         { 
@@ -74,25 +91,6 @@ serve(async (req) => {
     if (action === 'import') {
       const chunkStartTime = Date.now()
       console.log(`[IMPORT ${new Date().toISOString()}] Starting chunk for session: ${sessionId}, startIndex: ${startIndex || 0}`)
-      
-      // Clean old processing sessions for this tenant (older than SESSION_EXPIRY_MINUTES)
-      if (!startIndex || startIndex === 0) {
-        const expiryTime = new Date(Date.now() - SESSION_EXPIRY_MINUTES * 60 * 1000).toISOString()
-        console.log(`[IMPORT] Cleaning old sessions before ${expiryTime}`)
-        
-        const { error: cleanupError } = await supabaseClient
-          .from('import_staging')
-          .delete()
-          .eq('tenant_id', staging.tenant_id)
-          .eq('job_status', 'processing')
-          .lt('created_at', expiryTime)
-        
-        if (cleanupError) {
-          console.error('[IMPORT] Error cleaning old sessions:', cleanupError)
-        } else {
-          console.log('[IMPORT] Old sessions cleaned successfully')
-        }
-      }
 
       const rawData = staging.raw_data as any[]
       const importMappings = mappings as Record<string, string>

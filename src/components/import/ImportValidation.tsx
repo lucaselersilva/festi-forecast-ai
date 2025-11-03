@@ -80,19 +80,37 @@ export function ImportValidation({
 
       // Check for 404 - staging data not found
       if (statusError || (statusData?.error && statusData.error.includes('não encontrados'))) {
-        console.log('Staging data not found, resetting import state')
+        console.log('Staging data not found (404), resetting import state')
         toast({
-          title: "Sessão expirada",
-          description: "A sessão de importação não foi encontrada. Por favor, inicie uma nova importação.",
+          title: "Sessão não encontrada",
+          description: "Sua sessão de importação expirou ou não existe. Por favor, faça um novo upload.",
           variant: "destructive",
         })
-        onBack()
+        // Reset state and go back
+        setTimeout(() => onBack(), 2000)
         return
       }
 
       if (statusData) {
-        if (statusData.job_status === 'processing') {
-          // Resume polling
+        // Check for stuck sessions (processing for more than 5 minutes)
+        if (statusData.job_status === 'processing' && statusData.job_started_at) {
+          const startTime = new Date(statusData.job_started_at).getTime()
+          const now = Date.now()
+          const minutesElapsed = (now - startTime) / 1000 / 60
+          
+          if (minutesElapsed > 5) {
+            console.log(`Session stuck for ${minutesElapsed.toFixed(1)} minutes, resetting...`)
+            toast({
+              title: "Sessão travada",
+              description: "A importação anterior ficou travada. Por favor, faça um novo upload.",
+              variant: "destructive",
+            })
+            // Reset state and go back
+            setTimeout(() => onBack(), 2000)
+            return
+          }
+          
+          // Resume polling for recent processing jobs
           setIsImporting(true)
           setImportProgress(statusData.job_progress || 0)
           startPolling()
@@ -106,13 +124,32 @@ export function ImportValidation({
             total: statusData.job_result?.total || 0
           })
           return
+        } else if (statusData.job_status === 'failed') {
+          toast({
+            title: "Importação falhou",
+            description: statusData.job_error || "Erro desconhecido na importação anterior.",
+            variant: "destructive",
+          })
+          setTimeout(() => onBack(), 2000)
+          return
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error checking import status:', err)
-      // If error, proceed with validation
+      
+      // If it's a 404 error, reset state
+      if (err?.message?.includes('404') || err?.message?.includes('não encontrados')) {
+        toast({
+          title: "Sessão não encontrada",
+          description: "Por favor, faça um novo upload.",
+          variant: "destructive",
+        })
+        setTimeout(() => onBack(), 2000)
+        return
+      }
     }
     
+    // If no ongoing import, proceed with validation
     validateData()
   }
 
