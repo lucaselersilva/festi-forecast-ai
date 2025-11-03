@@ -215,27 +215,6 @@ export type Database = {
             foreignKeyName: "consumptions_customerid_fkey"
             columns: ["customerid"]
             isOneToOne: false
-            referencedRelation: "vw_demographic_profile"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "consumptions_customerid_fkey"
-            columns: ["customerid"]
-            isOneToOne: false
-            referencedRelation: "vw_digital_engagement"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "consumptions_customerid_fkey"
-            columns: ["customerid"]
-            isOneToOne: false
-            referencedRelation: "vw_multi_segment"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "consumptions_customerid_fkey"
-            columns: ["customerid"]
-            isOneToOne: false
             referencedRelation: "vw_musical_preference"
             referencedColumns: ["customer_id"]
           },
@@ -665,27 +644,6 @@ export type Database = {
             foreignKeyName: "fk_interactions_customer"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "vw_demographic_profile"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_interactions_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_digital_engagement"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_interactions_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_multi_segment"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_interactions_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "vw_musical_preference"
             referencedColumns: ["customer_id"]
           },
@@ -947,27 +905,6 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "vw_customers_preferred_days"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_scoring_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_demographic_profile"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_scoring_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_digital_engagement"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_scoring_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_multi_segment"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1520,27 +1457,6 @@ export type Database = {
             foreignKeyName: "fk_interactions_customer"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "vw_demographic_profile"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_interactions_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_digital_engagement"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_interactions_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "vw_multi_segment"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "fk_interactions_customer"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "vw_musical_preference"
             referencedColumns: ["customer_id"]
           },
@@ -1604,8 +1520,8 @@ export type Database = {
         Insert: {
           age?: never
           age_segment?: never
-          city?: string | null
-          customer_id?: number | null
+          city?: never
+          customer_id?: never
           gender?: string | null
           name?: string | null
           tenant_id?: string | null
@@ -1613,15 +1529,15 @@ export type Database = {
         Update: {
           age?: never
           age_segment?: never
-          city?: string | null
-          customer_id?: number | null
+          city?: never
+          customer_id?: never
           gender?: string | null
           name?: string | null
           tenant_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "customers_tenant_id_fkey"
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1638,9 +1554,25 @@ export type Database = {
           tenant_id: string | null
           total_purchases: number | null
         }
+        Insert: {
+          avg_days_between_purchases?: never
+          avg_purchase_value?: never
+          customer_id?: never
+          engagement_segment?: never
+          tenant_id?: string | null
+          total_purchases?: never
+        }
+        Update: {
+          avg_days_between_purchases?: never
+          avg_purchase_value?: never
+          customer_id?: never
+          engagement_segment?: never
+          tenant_id?: string | null
+          total_purchases?: never
+        }
         Relationships: [
           {
-            foreignKeyName: "customers_tenant_id_fkey"
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1797,7 +1729,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "customers_tenant_id_fkey"
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
