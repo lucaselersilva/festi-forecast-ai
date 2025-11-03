@@ -46,6 +46,21 @@ export default function Clustering() {
   const handleRunClustering = async () => {
     setClusteringLoading(true);
     try {
+      // Verificar se há sessão válida antes de executar
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast({
+          title: "Sessão expirada",
+          description: "Por favor, faça login novamente para continuar",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = '/auth';
+        }, 2000);
+        return;
+      }
+      
       console.log("🔬 Running clustering with method:", clusteringMethod);
       console.log("📊 Segmentation type:", segmentationType);
       
@@ -58,7 +73,22 @@ export default function Clustering() {
       });
 
       if (response.error) {
-        throw new Error(response.error.message || "Erro ao executar clustering");
+        // Verificar se é erro de autenticação
+        const errorMessage = response.error.message || "";
+        if (errorMessage.includes("Auth session missing") || 
+            errorMessage.includes("Unauthorized") ||
+            errorMessage.includes("session_not_found")) {
+          toast({
+            title: "Sessão expirada",
+            description: "Sua sessão expirou. Redirecionando para o login...",
+            variant: "destructive",
+          });
+          setTimeout(() => {
+            window.location.href = '/auth';
+          }, 2000);
+          return;
+        }
+        throw new Error(errorMessage || "Erro ao executar clustering");
       }
 
       if (response.data.success) {
