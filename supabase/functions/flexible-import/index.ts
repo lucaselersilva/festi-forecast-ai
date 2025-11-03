@@ -46,9 +46,11 @@ serve(async (req) => {
       }
     )
 
-    const CHUNK_SIZE = 300 // Process 300 records per chunk to avoid timeout
-    const IMPORT_BATCH_SIZE = 100 // Insert 100 records at a time within each chunk
-    const CHUNK_TIMEOUT_MS = 20000 // 20 seconds timeout per chunk
+    const CHUNK_SIZE = 100 // Process 100 records per chunk to avoid timeout
+    const IMPORT_BATCH_SIZE = 100 // Process all records in batch at once for bulk operations
+    const CHUNK_TIMEOUT_MS = 30000 // 30 seconds timeout per chunk
+    const STATUS_CHECK_FREQUENCY = 3 // Check job_status every N batches
+    const PROGRESS_UPDATE_RECORDS = 50 // Update progress every N records
     const SESSION_EXPIRY_MINUTES = 5 // Consider sessions older than 5 minutes as expired
 
     const { action, sessionId, mappings, targetTable, startIndex } = await req.json()
@@ -146,6 +148,7 @@ serve(async (req) => {
         let insertedCount = previousResult.inserted || 0
         let updatedCount = previousResult.updated || 0
         let skippedCount = previousResult.skipped || 0
+        let batchCounter = 0
         
         // Calculate chunk boundaries
         const chunkEnd = Math.min(currentStartIndex + CHUNK_SIZE, rawData.length)
@@ -153,8 +156,9 @@ serve(async (req) => {
         
         console.log(`[IMPORT ${new Date().toISOString()}] Processing chunk: ${currentStartIndex}-${chunkEnd} (${chunk.length} rows)`)
         
-        // Process this chunk in smaller batches for DB operations
+        // Process this chunk in smaller batches for bulk DB operations
         for (let i = 0; i < chunk.length; i += IMPORT_BATCH_SIZE) {
+            batchCounter++
             // Check chunk timeout
             const chunkElapsedTime = Date.now() - chunkStartTime
             if (chunkElapsedTime > CHUNK_TIMEOUT_MS) {
@@ -175,42 +179,44 @@ serve(async (req) => {
             const absoluteIndex = currentStartIndex + i
             const progress = Math.round((absoluteIndex / rawData.length) * 100)
             
-            console.log(`[IMPORT ${new Date().toISOString()}] Processing batch at index ${absoluteIndex} - Progress: ${progress}% - Session: ${sessionId}`)
+            console.log(`[IMPORT ${new Date().toISOString()}] Processing batch ${batchCounter} at index ${absoluteIndex} - Progress: ${progress}% - Session: ${sessionId}`)
             
-            // Check if job was cancelled
-            const { data: jobCheck } = await supabaseClient
-              .from('import_staging')
-              .select('job_status')
-              .eq('session_id', sessionId)
-              .single()
+            // Check if job was cancelled (only every STATUS_CHECK_FREQUENCY batches to reduce queries)
+            if (batchCounter % STATUS_CHECK_FREQUENCY === 0) {
+              const { data: jobCheck } = await supabaseClient
+                .from('import_staging')
+                .select('job_status')
+                .eq('session_id', sessionId)
+                .single()
 
-            if (!jobCheck || jobCheck.job_status === 'cancelled') {
-              console.log('Job cancelled by user, stopping...')
+              if (!jobCheck || jobCheck.job_status === 'cancelled') {
+                console.log('Job cancelled by user, stopping...')
+                await supabaseClient
+                  .from('import_staging')
+                  .update({
+                    job_completed_at: new Date().toISOString(),
+                    job_error: 'Cancelado pelo usuário'
+                  })
+                  .eq('session_id', sessionId)
+                
+                return new Response(
+                  JSON.stringify({ 
+                    success: false, 
+                    message: 'Import cancelled by user' 
+                  }),
+                  { 
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  }
+                )
+              }
+              
+              // Update progress when checking status
               await supabaseClient
                 .from('import_staging')
-                .update({
-                  job_completed_at: new Date().toISOString(),
-                  job_error: 'Cancelado pelo usuário'
-                })
+                .update({ job_progress: progress })
                 .eq('session_id', sessionId)
-              
-              return new Response(
-                JSON.stringify({ 
-                  success: false, 
-                  message: 'Import cancelled by user' 
-                }),
-                { 
-                  status: 200,
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                }
-              )
             }
-            
-            // Update progress
-            await supabaseClient
-              .from('import_staging')
-              .update({ job_progress: progress })
-              .eq('session_id', sessionId)
 
             // Apply mappings to each raw row in batch
             const processedBatch = batch
@@ -241,80 +247,113 @@ serve(async (req) => {
               })
               .filter(row => row !== null)
 
-            // Process each valid row in batch
-            for (const row of processedBatch) {
-              try {
-                // Check for duplicates based on target table
-                let duplicateCheckResult
+            // BULK OPERATIONS - Process entire batch at once
+            if (processedBatch.length === 0) continue
+            
+            try {
+              // Step 1: Bulk duplicate check
+              let existingRecordsMap = new Map()
+              
+              if (targetTable === 'valle_clientes') {
+                // For valle_clientes: check by telefone
+                const phones = processedBatch
+                  .map(row => row.telefone?.toString().trim())
+                  .filter(p => p)
+                
+                if (phones.length > 0) {
+                  const { data: existingRecords } = await supabaseClient
+                    .from(targetTable)
+                    .select('id, telefone, nome')
+                    .eq('tenant_id', staging.tenant_id)
+                    .in('telefone', phones)
+                  
+                  // Create map: telefone+nome -> id
+                  existingRecords?.forEach(record => {
+                    const key = `${record.telefone}|${record.nome?.toLowerCase()}`
+                    existingRecordsMap.set(key, record.id)
+                  })
+                }
+              } else {
+                // For other tables: check by cpf
+                const cpfs = processedBatch
+                  .map(row => row.cpf)
+                  .filter(c => c)
+                
+                if (cpfs.length > 0) {
+                  const { data: existingRecords } = await supabaseClient
+                    .from(targetTable)
+                    .select('id, cpf')
+                    .eq('tenant_id', staging.tenant_id)
+                    .in('cpf', cpfs)
+                  
+                  existingRecords?.forEach(record => {
+                    existingRecordsMap.set(record.cpf, record.id)
+                  })
+                }
+              }
+              
+              // Step 2: Separate into inserts and updates
+              const recordsToInsert = []
+              const recordsToUpdate = []
+              
+              for (const row of processedBatch) {
+                let existingId = null
                 
                 if (targetTable === 'valle_clientes') {
-                  // For valle_clientes: check by telefone + nome (lowercase)
-                  const normalizedPhone = row.telefone?.toString().trim()
-                  const normalizedName = row.nome?.toString().toLowerCase().trim()
-                  
-                  duplicateCheckResult = await supabaseClient
-                    .from(targetTable)
-                    .select('id')
-                    .eq('tenant_id', staging.tenant_id)
-                    .eq('telefone', normalizedPhone)
-                    .ilike('nome', normalizedName)
-                    .maybeSingle()
-                } else {
-                  // For other tables: check by cpf if available
-                  if (row.cpf) {
-                    duplicateCheckResult = await supabaseClient
-                      .from(targetTable)
-                      .select('id')
-                      .eq('tenant_id', staging.tenant_id)
-                      .eq('cpf', row.cpf)
-                      .maybeSingle()
-                  }
+                  const key = `${row.telefone?.toString().trim()}|${row.nome?.toLowerCase()}`
+                  existingId = existingRecordsMap.get(key)
+                } else if (row.cpf) {
+                  existingId = existingRecordsMap.get(row.cpf)
                 }
-
-                const existingRecord = duplicateCheckResult?.data
-
-                if (existingRecord) {
-                  // Update existing record
-                  console.log(`Duplicate found for ${row.nome}, updating instead...`)
+                
+                if (existingId) {
+                  recordsToUpdate.push({ ...row, id: existingId })
+                } else {
+                  recordsToInsert.push(row)
+                }
+              }
+              
+              // Step 3: Bulk upsert (uses Supabase upsert which handles conflicts)
+              if (recordsToInsert.length > 0) {
+                const { error: insertError, data: insertedData } = await supabaseClient
+                  .from(targetTable)
+                  .upsert(recordsToInsert, { 
+                    onConflict: targetTable === 'valle_clientes' ? 'telefone,tenant_id' : 'cpf,tenant_id',
+                    ignoreDuplicates: false 
+                  })
+                  .select('id')
+                
+                if (insertError) {
+                  console.error('Bulk insert error:', insertError)
+                  skippedCount += recordsToInsert.length
+                } else {
+                  insertedCount += insertedData?.length || recordsToInsert.length
+                }
+              }
+              
+              // Step 4: Bulk update existing records
+              if (recordsToUpdate.length > 0) {
+                for (const record of recordsToUpdate) {
+                  const { id, ...updateData } = record
                   const { error: updateError } = await supabaseClient
                     .from(targetTable)
-                    .update(row)
-                    .eq('id', existingRecord.id)
+                    .update(updateData)
+                    .eq('id', id)
                   
-                  if (updateError) throw updateError
-                  updatedCount++
-                } else {
-                  // Insert new record
-                  const { error: insertError } = await supabaseClient
-                    .from(targetTable)
-                    .insert({ ...row, tenant_id: staging.tenant_id })
-                  
-                  if (insertError) {
-                    // If unique constraint violation, try to update
-                    if (insertError.code === '23505') {
-                      console.log(`Unique constraint violation for ${row.nome}, attempting update...`)
-                      const { error: updateError } = await supabaseClient
-                        .from(targetTable)
-                        .update(row)
-                        .eq('tenant_id', staging.tenant_id)
-                        .eq('telefone', row.telefone)
-                      
-                      if (!updateError) {
-                        updatedCount++
-                      } else {
-                        skippedCount++
-                      }
-                    } else {
-                      throw insertError
-                    }
+                  if (updateError) {
+                    console.error('Update error:', updateError)
+                    skippedCount++
                   } else {
-                    insertedCount++
+                    updatedCount++
                   }
                 }
-              } catch (error) {
-                console.error(`Error processing row:`, error)
-                skippedCount++
               }
+              
+              console.log(`[BULK] Inserted: ${recordsToInsert.length}, Updated: ${recordsToUpdate.length}`)
+              
+            } catch (error) {
+              console.error(`Error in bulk operations:`, error)
+              skippedCount += processedBatch.length
             }
           }
 
