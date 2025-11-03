@@ -235,6 +235,20 @@ serve(async (req) => {
                   }
                 }
                 
+                // Track day of week for ultima_visita
+                if (row.ultima_visita && importMappings.ultima_visita) {
+                  const rawVisitDate = rawRow[importMappings.ultima_visita as string]
+                  const { dayOfWeek } = parseDateTimeWithDayOfWeek(rawVisitDate)
+                  
+                  if (dayOfWeek !== null) {
+                    // Initialize dias_semana_visitas with the day of this visit
+                    row.dias_semana_visitas = {
+                      "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0,
+                      [dayOfWeek.toString()]: 1
+                    }
+                  }
+                }
+                
                 // Validate required fields
                 const requiredFields = getRequiredFields(targetTable)
                 for (const field of requiredFields) {
@@ -524,7 +538,12 @@ function normalizeValue(value: any, fieldName: string): any {
       fieldName.endsWith('_entrada') || 
       fieldName.endsWith('_visita') || 
       fieldName.endsWith('_interacao')) {
-    return parseDateTime(value)
+    try {
+      return parseDateTime(value)
+    } catch (error) {
+      console.warn(`Failed to parse optional datetime field ${fieldName}: ${value}`)
+      return null
+    }
   }
 
   // Number fields
@@ -617,7 +636,7 @@ function parseDateTime(value: any): string | null {
   
   let parsedDate: Date | null = null
   
-  // 1. Try DD/MM/YYYY HH:MM:SS (formato completo)
+  // 1. Try DD/MM/YYYY HH:MM:SS (formato completo) - PRIORIDADE MÁXIMA
   const ddmmyyyyTime = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})$/)
   if (ddmmyyyyTime) {
     const year = parseInt(ddmmyyyyTime[3])
@@ -645,21 +664,18 @@ function parseDateTime(value: any): string | null {
     parsedDate = new Date(str.includes('T') ? str : str + 'T00:00:00Z')
   }
   
-  // 4. Detectar se é número (pode ser Excel serial ou timestamp Unix)
+  // 4. Detectar se é número (pode ser Excel serial ou timestamp Unix) - ÚLTIMA PRIORIDADE
   if (!parsedDate) {
     const num = parseFloat(str)
     if (!isNaN(num)) {
       // Se número muito grande, pode ser timestamp Unix (milissegundos desde 1970)
       if (num > 1000000000000) {
-        // Timestamp em milissegundos
         parsedDate = new Date(num)
       } else if (num > 1000000000) {
-        // Timestamp em segundos
         parsedDate = new Date(num * 1000)
       } else if (num > 0 && num < 100000) {
-        // Excel serial number (dias desde 1900-01-01)
         const excelEpoch = new Date(1900, 0, 1)
-        const days = Math.floor(num) - 2 // -2 corrige bug do Excel
+        const days = Math.floor(num) - 2
         const fractionalDay = num - Math.floor(num)
         const milliseconds = fractionalDay * 24 * 60 * 60 * 1000
         parsedDate = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000 + milliseconds)
@@ -667,9 +683,9 @@ function parseDateTime(value: any): string | null {
     }
   }
   
-  // Validar se a data está em um intervalo razoável (1900 a hoje + 1 ano)
+  // Validar se a data está em um intervalo razoável (2020 a hoje + 1 ano)
   if (parsedDate) {
-    const minDate = new Date('1900-01-01')
+    const minDate = new Date('2020-01-01') // Mudado de 1900 para 2020
     const maxDate = new Date()
     maxDate.setFullYear(maxDate.getFullYear() + 1)
     
@@ -678,7 +694,6 @@ function parseDateTime(value: any): string | null {
       return null
     }
     
-    // Validar se a data é válida (não é NaN)
     if (isNaN(parsedDate.getTime())) {
       throw new Error(`Data inválida após parse: ${value}`)
     }
@@ -687,6 +702,17 @@ function parseDateTime(value: any): string | null {
   }
   
   throw new Error(`Formato de data/hora inválido: ${value}`)
+}
+
+// Helper function to parse datetime and extract day of week
+function parseDateTimeWithDayOfWeek(value: any): { date: string | null; dayOfWeek: number | null } {
+  const parsedDate = parseDateTime(value)
+  if (!parsedDate) return { date: null, dayOfWeek: null }
+  
+  const dateObj = new Date(parsedDate)
+  const dayOfWeek = dateObj.getUTCDay() // 0=Sunday, 1=Monday, ..., 6=Saturday
+  
+  return { date: parsedDate, dayOfWeek }
 }
 
 function parseNumber(value: any): number {

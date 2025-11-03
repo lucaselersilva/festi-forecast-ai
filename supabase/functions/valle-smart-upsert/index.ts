@@ -134,6 +134,20 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString()
           };
 
+          // Atualizar contador de dias da semana
+          if (client.ultima_visita) {
+            const visitDate = new Date(client.ultima_visita);
+            const dayOfWeek = visitDate.getUTCDay();
+            
+            const existingDays = existing.dias_semana_visitas || 
+              {"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0};
+            
+            updates.dias_semana_visitas = {
+              ...existingDays,
+              [dayOfWeek]: (existingDays[dayOfWeek] || 0) + 1
+            };
+          }
+
           // Atualizar email/telefone se mudaram
           if (client.email && client.email !== existing.email) {
             updates.email = client.email;

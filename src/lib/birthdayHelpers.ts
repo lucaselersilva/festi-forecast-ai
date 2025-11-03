@@ -21,6 +21,9 @@ export interface BirthdayCustomer {
   aplicativo_ativo: boolean;
   frequency: number;
   monetary: number;
+  dias_semana_visitas?: Record<string, number> | null;
+  dia_preferido?: string;
+  dia_preferido_numero?: number;
 }
 
 export interface BirthdayMetrics {

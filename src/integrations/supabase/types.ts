@@ -208,6 +208,13 @@ export type Database = {
             foreignKeyName: "consumptions_customerid_fkey"
             columns: ["customerid"]
             isOneToOne: false
+            referencedRelation: "vw_customers_preferred_days"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "consumptions_customerid_fkey"
+            columns: ["customerid"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -262,6 +269,7 @@ export type Database = {
           city: string | null
           consumo: number | null
           cpf: string | null
+          dias_semana_visitas: Json | null
           email: string | null
           gender: string | null
           id: number
@@ -282,6 +290,7 @@ export type Database = {
           city?: string | null
           consumo?: number | null
           cpf?: string | null
+          dias_semana_visitas?: Json | null
           email?: string | null
           gender?: string | null
           id?: number
@@ -302,6 +311,7 @@ export type Database = {
           city?: string | null
           consumo?: number | null
           cpf?: string | null
+          dias_semana_visitas?: Json | null
           email?: string | null
           gender?: string | null
           id?: number
@@ -655,6 +665,13 @@ export type Database = {
             foreignKeyName: "fk_interactions_customer"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "vw_customers_preferred_days"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -943,6 +960,13 @@ export type Database = {
             foreignKeyName: "fk_scoring_customer"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "vw_customers_preferred_days"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_scoring_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "vw_demographic_profile"
             referencedColumns: ["customer_id"]
           },
@@ -1216,6 +1240,7 @@ export type Database = {
           consumo: number | null
           cpf: string | null
           created_at: string | null
+          dias_semana_visitas: Json | null
           email: string | null
           genero: string | null
           id: string
@@ -1236,6 +1261,7 @@ export type Database = {
           consumo?: number | null
           cpf?: string | null
           created_at?: string | null
+          dias_semana_visitas?: Json | null
           email?: string | null
           genero?: string | null
           id?: string
@@ -1256,6 +1282,7 @@ export type Database = {
           consumo?: number | null
           cpf?: string | null
           created_at?: string | null
+          dias_semana_visitas?: Json | null
           email?: string | null
           genero?: string | null
           id?: string
@@ -1437,6 +1464,44 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_customer_preferred_days: {
+        Row: {
+          customer_id: string | null
+          dia_preferido: string | null
+          dia_preferido_nome: string | null
+          dias_semana_visitas: Json | null
+          nome: string | null
+          tenant_id: string | null
+          total_visitas_tracked: number | null
+        }
+        Insert: {
+          customer_id?: string | null
+          dia_preferido?: never
+          dia_preferido_nome?: never
+          dias_semana_visitas?: Json | null
+          nome?: string | null
+          tenant_id?: string | null
+          total_visitas_tracked?: never
+        }
+        Update: {
+          customer_id?: string | null
+          dia_preferido?: never
+          dia_preferido_nome?: never
+          dias_semana_visitas?: Json | null
+          nome?: string | null
+          tenant_id?: string | null
+          total_visitas_tracked?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vw_customer_rfm: {
         Row: {
           customer_id: number | null
@@ -1463,6 +1528,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_interactions_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_customers_preferred_days"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1506,6 +1578,44 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_valle_rfm_customer"
             referencedColumns: ["customer_id"]
+          },
+        ]
+      }
+      vw_customers_preferred_days: {
+        Row: {
+          customer_id: number | null
+          dia_preferido: string | null
+          dia_preferido_nome: string | null
+          dias_semana_visitas: Json | null
+          nome: string | null
+          tenant_id: string | null
+          total_visitas_tracked: number | null
+        }
+        Insert: {
+          customer_id?: number | null
+          dia_preferido?: never
+          dia_preferido_nome?: never
+          dias_semana_visitas?: Json | null
+          nome?: string | null
+          tenant_id?: string | null
+          total_visitas_tracked?: never
+        }
+        Update: {
+          customer_id?: number | null
+          dia_preferido?: never
+          dia_preferido_nome?: never
+          dias_semana_visitas?: Json | null
+          nome?: string | null
+          tenant_id?: string | null
+          total_visitas_tracked?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
           },
         ]
       }
