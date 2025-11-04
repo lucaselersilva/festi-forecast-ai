@@ -40,7 +40,7 @@ const mainItems = [
   { title: "Orquestrador", url: "/orchestrator", icon: Workflow, featureKey: "orchestrator" },
   { title: "Assistente Marketing", url: "/marketing-assistant", icon: Sparkles, featureKey: "marketing" },
   { title: "Aniversariantes", url: "/birthdays", icon: Cake, featureKey: "birthdays" },
-  { title: "Zig Casas", url: "/zig-casas", icon: Users, featureKey: "zig-casas" },
+  { title: "Casas", url: "/zig-casas", icon: Users, featureKey: "zig-casas" },
   { title: "Events", url: "/events", icon: Calendar, featureKey: "events" },
   { title: "Sponsors", url: "/sponsors", icon: Briefcase, featureKey: "sponsors" },
 ]

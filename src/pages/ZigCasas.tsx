@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ZigImport } from "@/components/zigcasas/ZigImport";
 import { ZigClusters } from "@/components/zigcasas/ZigClusters";
 import { ZigReactivation } from "@/components/zigcasas/ZigReactivation";
-import { Database, Upload, Target } from "lucide-react";
+import { Database, Target } from "lucide-react";
 
 export default function ZigCasas() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -26,12 +25,8 @@ export default function ZigCasas() {
         </div>
       </div>
 
-      <Tabs defaultValue="import" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="import" className="flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            Importar Dados
-          </TabsTrigger>
+      <Tabs defaultValue="clusters" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="clusters" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             Clusters
@@ -41,10 +36,6 @@ export default function ZigCasas() {
             Reativação
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="import" className="mt-6">
-          <ZigImport onImportComplete={handleImportComplete} />
-        </TabsContent>
 
         <TabsContent value="clusters" className="mt-6">
           <ZigClusters key={refreshKey} />
