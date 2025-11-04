@@ -13,35 +13,179 @@ import {
   Target,
   Lightbulb,
   Music,
-  Plus
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2
 } from "lucide-react"
 import { dataService } from "@/lib/dataService"
 import { mlService } from "@/lib/mlService"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
+import { supabase } from "@/integrations/supabase/client"
+import { useTenant } from "@/hooks/useTenant"
+import { useToast } from "@/hooks/use-toast"
+import { EventDialog } from "@/components/events/EventDialog"
+import { EventFilters } from "@/components/events/EventFilters"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const Events = () => {
+  const { tenantId } = useTenant()
+  const { toast } = useToast()
   const [events, setEvents] = useState<any[]>([])
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [briefingText, setBriefingText] = useState("")
   const [suggestedTarget, setSuggestedTarget] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [eventDialogOpen, setEventDialogOpen] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<any>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [eventToDelete, setEventToDelete] = useState<any>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedGenre, setSelectedGenre] = useState("all")
+  const [selectedCity, setSelectedCity] = useState("all")
+  const [pricingLoading, setPricingLoading] = useState(false)
+  const [pricingResult, setPricingResult] = useState<any>(null)
+  const [priceInputs, setPriceInputs] = useState({
+    pista: '',
+    marketing: ''
+  })
 
   useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const data = await dataService.getAllEvents()
-        setEvents(data)
-        if (data.length > 0) {
-          setSelectedEvent(data[0])
-        }
-      } catch (error) {
-        console.error('Error loading events:', error)
-      } finally {
-        setLoading(false)
-      }
+    if (tenantId) {
+      loadEvents()
     }
-    loadEvents()
-  }, [])
+  }, [tenantId])
+
+  const loadEvents = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('date', { ascending: false })
+
+      if (error) throw error
+
+      setEvents(data || [])
+      if (data && data.length > 0 && !selectedEvent) {
+        setSelectedEvent(data[0])
+      }
+    } catch (error: any) {
+      console.error('Error loading events:', error)
+      toast({
+        title: "Error loading events",
+        description: error.message,
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const genres = useMemo(() => 
+    Array.from(new Set(events.map(e => e.genre))).sort(),
+    [events]
+  )
+
+  const cities = useMemo(() => 
+    Array.from(new Set(events.map(e => e.city))).sort(),
+    [events]
+  )
+
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const matchesSearch = searchTerm === "" || 
+        event.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        event.venue.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesGenre = selectedGenre === "all" || event.genre === selectedGenre
+      const matchesCity = selectedCity === "all" || event.city === selectedCity
+      return matchesSearch && matchesGenre && matchesCity
+    })
+  }, [events, searchTerm, selectedGenre, selectedCity])
+
+  const handleSaveEvent = async (eventData: any) => {
+    try {
+      if (editingEvent) {
+        const { error } = await supabase
+          .from('events')
+          .update(eventData)
+          .eq('id', editingEvent.id)
+          .eq('tenant_id', tenantId)
+
+        if (error) throw error
+
+        toast({
+          title: "Event updated",
+          description: "Event has been updated successfully"
+        })
+      } else {
+        const { error } = await supabase
+          .from('events')
+          .insert({ ...eventData, tenant_id: tenantId })
+
+        if (error) throw error
+
+        toast({
+          title: "Event created",
+          description: "Event has been created successfully"
+        })
+      }
+      
+      await loadEvents()
+      setEditingEvent(null)
+    } catch (error: any) {
+      console.error('Error saving event:', error)
+      toast({
+        title: "Error saving event",
+        description: error.message,
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteEvent = async () => {
+    if (!eventToDelete) return
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', eventToDelete.id)
+        .eq('tenant_id', tenantId)
+
+      if (error) throw error
+
+      toast({
+        title: "Event deleted",
+        description: "Event has been deleted successfully"
+      })
+
+      if (selectedEvent?.id === eventToDelete.id) {
+        setSelectedEvent(null)
+      }
+
+      await loadEvents()
+      setEventToDelete(null)
+      setDeleteDialogOpen(false)
+    } catch (error: any) {
+      console.error('Error deleting event:', error)
+      toast({
+        title: "Error deleting event",
+        description: error.message,
+        variant: "destructive"
+      })
+    }
+  }
 
   const handleBriefingSubmit = async () => {
     if (!briefingText.trim() || !selectedEvent) return
@@ -53,10 +197,7 @@ const Events = () => {
         genre: selectedEvent.genre,
         averagePrice: selectedEvent.ticket_price,
         region: selectedEvent.city,
-        existingClusters: [
-          { id: 'premium', name: 'Premium VIP', size: 1200, characteristics: {} },
-          { id: 'universitarios', name: 'Universitários', size: 3500, characteristics: {} }
-        ]
+        existingClusters: []
       })
       
       setSuggestedTarget({
@@ -65,10 +206,58 @@ const Events = () => {
         estimatedReach: result.audienceSize?.withinDatabase || 15000,
         confidence: 0.85
       })
-    } catch (error) {
+
+      toast({
+        title: "Analysis complete",
+        description: "Target audience suggestions generated successfully"
+      })
+    } catch (error: any) {
       console.error('Error generating target audience:', error)
+      toast({
+        title: "Error generating analysis",
+        description: error.message,
+        variant: "destructive"
+      })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePricingOptimization = async () => {
+    if (!selectedEvent) return
+
+    setPricingLoading(true)
+    try {
+      const result = await mlService.runPricing({
+        event: {
+          genre: selectedEvent.genre,
+          city: selectedEvent.city,
+          venue: selectedEvent.venue,
+          capacity: selectedEvent.capacity,
+          date: selectedEvent.date,
+          dayOfWeek: selectedEvent.day_of_week,
+          weather: {
+            temp: selectedEvent.temp_c,
+            precipitation: selectedEvent.precip_mm
+          }
+        },
+        historicalSales: []
+      })
+
+      setPricingResult(result)
+      toast({
+        title: "Pricing optimization complete",
+        description: `Optimal price: R$ ${result.recommendedPrices.pista.optimal}`
+      })
+    } catch (error: any) {
+      console.error('Error running pricing optimization:', error)
+      toast({
+        title: "Error running optimization",
+        description: error.message,
+        variant: "destructive"
+      })
+    } finally {
+      setPricingLoading(false)
     }
   }
 
@@ -82,20 +271,57 @@ const Events = () => {
           </p>
         </div>
         
-        <Button className="gap-2 bg-gradient-primary hover:bg-gradient-primary/90">
+        <Button 
+          className="gap-2 bg-gradient-primary hover:bg-gradient-primary/90"
+          onClick={() => {
+            setEditingEvent(null)
+            setEventDialogOpen(true)
+          }}
+        >
           <Plus className="w-4 h-4" />
           Create Event
         </Button>
       </div>
 
+      <EventFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        selectedGenre={selectedGenre}
+        onGenreChange={setSelectedGenre}
+        selectedCity={selectedCity}
+        onCityChange={setSelectedCity}
+        genres={genres}
+        cities={cities}
+      />
+
       {/* Events List */}
       <Card className="glass border-border/50">
         <CardHeader>
-          <CardTitle>Upcoming Events</CardTitle>
+          <CardTitle>Upcoming Events ({filteredEvents.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {events.map((event) => (
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredEvents.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Music className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No events found</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => {
+                  setEditingEvent(null)
+                  setEventDialogOpen(true)
+                }}
+              >
+                Create your first event
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredEvents.map((event) => (
               <div 
                 key={event.id}
                 className={`p-4 rounded-lg border cursor-pointer transition-all hover:border-primary/50 ${
@@ -128,16 +354,41 @@ const Events = () => {
                       </Badge>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold">R$ {(event.revenue || 0).toLocaleString()}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {(((event.sold_tickets || 0) / event.capacity) * 100).toFixed(1)}% sold
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right mr-4">
+                      <p className="text-lg font-bold">R$ {(event.revenue || 0).toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(((event.sold_tickets || 0) / event.capacity) * 100).toFixed(1)}% sold
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingEvent(event)
+                        setEventDialogOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEventToDelete(event)
+                        setDeleteDialogOpen(true)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -266,10 +517,11 @@ const Events = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div>
-                    <label className="text-sm font-medium">Pista Price (R$)</label>
+                    <label className="text-sm font-medium">Current Pista Price (R$)</label>
                     <Input 
                       type="number" 
-                      defaultValue={selectedEvent?.ticket_price || 0}
+                      value={priceInputs.pista || selectedEvent?.ticket_price || 0}
+                      onChange={(e) => setPriceInputs({...priceInputs, pista: e.target.value})}
                       className="mt-1"
                     />
                   </div>
@@ -277,11 +529,17 @@ const Events = () => {
                     <label className="text-sm font-medium">Marketing Budget (R$)</label>
                     <Input 
                       type="number" 
-                      defaultValue={selectedEvent?.marketing_spend || 0}
+                      value={priceInputs.marketing || selectedEvent?.marketing_spend || 0}
+                      onChange={(e) => setPriceInputs({...priceInputs, marketing: e.target.value})}
                       className="mt-1"
                     />
                   </div>
-                  <Button className="w-full bg-gradient-primary hover:bg-gradient-primary/90">
+                  <Button 
+                    className="w-full bg-gradient-primary hover:bg-gradient-primary/90"
+                    onClick={handlePricingOptimization}
+                    disabled={pricingLoading || !selectedEvent}
+                  >
+                    {pricingLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Run Price Optimization
                   </Button>
                 </div>
@@ -296,29 +554,51 @@ const Events = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-                  <p className="font-medium text-primary">Optimal Pricing Strategy</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Based on historical data and demand patterns
-                  </p>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Pista (Recommended)</span>
-                    <span className="font-bold">R$ 135</span>
+                {pricingResult ? (
+                  <>
+                    <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                      <p className="font-medium text-primary">Optimal Pricing Strategy</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Confidence: {pricingResult.confidence} - Based on {pricingResult.dataUsed?.length || 0} data sources
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Pista (Recommended)</span>
+                        <span className="font-bold">R$ {pricingResult.recommendedPrices.pista.optimal}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-muted-foreground">
+                        <span>Range</span>
+                        <span>R$ {pricingResult.recommendedPrices.pista.min} - R$ {pricingResult.recommendedPrices.pista.max}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">VIP (Recommended)</span>
+                        <span className="font-bold">R$ {pricingResult.recommendedPrices.vip.optimal}</span>
+                      </div>
+                      <div className="pt-2 border-t">
+                        <p className="text-sm font-medium mb-2">Key Factors:</p>
+                        {pricingResult.analysis?.map((factor: any, idx: number) => (
+                          <div key={idx} className="text-sm mb-2">
+                            <span className="font-medium">{factor.factor}:</span>
+                            <span className="text-muted-foreground ml-1">{factor.impact}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="pt-2 border-t">
+                        <p className="text-sm font-medium mb-2">Recommendations:</p>
+                        {pricingResult.recommendations?.map((rec: string, idx: number) => (
+                          <p key={idx} className="text-sm text-muted-foreground">• {rec}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Run pricing optimization to see AI recommendations</p>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">VIP (Recommended)</span>
-                    <span className="font-bold">R$ 285</span>
-                  </div>
-                  <div className="pt-2 border-t">
-                    <p className="text-sm text-muted-foreground">Expected outcome:</p>
-                    <p className="text-sm">• 95% occupancy rate</p>
-                    <p className="text-sm">• R$ 1.2M projected revenue</p>
-                    <p className="text-sm">• 15% higher profit margin</p>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -413,6 +693,33 @@ const Events = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      <EventDialog
+        open={eventDialogOpen}
+        onOpenChange={setEventDialogOpen}
+        onSave={handleSaveEvent}
+        event={editingEvent}
+        genres={genres}
+        cities={cities}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{eventToDelete?.artist} - {eventToDelete?.venue}"? 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteEvent} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
