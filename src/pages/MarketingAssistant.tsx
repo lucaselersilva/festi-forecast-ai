@@ -37,29 +37,22 @@ export default function MarketingAssistant() {
     setCurrentEventData(eventData);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketing-assistant`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify(eventData),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Erro ao gerar plano");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Você precisa estar autenticado");
       }
 
-      const result = await response.json();
+      const { data, error } = await supabase.functions.invoke('marketing-assistant', {
+        body: eventData,
+      });
 
-      if (!result.success) {
-        throw new Error(result.error || "Erro ao gerar plano");
+      if (error) throw error;
+
+      if (!data.success) {
+        throw new Error(data.error || "Erro ao gerar plano");
       }
 
-      setCurrentPlan(result.data);
+      setCurrentPlan(data.data);
       setViewMode("viewer");
       toast.success("Plano gerado com sucesso!");
     } catch (error) {

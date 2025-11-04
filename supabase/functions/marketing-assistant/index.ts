@@ -38,11 +38,37 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
     
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Authorization header missing');
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
     const eventData: EventData = await req.json();
+    
+    // Get user's tenant_id from auth
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Unauthorized: ' + (userError?.message || 'No user found'));
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile?.tenant_id) {
+      throw new Error('Tenant not found for user');
+    }
+
+    const tenantId = profile.tenant_id;
 
     // Validar dados básicos
     if (!eventData.event_name || !eventData.event_date || !eventData.event_city) {
@@ -53,6 +79,7 @@ serve(async (req) => {
     const { data: cityEvents, error: eventsError } = await supabase
       .from("events")
       .select("*")
+      .eq('tenant_id', tenantId)
       .ilike("city", eventData.event_city)
       .limit(10);
 
@@ -65,7 +92,8 @@ serve(async (req) => {
     if (cityEvents && cityEvents.length > 0) {
       const { data: clusters, error: clustersError } = await supabase
         .from("vw_valle_cluster_analysis")
-        .select("*");
+        .select("*")
+        .eq('tenant_id', tenantId);
 
       if (!clustersError && clusters) {
         clusterData = clusters as ClusterData[];

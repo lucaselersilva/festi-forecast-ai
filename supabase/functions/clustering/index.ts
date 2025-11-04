@@ -367,7 +367,7 @@ serve(async (req) => {
       throw new Error('Unauthorized: ' + (userError?.message || 'No user found'));
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('tenant_id')
       .eq('id', user.id)
@@ -384,7 +384,7 @@ serve(async (req) => {
     console.log(`📊 Fetching data from view: ${config.view}`);
     
     // Get total count first
-    const { count: totalRecords } = await supabase
+    const { count: totalRecords } = await supabaseClient
       .from(config.view)
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenantId);
@@ -398,7 +398,7 @@ serve(async (req) => {
     const rangeSize = 1000; // Supabase default limit
     
     while (rangeStart < totalCount) {
-      const { data: batch, error: fetchError } = await supabase
+      const { data: batch, error: fetchError } = await supabaseClient
         .from(config.view)
         .select('*')
         .eq('tenant_id', tenantId)
