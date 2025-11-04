@@ -73,10 +73,48 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUser = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: profile } = await supabaseUser
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return new Response(
+        JSON.stringify({ error: 'Tenant not found' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const tenantId = profile.tenant_id;
+    
     const { action, payload } = await req.json();
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    console.log(`📊 Orchestrator action: ${action}`);
+    console.log(`📊 Orchestrator action: ${action} for tenant: ${tenantId}`);
 
     switch (action) {
       case 'plan': {
@@ -91,7 +129,8 @@ serve(async (req) => {
             event_context_json: newEvent,
             goal,
             constraints_json: constraints,
-            status: 'planning'
+            status: 'planning',
+            tenant_id: tenantId
           })
           .select()
           .single();
