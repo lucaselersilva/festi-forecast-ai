@@ -810,6 +810,53 @@ export type Database = {
           },
         ]
       }
+      message_templates: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+          updated_at: string
+          usage_count: number
+          variables: Json | null
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string
+          usage_count?: number
+          variables?: Json | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+          usage_count?: number
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1266,6 +1313,154 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "valle_reactivation_strategies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_configs: {
+        Row: {
+          created_at: string
+          id: string
+          is_connected: boolean
+          last_connection_at: string | null
+          phone_number: string | null
+          qr_code: string | null
+          railway_service_url: string | null
+          session_name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          last_connection_at?: string | null
+          phone_number?: string | null
+          qr_code?: string | null
+          railway_service_url?: string | null
+          session_name?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          last_connection_at?: string | null
+          phone_number?: string | null
+          qr_code?: string | null
+          railway_service_url?: string | null
+          session_name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_configs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_messages_log: {
+        Row: {
+          campaign_name: string | null
+          created_at: string
+          customer_id: number | null
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          message_content: string
+          metadata: Json | null
+          phone_number: string
+          read_at: string | null
+          sent_at: string | null
+          status: string
+          template_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          campaign_name?: string | null
+          created_at?: string
+          customer_id?: number | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content: string
+          metadata?: Json | null
+          phone_number: string
+          read_at?: string | null
+          sent_at?: string | null
+          status?: string
+          template_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          campaign_name?: string | null
+          created_at?: string
+          customer_id?: number | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content?: string
+          metadata?: Json | null
+          phone_number?: string
+          read_at?: string | null
+          sent_at?: string | null
+          status?: string
+          template_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_customer_event_features"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_customers_preferred_days"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_musical_preference"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_rfm_customer"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_log_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_log_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
