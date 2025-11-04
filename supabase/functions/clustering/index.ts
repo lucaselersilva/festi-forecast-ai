@@ -313,12 +313,12 @@ serve(async (req) => {
         featureFields: ['recency_days', 'frequency_interactions', 'monetary_total'],
         featureNames: ['Recência', 'Frequência', 'Valor Monetário']
       },
-  'valle-rfm': {
-    view: 'vw_valle_rfm',
-    idField: 'id',
-    featureFields: ['recency_days', 'frequency', 'monetary'],
-    featureNames: ['Recência', 'Frequência', 'Valor Monetário']
-  },
+      'valle-rfm': {
+        view: 'vw_valle_rfm',
+        idField: 'id',
+        featureFields: ['recency_days', 'frequency', 'monetary'],
+        featureNames: ['Recência', 'Frequência', 'Valor Monetário']
+      },
       demographic: {
         view: 'vw_demographic_profile',
         idField: 'customer_id',
@@ -326,11 +326,24 @@ serve(async (req) => {
         featureNames: ['Idade', 'Gênero', 'Cidade'],
         encodeFields: ['gender', 'city']
       },
+      'valle-demographic': {
+        view: 'vw_valle_demographic',
+        idField: 'customer_id',
+        featureFields: ['age'],
+        featureNames: ['Idade', 'Gênero'],
+        encodeFields: ['gender', 'age_segment']
+      },
       behavioral: {
         view: 'vw_digital_engagement',
         idField: 'customer_id',
         featureFields: ['total_purchases', 'avg_days_between_purchases', 'avg_purchase_value'],
         featureNames: ['Total de Compras', 'Dias Entre Compras', 'Valor Médio']
+      },
+      'valle-behavioral': {
+        view: 'vw_valle_digital_engagement',
+        idField: 'customer_id',
+        featureFields: ['total_purchases', 'avg_days_between_purchases', 'avg_purchase_value'],
+        featureNames: ['Total de Presenças', 'Dias Entre Visitas', 'Valor Médio']
       },
       musical: {
         view: 'vw_musical_preference',
@@ -345,6 +358,13 @@ serve(async (req) => {
         featureFields: ['recency_days', 'frequency', 'monetary_total', 'age', 'total_purchases', 'avg_days_between_purchases', 'genre_interaction_count'],
         featureNames: ['Recência', 'Frequência', 'Monetary', 'Idade', 'Compras', 'Intervalo', 'Interações Gênero'],
         encodeFields: ['gender', 'city', 'preferred_genre', 'age_segment', 'rfm_segment', 'engagement_segment']
+      },
+      'valle-multi': {
+        view: 'vw_valle_multi_segment',
+        idField: 'customer_id',
+        featureFields: ['recency_days', 'frequency', 'monetary_total', 'age', 'total_purchases', 'avg_days_between_purchases'],
+        featureNames: ['Recência', 'Frequência', 'Monetary', 'Idade', 'Presenças', 'Intervalo'],
+        encodeFields: ['gender', 'age_segment', 'rfm_segment', 'engagement_segment']
       }
     };
 
@@ -490,9 +510,9 @@ serve(async (req) => {
       percentiles.recency = rawPercentiles.feature_0;
       percentiles.frequency = rawPercentiles.feature_1;
       percentiles.monetary = rawPercentiles.feature_2;
-    } else if (segmentationType === 'demographic') {
+    } else if (segmentationType === 'demographic' || segmentationType === 'valle-demographic') {
       percentiles.age = rawPercentiles.feature_0;
-    } else if (segmentationType === 'behavioral') {
+    } else if (segmentationType === 'behavioral' || segmentationType === 'valle-behavioral') {
       percentiles.purchases = rawPercentiles.feature_0;
       percentiles.daysBetween = rawPercentiles.feature_1;
       percentiles.purchaseValue = rawPercentiles.feature_2;
@@ -507,6 +527,13 @@ serve(async (req) => {
       percentiles.total_purchases = rawPercentiles.feature_4;
       percentiles.avg_days_between_purchases = rawPercentiles.feature_5;
       percentiles.genre_interaction_count = rawPercentiles.feature_6;
+    } else if (segmentationType === 'valle-multi') {
+      percentiles.recency = rawPercentiles.feature_0;
+      percentiles.frequency = rawPercentiles.feature_1;
+      percentiles.monetary = rawPercentiles.feature_2;
+      percentiles.age = rawPercentiles.feature_3;
+      percentiles.total_purchases = rawPercentiles.feature_4;
+      percentiles.avg_days_between_purchases = rawPercentiles.feature_5;
     }
     
     console.log(`📊 Calculated percentiles:`, percentiles);

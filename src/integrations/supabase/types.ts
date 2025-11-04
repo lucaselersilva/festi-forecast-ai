@@ -2035,6 +2035,159 @@ export type Database = {
           },
         ]
       }
+      vw_valle_demographic: {
+        Row: {
+          age: number | null
+          age_segment: string | null
+          city: string | null
+          customer_id: string | null
+          gender: string | null
+          name: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          age?: never
+          age_segment?: never
+          city?: never
+          customer_id?: never
+          gender?: string | null
+          name?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          age?: never
+          age_segment?: never
+          city?: never
+          customer_id?: never
+          gender?: string | null
+          name?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_valle_digital_engagement: {
+        Row: {
+          avg_days_between_purchases: number | null
+          avg_purchase_value: number | null
+          customer_id: string | null
+          engagement_segment: string | null
+          tenant_id: string | null
+          total_purchases: number | null
+        }
+        Insert: {
+          avg_days_between_purchases?: never
+          avg_purchase_value?: never
+          customer_id?: never
+          engagement_segment?: never
+          tenant_id?: string | null
+          total_purchases?: never
+        }
+        Update: {
+          avg_days_between_purchases?: never
+          avg_purchase_value?: never
+          customer_id?: never
+          engagement_segment?: never
+          tenant_id?: string | null
+          total_purchases?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_valle_multi_segment: {
+        Row: {
+          age: number | null
+          age_segment: string | null
+          avg_days_between_purchases: number | null
+          avg_purchase_value: number | null
+          city: string | null
+          customer_id: string | null
+          engagement_segment: string | null
+          frequency: number | null
+          gender: string | null
+          genre_interaction_count: number | null
+          monetary_total: number | null
+          name: string | null
+          preferred_genre: string | null
+          recency_days: number | null
+          rfm_f: number | null
+          rfm_m: number | null
+          rfm_r: number | null
+          rfm_segment: string | null
+          segment_priority_score: number | null
+          tenant_id: string | null
+          total_purchases: number | null
+        }
+        Insert: {
+          age?: never
+          age_segment?: never
+          avg_days_between_purchases?: never
+          avg_purchase_value?: never
+          city?: never
+          customer_id?: never
+          engagement_segment?: never
+          frequency?: never
+          gender?: string | null
+          genre_interaction_count?: never
+          monetary_total?: never
+          name?: string | null
+          preferred_genre?: never
+          recency_days?: never
+          rfm_f?: never
+          rfm_m?: never
+          rfm_r?: never
+          rfm_segment?: never
+          segment_priority_score?: never
+          tenant_id?: string | null
+          total_purchases?: never
+        }
+        Update: {
+          age?: never
+          age_segment?: never
+          avg_days_between_purchases?: never
+          avg_purchase_value?: never
+          city?: never
+          customer_id?: never
+          engagement_segment?: never
+          frequency?: never
+          gender?: string | null
+          genre_interaction_count?: never
+          monetary_total?: never
+          name?: string | null
+          preferred_genre?: never
+          recency_days?: never
+          rfm_f?: never
+          rfm_m?: never
+          rfm_r?: never
+          rfm_segment?: never
+          segment_priority_score?: never
+          tenant_id?: string | null
+          total_purchases?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "valle_clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vw_valle_rfm: {
         Row: {
           aniversario: string | null

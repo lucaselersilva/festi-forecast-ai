@@ -14,7 +14,7 @@ interface ClusterData {
 
 interface ClusterVisualizationProps {
   clusters: ClusterData[];
-  type: 'valle-rfm' | 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
+  type: 'valle-rfm' | 'rfm' | 'demographic' | 'valle-demographic' | 'behavioral' | 'valle-behavioral' | 'musical' | 'multi-dimensional' | 'valle-multi';
   onClusterClick?: (clusterName: string, customerIds: number[]) => void;
   customerIds?: Map<string, number[]>;
 }

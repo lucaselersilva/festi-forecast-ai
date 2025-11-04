@@ -3,7 +3,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, TrendingUp, Activity, Music, Target } from "lucide-react";
 
-export type SegmentationType = 'valle-rfm' | 'rfm' | 'demographic' | 'behavioral' | 'musical' | 'multi-dimensional';
+export type SegmentationType = 'valle-rfm' | 'rfm' | 'demographic' | 'valle-demographic' | 'behavioral' | 'valle-behavioral' | 'musical' | 'multi-dimensional' | 'valle-multi';
 
 interface SegmentationTypeSelectorProps {
   value: SegmentationType;
@@ -19,40 +19,24 @@ export function SegmentationTypeSelector({ value, onChange }: SegmentationTypeSe
       icon: TrendingUp,
       features: ['Recência de visita', 'Presenças', 'Consumo total']
     },
-    // Temporarily disabled
-    // {
-    //   value: 'rfm' as const,
-    //   label: 'RFM Clássico',
-    //   description: 'RFM baseado em interações',
-    //   icon: TrendingUp,
-    //   features: ['Recência de compra', 'Frequência de interações', 'Valor monetário total']
-    // },
     {
-      value: 'demographic' as const,
-      label: 'Demográfica',
-      description: 'Idade, Gênero e Localização',
+      value: 'valle-demographic' as const,
+      label: 'Valle Demográfica',
+      description: 'Idade e Gênero dos clientes Valle',
       icon: Users,
-      features: ['Faixa etária', 'Gênero', 'Cidade']
+      features: ['Faixa etária', 'Gênero']
     },
     {
-      value: 'behavioral' as const,
-      label: 'Comportamental',
-      description: 'Padrões de compra e timing',
+      value: 'valle-behavioral' as const,
+      label: 'Valle Comportamental',
+      description: 'Padrões de visita e consumo Valle',
       icon: Activity,
-      features: ['Dias entre compras', 'Antecedência de compra', 'Padrões de consumo']
+      features: ['Presenças', 'Dias entre visitas', 'Valor médio']
     },
-    // Temporarily disabled
-    // {
-    //   value: 'musical' as const,
-    //   label: 'Musical',
-    //   description: 'Preferências de gênero',
-    //   icon: Music,
-    //   features: ['Gênero preferido', 'Diversidade', 'Frequência por gênero']
-    // },
     {
-      value: 'multi-dimensional' as const,
-      label: 'Multi-Dimensional',
-      description: 'Análise combinada RFM + Demografia + Comportamento',
+      value: 'valle-multi' as const,
+      label: 'Valle Multi-Dimensional',
+      description: 'Análise combinada Valle: RFM + Demografia + Comportamento',
       icon: Target,
       features: ['RFM completo', 'Perfil demográfico', 'Padrão comportamental']
     }

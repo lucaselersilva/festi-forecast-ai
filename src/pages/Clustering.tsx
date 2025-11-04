@@ -337,7 +337,7 @@ export default function Clustering() {
         avgMonetary: cluster.avgMonetary,
       });
       return insight.name;
-    } else if (type === 'demographic' && cluster.avgAge !== undefined) {
+    } else if ((type === 'demographic' || type === 'valle-demographic') && cluster.avgAge !== undefined) {
       if (percentiles && percentiles.age) {
         const insight = getDemographicInsightDynamic(
           cluster.avgAge,
@@ -356,7 +356,7 @@ export default function Clustering() {
         cluster.dominantCity || ''
       );
       return insight.name;
-    } else if (type === 'behavioral' && cluster.avgDaysBetween !== undefined) {
+    } else if ((type === 'behavioral' || type === 'valle-behavioral') && cluster.avgDaysBetween !== undefined) {
       if (percentiles && percentiles.purchases && percentiles.daysBetween && percentiles.purchaseValue) {
         const insight = getBehavioralInsightDynamic(
           cluster.avgPurchases || 0,
@@ -385,7 +385,7 @@ export default function Clustering() {
       }
       const insight = getMusicalInsight(cluster.dominantGenre);
       return insight.name;
-    } else if (type === 'multi-dimensional') {
+    } else if (type === 'multi-dimensional' || type === 'valle-multi') {
       const rfmSegment = cluster.dominantRfmSegment || 'Segmento';
       const ageSegment = cluster.dominantAgeSegment || '';
       const genre = cluster.dominantGenre || '';
