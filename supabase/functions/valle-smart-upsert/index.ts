@@ -101,8 +101,20 @@ Deno.serve(async (req) => {
 
         if (!existing) {
           // Cliente novo - INSERT
-          // Usar upsert para evitar conflitos de constraint
-          const upsertData = { ...client, tenant_id: tenantId };
+          // Inicializar dias_semana_visitas com a primeira visita
+          const visitDate = client.ultima_visita || client.primeira_entrada;
+          const diasSemanaVisitas: Record<string, number> = {"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0};
+          
+          if (visitDate) {
+            const dayOfWeek = new Date(visitDate).getUTCDay();
+            diasSemanaVisitas[dayOfWeek.toString()] = 1;
+          }
+          
+          const upsertData = { 
+            ...client, 
+            tenant_id: tenantId,
+            dias_semana_visitas: diasSemanaVisitas
+          };
           const onConflict = cpf ? 'cpf,tenant_id' : 'telefone,tenant_id';
           
           const { error } = await supabase

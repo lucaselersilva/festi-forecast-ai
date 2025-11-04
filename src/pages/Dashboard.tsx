@@ -35,6 +35,7 @@ import ClientsTable from "@/components/ClientsTable"
 interface FilterState {
   genres: string[]
   month: string | null
+  daysOfWeek: number[]
 }
 
 const Dashboard = () => {
@@ -55,7 +56,8 @@ const Dashboard = () => {
 
   const [filters, setFilters] = useState<FilterState>({
     genres: [],
-    month: null
+    month: null,
+    daysOfWeek: []
   })
   const [availableMonths, setAvailableMonths] = useState<string[]>([])
   const [availableGenres, setAvailableGenres] = useState<string[]>([])
@@ -155,9 +157,26 @@ const Dashboard = () => {
       filtered = filtered.filter(cliente => filters.genres.includes(cliente.genero))
     }
 
+    if (filters.daysOfWeek.length > 0) {
+      filtered = filtered.filter(cliente => {
+        if (!cliente.dias_semana_visitas) return false
+        const preferredDay = getPreferredDay(cliente.dias_semana_visitas)
+        return filters.daysOfWeek.includes(preferredDay.day)
+      })
+    }
+
     console.log('✅ Clientes filtrados:', filtered.length)
     setFilteredClientes(filtered)
     calculateValleClientesMetrics(filtered)
+  }
+
+  const getPreferredDay = (diasSemana: Record<string, number>) => {
+    const entries = Object.entries(diasSemana).map(([day, count]) => ({
+      day: parseInt(day),
+      count
+    }))
+    if (entries.length === 0) return { day: 0, count: 0 }
+    return entries.reduce((max, curr) => curr.count > max.count ? curr : max, entries[0])
   }
 
 const calculateValleClientesMetrics = (clientes: any[]) => {
@@ -212,10 +231,20 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
     }))
   }
 
+  const toggleDayFilter = (day: number) => {
+    setFilters(prev => ({
+      ...prev,
+      daysOfWeek: prev.daysOfWeek.includes(day)
+        ? prev.daysOfWeek.filter(d => d !== day)
+        : [...prev.daysOfWeek, day]
+    }))
+  }
+
   const clearFilters = () => {
     setFilters({
       genres: [],
-      month: null
+      month: null,
+      daysOfWeek: []
     })
   }
 
@@ -266,6 +295,35 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
       }))
       .sort((a, b) => (b[selectedMetric as keyof typeof a] as number) - (a[selectedMetric as keyof typeof a] as number))
       .slice(0, 10)
+  }
+
+  const getDayOfWeekData = () => {
+    const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    const dayStats: Record<number, { clientes: number, visitas: number }> = {
+      0: { clientes: 0, visitas: 0 },
+      1: { clientes: 0, visitas: 0 },
+      2: { clientes: 0, visitas: 0 },
+      3: { clientes: 0, visitas: 0 },
+      4: { clientes: 0, visitas: 0 },
+      5: { clientes: 0, visitas: 0 },
+      6: { clientes: 0, visitas: 0 }
+    }
+    
+    filteredClientes.forEach(cliente => {
+      if (!cliente.dias_semana_visitas) return
+      Object.entries(cliente.dias_semana_visitas).forEach(([day, count]) => {
+        const dayNum = parseInt(day)
+        const countNum = typeof count === 'number' ? count : 0
+        dayStats[dayNum].visitas += countNum
+        if (countNum > 0) dayStats[dayNum].clientes += 1
+      })
+    })
+
+    return dayNames.map((name, index) => ({
+      name,
+      visitas: dayStats[index].visitas,
+      clientes: dayStats[index].clientes
+    }))
   }
 
   if (loading) {
@@ -406,6 +464,28 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
                   </Badge>
                 ))}
               </div>
+
+              <div className="flex flex-wrap gap-1">
+                <Label className="text-xs text-muted-foreground w-full mb-1">Dia da Semana Preferido:</Label>
+                {[
+                  { value: 0, label: 'Dom' },
+                  { value: 1, label: 'Seg' },
+                  { value: 2, label: 'Ter' },
+                  { value: 3, label: 'Qua' },
+                  { value: 4, label: 'Qui' },
+                  { value: 5, label: 'Sex' },
+                  { value: 6, label: 'Sáb' }
+                ].map(day => (
+                  <Badge 
+                    key={day.value}
+                    variant={filters.daysOfWeek.includes(day.value) ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => toggleDayFilter(day.value)}
+                  >
+                    {day.label}
+                  </Badge>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -514,6 +594,38 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gráfico de Dia da Semana */}
+      <Card className="glass border-border/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Distribuição por Dia da Semana
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={getDayOfWeekData()}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="name" className="text-xs" />
+              <YAxis className="text-xs" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
+                }}
+                formatter={(value: any, name: string) => {
+                  if (name === 'visitas') return [value, 'Total de Visitas']
+                  if (name === 'clientes') return [value, 'Clientes']
+                  return [value, name]
+                }}
+              />
+              <Bar dataKey="visitas" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
         </TabsContent>
 
         <TabsContent value="database">

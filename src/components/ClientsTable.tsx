@@ -137,6 +137,18 @@ const ClientsTable = ({ clients, onRefresh }: ClientsTableProps) => {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   }
 
+  const formatPreferredDay = (diasSemana: Record<string, number> | null) => {
+    if (!diasSemana) return "-"
+    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    const entries = Object.entries(diasSemana).map(([day, count]) => ({
+      day: parseInt(day),
+      count: typeof count === 'number' ? count : 0
+    }))
+    if (entries.length === 0 || entries.every(e => e.count === 0)) return "-"
+    const preferred = entries.reduce((max, curr) => curr.count > max.count ? curr : max, entries[0])
+    return `${days[preferred.day]} (${preferred.count}x)`
+  }
+
   return (
     <>
       <Card className="glass border-border/50">
@@ -172,6 +184,7 @@ const ClientsTable = ({ clients, onRefresh }: ClientsTableProps) => {
                   <TableHead>Telefone</TableHead>
                   <TableHead>Gênero</TableHead>
                   <TableHead>Aniversário</TableHead>
+                  <TableHead>Dia Preferido</TableHead>
                   <TableHead className="text-right">Consumo</TableHead>
                   <TableHead className="text-center">Presenças</TableHead>
                   <TableHead className="text-center">App Ativo</TableHead>
@@ -186,6 +199,7 @@ const ClientsTable = ({ clients, onRefresh }: ClientsTableProps) => {
                     <TableCell>{client.telefone || "-"}</TableCell>
                     <TableCell>{client.genero || "-"}</TableCell>
                     <TableCell>{formatDate(client.aniversario)}</TableCell>
+                    <TableCell>{formatPreferredDay(client.dias_semana_visitas)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(client.consumo)}</TableCell>
                     <TableCell className="text-center">{client.presencas || 0}</TableCell>
                     <TableCell className="text-center">
