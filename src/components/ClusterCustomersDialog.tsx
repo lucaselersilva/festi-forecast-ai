@@ -12,12 +12,12 @@ interface ClusterCustomersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clusterName: string;
-  customerIds: number[];
+  customerIds: (number | string)[];
   tenantId: string;
 }
 
 interface Customer {
-  id: number;
+  id: number | string;
   name: string;
   email: string;
   phone: string;
@@ -59,16 +59,42 @@ export function ClusterCustomersDialog({
     try {
       console.log('📊 Fetching customers:', { customerIds: customerIds.slice(0, 5), tenantId });
       
-      const { data, error } = await supabase
-        .from('customers')
-        .select('id, name, email, phone, consumo, presencas')
-        .eq('tenant_id', tenantId)
-        .in('id', customerIds);
-
-      if (error) throw error;
+      // Verificar se os IDs são UUIDs ou integers
+      const firstId = customerIds[0];
+      const isUUID = typeof firstId === 'string' && firstId.includes('-');
       
-      console.log('✅ Loaded customers:', data?.length || 0);
-      setCustomers(data || []);
+      if (isUUID) {
+        // Buscar de valle_clientes (IDs são UUIDs)
+        const { data: valleData, error: valleError } = await supabase
+          .from('valle_clientes')
+          .select('id, nome, email, telefone, consumo, presencas')
+          .eq('tenant_id', tenantId)
+          .in('id', customerIds as string[]);
+        
+        if (valleError) throw valleError;
+        
+        console.log('✅ Loaded valle_clientes:', valleData?.length || 0);
+        setCustomers((valleData || []).map((c: any) => ({
+          id: c.id,
+          name: c.nome,
+          email: c.email,
+          phone: c.telefone,
+          consumo: c.consumo,
+          presencas: c.presencas
+        })));
+      } else {
+        // Buscar de customers (IDs são integers)
+        const { data: customersData, error: customersError } = await supabase
+          .from('customers')
+          .select('id, name, email, phone, consumo, presencas')
+          .eq('tenant_id', tenantId)
+          .in('id', customerIds as number[]);
+
+        if (customersError) throw customersError;
+        
+        console.log('✅ Loaded customers:', customersData?.length || 0);
+        setCustomers(customersData || []);
+      }
     } catch (error) {
       console.error('Error loading customers:', error);
       toast({
