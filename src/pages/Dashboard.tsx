@@ -161,6 +161,7 @@ const Dashboard = () => {
       filtered = filtered.filter(cliente => {
         if (!cliente.dias_semana_visitas) return false
         const preferredDay = getPreferredDay(cliente.dias_semana_visitas)
+        if (!preferredDay) return false // Ignorar clientes sem dados
         return filters.daysOfWeek.includes(preferredDay.day)
       })
     }
@@ -175,8 +176,11 @@ const Dashboard = () => {
       day: parseInt(day),
       count
     }))
-    if (entries.length === 0) return { day: 0, count: 0 }
-    return entries.reduce((max, curr) => curr.count > max.count ? curr : max, entries[0])
+    if (entries.length === 0) return null
+    const maxEntry = entries.reduce((max, curr) => curr.count > max.count ? curr : max, entries[0])
+    // Se todos os dias são 0, retornar null
+    if (maxEntry.count === 0) return null
+    return maxEntry
   }
 
 const calculateValleClientesMetrics = (clientes: any[]) => {
