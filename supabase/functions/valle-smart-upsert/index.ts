@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
           const diasSemanaVisitas: Record<string, number> = {"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0};
           
           if (visitDate) {
-            const dayOfWeek = new Date(visitDate).getDay();
+            const dayOfWeek = new Date(visitDate).getUTCDay();
             diasSemanaVisitas[dayOfWeek.toString()] = 1;
           }
           
@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
           // Atualizar contador de dias da semana
           if (client.ultima_visita) {
             const visitDate = new Date(client.ultima_visita);
-            const dayOfWeek = visitDate.getDay();
+            const dayOfWeek = visitDate.getUTCDay();
             
             const existingDays = existing.dias_semana_visitas || 
               {"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0};
