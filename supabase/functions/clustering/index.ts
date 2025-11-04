@@ -622,28 +622,26 @@ serve(async (req) => {
         clusterObj.avgRecency = avgFeatures[0];
         clusterObj.avgFrequency = avgFeatures[1];
         clusterObj.avgMonetary = avgFeatures[2];
-      } else if (segmentationType === 'demographic') {
+      } else if (segmentationType === 'demographic' || segmentationType === 'valle-demographic') {
         clusterObj.avgAge = avgFeatures[0];
         clusterObj.avgGenderCode = avgFeatures[1];
-        clusterObj.avgCityCode = avgFeatures[2];
+        clusterObj.avgAgeSegmentCode = avgFeatures[2];
         
-        // Decode gender (M=0, F=1)
-        clusterObj.dominantGender = avgFeatures[1] > 0.5 ? 'F' : 'M';
-        
-        // Decode city - find most common city in cluster
-        const cityCounts: Record<string, number> = {};
+        // Decode gender - find most common gender in cluster
+        const genderCounts: Record<string, number> = {};
         members.forEach(member => {
           const row = features.find((r: any) => r.customer_id === member.customer_id);
-          if (row && row.city) {
-            cityCounts[row.city] = (cityCounts[row.city] || 0) + 1;
+          if (row && row.gender) {
+            genderCounts[row.gender] = (genderCounts[row.gender] || 0) + 1;
           }
         });
-        if (Object.keys(cityCounts).length > 0) {
-          clusterObj.dominantCity = Object.keys(cityCounts).reduce((a, b) => 
-            cityCounts[a] > cityCounts[b] ? a : b
-          );
-        }
-      } else if (segmentationType === 'behavioral') {
+        clusterObj.dominantGender = genderCounts && Object.keys(genderCounts).length > 0
+          ? Object.keys(genderCounts).reduce((a, b) => genderCounts[a] > genderCounts[b] ? a : b)
+          : 'M';
+        
+        // For valle-demographic, city is NULL, so we don't need to decode it
+        clusterObj.dominantCity = '';
+      } else if (segmentationType === 'behavioral' || segmentationType === 'valle-behavioral') {
         clusterObj.avgPurchases = avgFeatures[0];
         clusterObj.avgDaysBetween = avgFeatures[1];
         clusterObj.avgPurchaseValue = avgFeatures[2];
@@ -706,6 +704,42 @@ serve(async (req) => {
         clusterObj.dominantGender = getDominant(genderCounts);
         clusterObj.dominantCity = getDominant(cityCounts);
         clusterObj.dominantGenre = getDominant(genreCounts);
+        clusterObj.dominantAgeSegment = getDominant(ageSegmentCounts);
+        clusterObj.dominantRfmSegment = getDominant(rfmSegmentCounts);
+        clusterObj.dominantEngagementSegment = getDominant(engagementSegmentCounts);
+      } else if (segmentationType === 'valle-multi') {
+        // RFM features
+        clusterObj.avgRecency = avgFeatures[0];
+        clusterObj.avgFrequency = avgFeatures[1];
+        clusterObj.avgMonetary = avgFeatures[2];
+        // Demographic features
+        clusterObj.avgAge = avgFeatures[3];
+        // Behavioral features
+        clusterObj.avgPurchases = avgFeatures[4];
+        clusterObj.avgDaysBetween = avgFeatures[5];
+        
+        // Decode categorical fields
+        const genderCounts: Record<string, number> = {};
+        const ageSegmentCounts: Record<string, number> = {};
+        const rfmSegmentCounts: Record<string, number> = {};
+        const engagementSegmentCounts: Record<string, number> = {};
+        
+        members.forEach(member => {
+          const row = features.find((r: any) => r.customer_id === member.customer_id);
+          if (row) {
+            if (row.gender) genderCounts[row.gender] = (genderCounts[row.gender] || 0) + 1;
+            if (row.age_segment) ageSegmentCounts[row.age_segment] = (ageSegmentCounts[row.age_segment] || 0) + 1;
+            if (row.rfm_segment) rfmSegmentCounts[row.rfm_segment] = (rfmSegmentCounts[row.rfm_segment] || 0) + 1;
+            if (row.engagement_segment) engagementSegmentCounts[row.engagement_segment] = (engagementSegmentCounts[row.engagement_segment] || 0) + 1;
+          }
+        });
+        
+        const getDominant = (counts: Record<string, number>) => {
+          if (Object.keys(counts).length === 0) return undefined;
+          return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        };
+        
+        clusterObj.dominantGender = getDominant(genderCounts);
         clusterObj.dominantAgeSegment = getDominant(ageSegmentCounts);
         clusterObj.dominantRfmSegment = getDominant(rfmSegmentCounts);
         clusterObj.dominantEngagementSegment = getDominant(engagementSegmentCounts);
