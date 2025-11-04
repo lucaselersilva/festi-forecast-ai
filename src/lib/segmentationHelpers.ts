@@ -730,7 +730,7 @@ export function getDemographicInsightDynamic(
   // Very Young (bottom 25%)
   if (age <= agePerc.p25) {
     return {
-      name: 'Gen Z e Millennials Jovens',
+      name: 'Jovens (até ' + agePerc.p25.toFixed(0) + ' anos)',
       description: `Audiência mais jovem (≤ ${agePerc.p25.toFixed(0)} anos) - digital natives`,
       characteristics: [
         'Nativos digitais e mobile-first',
@@ -754,7 +754,7 @@ export function getDemographicInsightDynamic(
   // Young Adults (25-50%)
   if (age <= agePerc.p50) {
     return {
-      name: 'Millennials Estabelecidos',
+      name: 'Adultos Jovens (' + agePerc.p25.toFixed(0) + '-' + agePerc.p50.toFixed(0) + ' anos)',
       description: `Adultos jovens (${agePerc.p25.toFixed(0)}-${agePerc.p50.toFixed(0)} anos) - profissionais em ascensão`,
       characteristics: [
         'Poder aquisitivo crescente',
@@ -778,7 +778,7 @@ export function getDemographicInsightDynamic(
   // Middle Age (50-75%)
   if (age <= agePerc.p75) {
     return {
-      name: 'Geração X Consolidada',
+      name: 'Meia-Idade (' + agePerc.p50.toFixed(0) + '-' + agePerc.p75.toFixed(0) + ' anos)',
       description: `Meia-idade (${agePerc.p50.toFixed(0)}-${agePerc.p75.toFixed(0)} anos) - alto poder aquisitivo`,
       characteristics: [
         'Alto poder aquisitivo estabelecido',
@@ -801,7 +801,7 @@ export function getDemographicInsightDynamic(
   
   // Mature (top 25%)
   return {
-    name: 'Boomers e Entusiastas Maduros',
+    name: 'Maduros (' + agePerc.p75.toFixed(0) + '+ anos)',
     description: `Audiência madura (≥ ${agePerc.p75.toFixed(0)} anos) - experiência e tradição`,
     characteristics: [
       'Alta experiência e conhecimento cultural',
@@ -844,7 +844,7 @@ export function getBehavioralInsightDynamic(
   // Super Frequent High Value
   if (purchaseQuartile === 4 && frequencyQuartile === 4 && valueQuartile >= 3) {
     return {
-      name: 'Super Frequentes Premium',
+      name: 'Visitantes VIP Frequentes',
       description: 'Compram muito, frequentemente e com alto valor',
       characteristics: [
         `Compras: ${avgPurchases.toFixed(0)}+ (top 25%)`,
@@ -866,7 +866,7 @@ export function getBehavioralInsightDynamic(
   // Frequent Impulsive
   if (frequencyQuartile >= 3 && valueQuartile <= 2) {
     return {
-      name: 'Compradores Frequentes Impulsivos',
+      name: 'Frequentes de Última Hora',
       description: 'Alta frequência de compras rápidas e de menor valor',
       characteristics: [
         'Decisão de compra muito rápida',
@@ -888,7 +888,7 @@ export function getBehavioralInsightDynamic(
   // High Value Planners
   if (valueQuartile === 4 && frequencyQuartile <= 2) {
     return {
-      name: 'Planejadores de Alto Valor',
+      name: 'VIPs Planejadores',
       description: 'Pesquisam extensivamente e compram com alto ticket',
       characteristics: [
         `Valor muito alto (≥ R$ ${vPerc.p75.toFixed(0)})`,
@@ -910,7 +910,7 @@ export function getBehavioralInsightDynamic(
   // Regular Moderate
   if (purchaseQuartile >= 2 && frequencyQuartile >= 2 && valueQuartile >= 2) {
     return {
-      name: 'Compradores Regulares Balanceados',
+      name: 'Visitantes Regulares',
       description: 'Performance mediana consistente em todas métricas',
       characteristics: [
         'Comportamento de compra previsível',
@@ -932,7 +932,7 @@ export function getBehavioralInsightDynamic(
   // Opportunity Seekers
   if (valueQuartile <= 2 && frequencyQuartile <= 2) {
     return {
-      name: 'Caçadores de Oportunidade',
+      name: 'Oportunistas',
       description: 'Aguardam o melhor momento e oferta para comprar',
       characteristics: [
         'Sensível a preço e promoções',
@@ -953,7 +953,7 @@ export function getBehavioralInsightDynamic(
   
   // Low engagement
   return {
-    name: 'Engajamento Baixo',
+    name: 'Visitantes Esporádicos',
     description: 'Comportamento de compra mínimo - segmento de conversão',
     characteristics: [
       `Poucas compras (< ${pPerc.p25.toFixed(0)})`,
