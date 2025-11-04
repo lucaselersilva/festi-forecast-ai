@@ -4,6 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PhaseCard } from "./PhaseCard";
 import { ClusterStrategyCard } from "./ClusterStrategyCard";
+import { KeywordsCard } from "./KeywordsCard";
+import { ReachStrategiesCard } from "./ReachStrategiesCard";
+import { TargetAudienceCard } from "./TargetAudienceCard";
+import { CompetitiveAnalysisCard } from "./CompetitiveAnalysisCard";
+import { SuccessMetricsCard } from "./SuccessMetricsCard";
 import { MarketingPlan, generatePlanText, copyToClipboard } from "@/lib/marketingHelpers";
 import { toast } from "sonner";
 import {
@@ -150,6 +155,31 @@ export function PlanViewer({ plan, eventName, onBack, onSave, onEdit, isSaved }:
           </div>
         </CardContent>
       </Card>
+
+      {/* Palavras-Chave */}
+      {plan.keywords && (
+        <KeywordsCard keywords={plan.keywords} />
+      )}
+
+      {/* Público-Alvo */}
+      {plan.target_audience && (
+        <TargetAudienceCard audience={plan.target_audience} />
+      )}
+
+      {/* Análise Competitiva */}
+      {plan.competitive_analysis && (
+        <CompetitiveAnalysisCard analysis={plan.competitive_analysis} />
+      )}
+
+      {/* Estratégias de Alcance */}
+      {plan.reach_strategies && plan.reach_strategies.length > 0 && (
+        <ReachStrategiesCard strategies={plan.reach_strategies} />
+      )}
+
+      {/* Métricas de Sucesso */}
+      {plan.success_metrics && plan.success_metrics.length > 0 && (
+        <SuccessMetricsCard metrics={plan.success_metrics} />
+      )}
 
       {/* Timeline de Fases */}
       <div>
