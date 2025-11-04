@@ -313,12 +313,12 @@ serve(async (req) => {
         featureFields: ['recency_days', 'frequency_interactions', 'monetary_total'],
         featureNames: ['Recência', 'Frequência', 'Valor Monetário']
       },
-      'valle-rfm': {
-        view: 'vw_valle_rfm_customer',
-        idField: 'customer_id',
-        featureFields: ['recency_days', 'frequency_interactions', 'monetary_total'],
-        featureNames: ['Recência', 'Frequência', 'Valor Monetário']
-      },
+  'valle-rfm': {
+    view: 'vw_valle_rfm',
+    idField: 'id',
+    featureFields: ['recency_days', 'frequency', 'monetary'],
+    featureNames: ['Recência', 'Frequência', 'Valor Monetário']
+  },
       demographic: {
         view: 'vw_demographic_profile',
         idField: 'customer_id',
