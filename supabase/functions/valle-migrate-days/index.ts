@@ -42,16 +42,42 @@ Deno.serve(async (req) => {
 
     console.log('Starting migration for tenant:', tenantId);
 
-    // Buscar clientes com dias_semana_visitas zerados
-    const { data: clientes, error: fetchError } = await supabase
-      .from('valle_clientes')
-      .select('id, ultima_visita, primeira_entrada, presencas')
-      .eq('tenant_id', tenantId)
-      .eq('dias_semana_visitas', '{"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0}');
+    // Buscar clientes com dias_semana_visitas zerados usando paginação
+    let allClientes: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (fetchError) {
-      throw new Error(`Error fetching clients: ${fetchError.message}`);
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data: clientesPage, error: fetchError } = await supabase
+        .from('valle_clientes')
+        .select('id, ultima_visita, primeira_entrada, presencas')
+        .eq('tenant_id', tenantId)
+        .eq('dias_semana_visitas', '{"0":0,"1":0,"2":0,"3":0,"4":0,"5":0,"6":0}')
+        .range(from, to);
+
+      if (fetchError) {
+        throw new Error(`Error fetching clients: ${fetchError.message}`);
+      }
+
+      if (!clientesPage || clientesPage.length === 0) {
+        hasMore = false;
+      } else {
+        allClientes = allClientes.concat(clientesPage);
+        console.log(`Fetched page ${page + 1}, total clients so far: ${allClientes.length}`);
+        
+        if (clientesPage.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
     }
+
+    const clientes = allClientes;
 
     const result: MigrationResult = {
       migrated: 0,
