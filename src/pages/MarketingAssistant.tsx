@@ -36,29 +36,61 @@ export default function MarketingAssistant() {
     setViewMode("generating");
     setCurrentEventData(eventData);
 
+    const timeout = setTimeout(() => {
+      toast.error("A geração está demorando muito. Tente novamente.");
+      setViewMode("form");
+    }, 60000);
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Você precisa estar autenticado");
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      console.log("🚀 Iniciando geração do plano para:", eventData.event_name);
 
       const { data, error } = await supabase.functions.invoke('marketing-assistant', {
         body: eventData,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro da função invoke:", error);
+        throw new Error(error.message || "Erro ao chamar função");
+      }
+
+      if (!data) {
+        console.error("Resposta vazia da função");
+        throw new Error("Nenhum dado retornado pela função");
+      }
 
       if (!data.success) {
+        console.error("Função retornou erro:", data.error);
         throw new Error(data.error || "Erro ao gerar plano");
       }
+
+      if (!data.data || !data.data.general_strategy || !data.data.phases) {
+        console.error("Dados malformados:", data);
+        throw new Error("Plano gerado com dados incompletos");
+      }
+
+      console.log("✅ Plano gerado com sucesso");
 
       setCurrentPlan(data.data);
       setViewMode("viewer");
       toast.success("Plano gerado com sucesso!");
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao gerar plano de marketing");
+      console.error("Erro completo:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erro ao gerar plano de marketing";
+      toast.error(errorMessage);
       setViewMode("form");
+    } finally {
+      clearTimeout(timeout);
     }
   };
 

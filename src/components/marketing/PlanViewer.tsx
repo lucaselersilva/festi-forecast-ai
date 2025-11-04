@@ -37,9 +37,11 @@ export function PlanViewer({ plan, eventName, onBack, onSave, onEdit, isSaved }:
     }
   };
 
-  const budgetData = Object.entries(plan.general_strategy.budget_allocation).map(
-    ([name, value]) => ({ name, value })
-  );
+  const budgetData = plan.general_strategy.budget_allocation 
+    ? Object.entries(plan.general_strategy.budget_allocation).map(
+        ([name, value]) => ({ name, value })
+      )
+    : [];
 
   return (
     <div className="space-y-6">
@@ -121,25 +123,29 @@ export function PlanViewer({ plan, eventName, onBack, onSave, onEdit, isSaved }:
             {/* Budget Allocation */}
             <div>
               <h3 className="font-semibold mb-3">Alocação de Orçamento</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={budgetData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={60}
-                    label={({ value }) => `${value}%`}
-                  >
-                    {budgetData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `${value}%`} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              {budgetData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={budgetData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={60}
+                      label={({ value }) => `${value}%`}
+                    >
+                      {budgetData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `${value}%`} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sem dados de orçamento</p>
+              )}
             </div>
           </div>
         </CardContent>

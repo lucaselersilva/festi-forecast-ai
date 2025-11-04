@@ -70,6 +70,9 @@ serve(async (req) => {
 
     const tenantId = profile.tenant_id;
 
+    console.log('✅ Autenticação validada para tenant:', tenantId);
+    console.log('📊 Evento:', eventData.event_name, 'em', eventData.event_city);
+
     // Validar dados básicos
     if (!eventData.event_name || !eventData.event_date || !eventData.event_city) {
       throw new Error("Dados obrigatórios ausentes");
@@ -240,6 +243,25 @@ ${eventData.description ? `\n\nSobre o evento: ${eventData.description}` : ''}`;
     }
 
     const plan = JSON.parse(toolCall.function.arguments);
+
+    console.log('🤖 Plano gerado pela OpenAI');
+
+    // Validar estrutura do plano
+    if (!plan.general_strategy || !plan.phases || !Array.isArray(plan.phases)) {
+      throw new Error('Plano gerado pela OpenAI está incompleto');
+    }
+
+    if (!plan.general_strategy.budget_allocation) {
+      console.log('⚠️ Budget allocation não encontrado, adicionando fallback');
+      plan.general_strategy.budget_allocation = { 
+        "Digital": 40, 
+        "Influencers": 30, 
+        "WhatsApp": 20, 
+        "Outros": 10 
+      };
+    }
+
+    console.log('📊 Fases no plano:', plan.phases.length);
 
     // 6. Gerar estratégias por cluster se houver
     let clusterStrategies = null;
