@@ -14,7 +14,8 @@ import {
   RefreshCw,
   BarChart3,
   Music2,
-  Table as TableIcon
+  Table as TableIcon,
+  Database
 } from "lucide-react"
 import { 
   AreaChart,
@@ -61,6 +62,7 @@ const Dashboard = () => {
   })
   const [availableMonths, setAvailableMonths] = useState<string[]>([])
   const [availableGenres, setAvailableGenres] = useState<string[]>([])
+  const [isMigrating, setIsMigrating] = useState(false)
 
   useEffect(() => {
     if (tenantId) {
@@ -181,6 +183,36 @@ const Dashboard = () => {
     // Se todos os dias são 0, retornar null
     if (maxEntry.count === 0) return null
     return maxEntry
+  }
+
+  const runMigration = async () => {
+    setIsMigrating(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('valle-migrate-days')
+      
+      if (error) throw error
+      
+      toast({
+        title: "Migração Concluída",
+        description: `✅ ${data.migrated} clientes migrados, ${data.skipped} ignorados`,
+      })
+      
+      if (data.errors && data.errors.length > 0) {
+        console.error('Erros na migração:', data.errors)
+      }
+      
+      // Recarregar dados após migração
+      await loadValleClientesData()
+    } catch (error: any) {
+      console.error('Erro na migração:', error)
+      toast({
+        title: "Erro na Migração",
+        description: error.message || "Falha ao executar migração",
+        variant: "destructive"
+      })
+    } finally {
+      setIsMigrating(false)
+    }
   }
 
 const calculateValleClientesMetrics = (clientes: any[]) => {
@@ -384,14 +416,25 @@ const calculateValleClientesMetrics = (clientes: any[]) => {
           </p>
         </div>
         
-        <Button 
-          variant="outline" 
-          className="gap-2"
-          onClick={loadValleClientesData}
-        >
-          <RefreshCw className="w-4 h-4" />
-          Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={runMigration}
+            disabled={isMigrating}
+          >
+            <Database className="w-4 h-4" />
+            {isMigrating ? "Migrando..." : "Migrar Dias da Semana"}
+          </Button>
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={loadValleClientesData}
+          >
+            <RefreshCw className="w-4 h-4" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
