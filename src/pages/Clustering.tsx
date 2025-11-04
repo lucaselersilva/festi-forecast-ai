@@ -3,14 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ClusteringConfig } from "@/components/ClusteringConfig";
 import { ClusterQuality } from "@/components/ClusterQuality";
 import { ClusterVisualization } from "@/components/ClusterVisualization";
 import { SegmentationTypeSelector, SegmentationType } from "@/components/SegmentationTypeSelector";
 import { SegmentInsightCard } from "@/components/SegmentInsightCard";
 import { ClusterCustomersDialog } from "@/components/ClusterCustomersDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Download, AlertCircle } from "lucide-react";
+import { Download, AlertCircle, Play } from "lucide-react";
 import { useTenant } from "@/hooks/useTenant";
 import { 
   getRFMSegmentName, 
@@ -29,15 +28,6 @@ export default function Clustering() {
   const { tenantId } = useTenant();
   
   const [segmentationType, setSegmentationType] = useState<SegmentationType>('valle-rfm');
-  const [clusteringMethod, setClusteringMethod] = useState<'kmeans' | 'dbscan' | 'gmm'>('kmeans');
-  const [clusteringParams, setClusteringParams] = useState({
-    k: 4,
-    eps: 0.6,
-    minSamples: 10,
-    nComponents: 4,
-    standardize: true,
-    randomState: 42,
-  });
   const [clusteringLoading, setClusteringLoading] = useState(false);
   const [clusteringResult, setClusteringResult] = useState<any>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
@@ -103,13 +93,17 @@ export default function Clustering() {
         return;
       }
       
-      console.log("🔬 Running clustering with method:", clusteringMethod);
+      console.log("🔬 Running clustering with K-Means (k=4)");
       console.log("📊 Segmentation type:", segmentationType);
       
       const response = await supabase.functions.invoke('clustering', {
         body: {
-          method: clusteringMethod,
-          params: clusteringParams,
+          method: 'kmeans',
+          params: {
+            k: 4,
+            standardize: true,
+            randomState: 42
+          },
           segmentationType: segmentationType
         }
       });
@@ -430,14 +424,14 @@ export default function Clustering() {
             onChange={setSegmentationType}
           />
           
-          <ClusteringConfig
-            method={clusteringMethod}
-            onMethodChange={setClusteringMethod}
-            params={clusteringParams}
-            onParamChange={(key, value) => setClusteringParams({ ...clusteringParams, [key]: value })}
-            onRun={handleRunClustering}
-            isLoading={clusteringLoading || isGeneratingInsights}
-          />
+          <Button 
+            onClick={handleRunClustering} 
+            className="w-full" 
+            disabled={clusteringLoading || isGeneratingInsights}
+          >
+            <Play className="mr-2 h-4 w-4" />
+            {clusteringLoading || isGeneratingInsights ? 'Processando...' : 'Rodar Segmentação'}
+          </Button>
 
           <div className="flex gap-4">
             
@@ -473,7 +467,7 @@ export default function Clustering() {
               acc[c.cluster] = c.size;
               return acc;
             }, {})}
-            method={clusteringMethod}
+            method="kmeans"
             clusterNames={new Map(
               clusteringResult.clusters.map((c: any) => [
                 c.cluster,
