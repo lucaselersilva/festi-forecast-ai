@@ -403,8 +403,8 @@ serve(async (req) => {
     // Fetch features from selected view, filtered by tenant_id
     console.log(`📊 Fetching data from view: ${config.view}`);
     
-    // Get total count first
-    const { count: totalRecords } = await supabaseClient
+    // Get total count first (using service role for view access)
+    const { count: totalRecords } = await supabase
       .from(config.view)
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenantId);
@@ -418,7 +418,7 @@ serve(async (req) => {
     const rangeSize = 1000; // Supabase default limit
     
     while (rangeStart < totalCount) {
-      const { data: batch, error: fetchError } = await supabaseClient
+      const { data: batch, error: fetchError } = await supabase
         .from(config.view)
         .select('*')
         .eq('tenant_id', tenantId)
