@@ -2380,6 +2380,20 @@ export type Database = {
           ultima_visita: string
         }[]
       }
+      get_clustering_data: {
+        Args: { _tenant_id: string; _view_name: string }
+        Returns: {
+          cluster_comportamental: string
+          cluster_valor: string
+          customer_id: string
+          faixa_etaria: string
+          frequency: number
+          genero: string
+          monetary: number
+          propensity_score: number
+          recency_days: number
+        }[]
+      }
       get_user_tenant_id: { Args: never; Returns: string }
       has_role_in_tenant: {
         Args: {
