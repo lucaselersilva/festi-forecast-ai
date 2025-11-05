@@ -4,10 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, DollarSign, Activity, Eye } from "lucide-react";
+import { Users, TrendingUp, DollarSign, Activity } from "lucide-react";
 import { useTenant } from "@/hooks/useTenant";
-import { ClusterMembersDialog } from "./ClusterMembersDialog";
 
 interface ClusterData {
   cluster_comportamental: string;
@@ -42,15 +40,8 @@ const clusterDescriptions: Record<string, string> = {
 export function ZigClusters() {
   const [clusters, setClusters] = useState<ClusterData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
   const { tenantId } = useTenant();
-
-  const handleViewMembers = (clusterName: string) => {
-    setSelectedCluster(clusterName);
-    setDialogOpen(true);
-  };
 
   useEffect(() => {
     if (tenantId) {
@@ -104,15 +95,8 @@ export function ZigClusters() {
   const totalClients = clusters.reduce((sum, c) => sum + c.total_clientes, 0);
 
   return (
-    <>
-      <ClusterMembersDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        clusterName={selectedCluster || ""}
-      />
-      
-      <div className="space-y-6">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+    <div className="space-y-6">
+      <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -150,7 +134,7 @@ export function ZigClusters() {
           const percentage = (cluster.total_clientes / totalClients) * 100;
           
           return (
-            <Card key={cluster.cluster_comportamental} className="hover:shadow-lg transition-all cursor-pointer group" onClick={() => handleViewMembers(cluster.cluster_comportamental)}>
+            <Card key={cluster.cluster_comportamental} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
@@ -213,27 +197,11 @@ export function ZigClusters() {
                     </Badge>
                   </div>
                 </div>
-
-                <div className="pt-3 border-t">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewMembers(cluster.cluster_comportamental);
-                    }}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Ver Membros
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
     </div>
-    </>
   );
 }

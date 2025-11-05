@@ -1,9 +1,16 @@
 import { useState } from "react";
-import { Calendar, ChevronDown, ChevronUp, Copy, Target, Lightbulb } from "lucide-react";
+import { Calendar, ChevronDown, ChevronUp, Copy, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { copyToClipboard, formatEventDate } from "@/lib/marketingHelpers";
 import { toast } from "sonner";
 
@@ -20,7 +27,6 @@ interface PhaseCardProps {
       message: string;
       timing: string;
       kpi: string;
-      rationale?: string;
     }>;
   };
 }
@@ -98,49 +104,34 @@ export function PhaseCard({ phase }: PhaseCardProps) {
             </div>
           </div>
 
-          <div className="space-y-3">
-            {phase.actions.map((action, index) => (
-              <div key={index} className="border rounded-lg p-4 space-y-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-xs text-muted-foreground font-medium">Ação</span>
-                    <p className="font-semibold text-sm">{action.action}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground font-medium">Canal</span>
-                    <div className="mt-1">
-                      <Badge variant="outline">{action.channel}</Badge>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <span className="text-xs text-muted-foreground font-medium">Mensagem</span>
-                  <p className="text-sm mt-1 bg-secondary/30 p-2 rounded">{action.message}</p>
-                </div>
-
-                {action.rationale && (
-                  <Alert className="border-primary/30 bg-primary/5">
-                    <Lightbulb className="h-4 w-4 text-primary" />
-                    <AlertDescription className="text-xs">
-                      <strong>Por quê?</strong> {action.rationale}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Timing:</span>
-                    <span className="ml-1 font-medium">{action.timing}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">KPI:</span>
-                    <span className="ml-1 font-medium">{action.kpi}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[25%]">Ação</TableHead>
+                <TableHead className="w-[35%]">Mensagem</TableHead>
+                <TableHead className="w-[15%]">Canal</TableHead>
+                <TableHead className="w-[15%]">Timing</TableHead>
+                <TableHead className="w-[10%]">KPI</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {phase.actions.map((action, index) => (
+                <TableRow key={index}>
+                  <TableCell className="font-medium">{action.action}</TableCell>
+                  <TableCell className="text-sm">{action.message}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{action.channel}</Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {action.timing}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {action.kpi}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       )}
     </Card>

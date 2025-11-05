@@ -113,25 +113,17 @@ serve(async (req) => {
 
 Quando receber informações sobre um evento - nome, data, cidade, gênero musical, histórico de vendas, clusters de clientes ou orçamento - use o que estiver disponível. Se algum dado faltar, não invente nada. Apenas explique naturalmente, por exemplo: "não temos informação sobre o orçamento, mas baseado no restante dos dados...".
 
-Seu plano DEVE incluir:
-
-1. **Canais diversificados**: Considere Instagram (stories, posts, reels), TikTok (vídeos curtos, trends), Facebook (eventos, grupos), WhatsApp (listas de transmissão, grupos), Email Marketing (segmentado), SMS (urgência), Google Ads (pesquisa e display), Spotify Ads (áudio), Twitter/X (engajamento em tempo real), LinkedIn (eventos corporativos). Escolha os mais relevantes para o público e gênero musical.
-
-2. **Palavras-chave estratégicas**: Sugira palavras-chave para SEO (landing pages e blog), hashtags para redes sociais (#exemplo) e keywords para anúncios pagos. SEMPRE explique no campo 'rationale' por que essas palavras conectam com o público deste evento específico.
-
-3. **Estratégias de alcance concretas**: Proponha 3-5 táticas específicas para expandir o alcance (parcerias com influenciadores micro/macro, mídia paga segmentada, cross-promotion com estabelecimentos locais, assessoria de imprensa, conteúdo viral como challenges/trends, remarketing). Para CADA estratégia, explique o racional, canais, alcance estimado e investimento sugerido.
-
-4. **Público-alvo detalhado**: Descreva demografia (idade, gênero, localização), psicografia (interesses, comportamentos, valores), dores/necessidades e desejos/aspirações. Justifique no 'rationale' por que focar nesse perfil específico.
-
-5. **Análise competitiva**: Identifique eventos concorrentes na região/gênero e explique como se diferenciar. Destaque vantagens competitivas únicas. No 'rationale', explique por que essa diferenciação funcionará.
-
-6. **Métricas de sucesso realistas**: Defina 3-5 métricas com metas específicas (ex: "Taxa de conversão de 15%", "10.000 alcance orgânico"). Para cada métrica, explique como medir e por que essa meta é atingível para ESTE evento.
-
-7. **Racional em TUDO**: Para CADA ação, canal, mensagem, estratégia ou recomendação, você DEVE explicar POR QUÊ essa escolha faz sentido para ESTE evento específico. Nunca deixe um campo 'rationale' vazio ou genérico.
+Seu plano deve fluir como uma conversa entre consultor e cliente. Organize em partes naturais:
+- Visão geral inspiradora do evento (1 frase que capture a essência)
+- Fases do plano (pré-lançamento, lançamento, engajamento, último chamado) com datas aproximadas quando houver
+- Ações recomendadas e por quê funcionam
+- Canais ideais e tom de comunicação apropriado
+- Distribuição de orçamento quando disponível
+- Mensagem central da campanha
 
 Mantenha o tom humano, otimista e estratégico. Evite jargões técnicos - transforme números e scores em ações compreensíveis. Considere o contexto cultural brasileiro, público jovem/adulto, comunicação leve e inteligente.
 
-Seu objetivo final é transformar dados em insights aplicáveis e inspiradores, com cada decisão claramente justificada para que o dono do evento execute o plano com total confiança.`;
+Seu objetivo final é transformar dados em insights aplicáveis e inspiradores para o dono do evento executar o plano com confiança.`;
 
     let userPrompt = `Vou te passar as informações disponíveis sobre este evento. Use o que tiver para criar o melhor plano possível.
 
@@ -172,7 +164,7 @@ ${eventData.description ? `\n\nSobre o evento: ${eventData.description}` : ''}`;
       type: "function",
       function: {
         name: "create_marketing_plan",
-        description: "Estrutura um plano de marketing completo com todas as análises estratégicas",
+        description: "Estrutura um plano de marketing completo",
         parameters: {
           type: "object",
           properties: {
@@ -185,65 +177,6 @@ ${eventData.description ? `\n\nSobre o evento: ${eventData.description}` : ''}`;
                 budget_allocation: { type: "object", additionalProperties: { type: "number" } }
               },
               required: ["overview", "key_messages", "channels", "budget_allocation"]
-            },
-            keywords: {
-              type: "object",
-              properties: {
-                seo_keywords: { type: "array", items: { type: "string" } },
-                hashtags: { type: "array", items: { type: "string" } },
-                paid_keywords: { type: "array", items: { type: "string" } },
-                rationale: { type: "string", description: "Explique por que essas palavras-chave conectam com o público" }
-              },
-              required: ["seo_keywords", "hashtags", "paid_keywords", "rationale"]
-            },
-            target_audience: {
-              type: "object",
-              properties: {
-                demographics: { type: "string", description: "Idade, gênero, localização" },
-                psychographics: { type: "string", description: "Interesses, comportamentos, valores" },
-                pain_points: { type: "array", items: { type: "string" } },
-                desires: { type: "array", items: { type: "string" } },
-                rationale: { type: "string", description: "Por que focar neste público específico" }
-              },
-              required: ["demographics", "psychographics", "pain_points", "desires", "rationale"]
-            },
-            competitive_analysis: {
-              type: "object",
-              properties: {
-                key_competitors: { type: "array", items: { type: "string" } },
-                differentiation: { type: "string", description: "Como se diferenciar dos concorrentes" },
-                competitive_advantages: { type: "array", items: { type: "string" } },
-                rationale: { type: "string", description: "Por que essa diferenciação funciona" }
-              },
-              required: ["key_competitors", "differentiation", "competitive_advantages", "rationale"]
-            },
-            reach_strategies: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  strategy: { type: "string" },
-                  description: { type: "string" },
-                  rationale: { type: "string", description: "Por que essa estratégia funciona para este evento" },
-                  channels: { type: "array", items: { type: "string" } },
-                  estimated_reach: { type: "string" },
-                  investment: { type: "string" }
-                },
-                required: ["strategy", "description", "rationale", "channels", "estimated_reach", "investment"]
-              }
-            },
-            success_metrics: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  metric: { type: "string" },
-                  target: { type: "string" },
-                  measurement: { type: "string", description: "Como medir essa métrica" },
-                  rationale: { type: "string", description: "Por que essa meta é realista" }
-                },
-                required: ["metric", "target", "measurement", "rationale"]
-              }
             },
             phases: {
               type: "array",
@@ -264,10 +197,9 @@ ${eventData.description ? `\n\nSobre o evento: ${eventData.description}` : ''}`;
                         channel: { type: "string" },
                         message: { type: "string" },
                         timing: { type: "string" },
-                        kpi: { type: "string" },
-                        rationale: { type: "string", description: "Por que essa ação é importante para esta fase" }
+                        kpi: { type: "string" }
                       },
-                      required: ["action", "channel", "message", "timing", "kpi", "rationale"]
+                      required: ["action", "channel", "message", "timing", "kpi"]
                     }
                   }
                 },
@@ -275,7 +207,7 @@ ${eventData.description ? `\n\nSobre o evento: ${eventData.description}` : ''}`;
               }
             }
           },
-          required: ["general_strategy", "keywords", "target_audience", "competitive_analysis", "reach_strategies", "success_metrics", "phases"]
+          required: ["general_strategy", "phases"]
         }
       }
     }];
@@ -294,7 +226,8 @@ ${eventData.description ? `\n\nSobre o evento: ${eventData.description}` : ''}`;
         ],
         tools,
         tool_choice: { type: "function", function: { name: "create_marketing_plan" } },
-        max_tokens: 8000
+        temperature: 0.7,
+        max_tokens: 4000
       }),
     });
 

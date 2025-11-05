@@ -17,7 +17,7 @@ export default function ZigCasas() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Casas
+            Zig Casas
           </h1>
           <p className="text-muted-foreground mt-2">
             Análise comportamental e reativação de clientes

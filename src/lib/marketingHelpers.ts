@@ -7,45 +7,6 @@ export interface MarketingPlan {
     channels: string[];
     budget_allocation: { [key: string]: number };
   };
-  
-  keywords?: {
-    seo_keywords: string[];
-    hashtags: string[];
-    paid_keywords: string[];
-    rationale: string;
-  };
-  
-  reach_strategies?: Array<{
-    strategy: string;
-    description: string;
-    rationale: string;
-    channels: string[];
-    estimated_reach: string;
-    investment: string;
-  }>;
-  
-  target_audience?: {
-    demographics: string;
-    psychographics: string;
-    pain_points: string[];
-    desires: string[];
-    rationale: string;
-  };
-  
-  competitive_analysis?: {
-    key_competitors: string[];
-    differentiation: string;
-    competitive_advantages: string[];
-    rationale: string;
-  };
-  
-  success_metrics?: Array<{
-    metric: string;
-    target: string;
-    measurement: string;
-    rationale: string;
-  }>;
-  
   phases: Array<{
     phase_number: number;
     phase_name: string;
@@ -58,10 +19,8 @@ export interface MarketingPlan {
       message: string;
       timing: string;
       kpi: string;
-      rationale?: string;
     }>;
   }>;
-  
   cluster_strategies?: Array<{
     cluster_name: string;
     cluster_size: number;
@@ -117,52 +76,6 @@ export function generatePlanText(plan: MarketingPlan, eventName: string): string
   
   text += `\nCANAIS: ${plan.general_strategy.channels.join(', ')}\n\n`;
   
-  if (plan.keywords) {
-    text += `\n=== PALAVRAS-CHAVE ESTRATÉGICAS ===\n\n`;
-    text += `Por quê? ${plan.keywords.rationale}\n\n`;
-    text += `SEO: ${plan.keywords.seo_keywords.join(', ')}\n`;
-    text += `Hashtags: ${plan.keywords.hashtags.map(h => `#${h}`).join(', ')}\n`;
-    text += `Anúncios Pagos: ${plan.keywords.paid_keywords.join(', ')}\n\n`;
-  }
-  
-  if (plan.target_audience) {
-    text += `\n=== PÚBLICO-ALVO ===\n\n`;
-    text += `Por quê focar neste público? ${plan.target_audience.rationale}\n\n`;
-    text += `Demografia: ${plan.target_audience.demographics}\n`;
-    text += `Psicografia: ${plan.target_audience.psychographics}\n\n`;
-    text += `Dores: ${plan.target_audience.pain_points.join(', ')}\n`;
-    text += `Desejos: ${plan.target_audience.desires.join(', ')}\n\n`;
-  }
-  
-  if (plan.competitive_analysis) {
-    text += `\n=== ANÁLISE COMPETITIVA ===\n\n`;
-    text += `Por quê essa diferenciação funciona? ${plan.competitive_analysis.rationale}\n\n`;
-    text += `Concorrentes: ${plan.competitive_analysis.key_competitors.join(', ')}\n`;
-    text += `Diferenciação: ${plan.competitive_analysis.differentiation}\n`;
-    text += `Vantagens: ${plan.competitive_analysis.competitive_advantages.join(', ')}\n\n`;
-  }
-  
-  if (plan.reach_strategies && plan.reach_strategies.length > 0) {
-    text += `\n=== ESTRATÉGIAS DE ALCANCE ===\n\n`;
-    plan.reach_strategies.forEach((strategy, i) => {
-      text += `${i + 1}. ${strategy.strategy}\n`;
-      text += `   ${strategy.description}\n`;
-      text += `   Por quê funciona: ${strategy.rationale}\n`;
-      text += `   Canais: ${strategy.channels.join(', ')}\n`;
-      text += `   Alcance estimado: ${strategy.estimated_reach}\n`;
-      text += `   Investimento: ${strategy.investment}\n\n`;
-    });
-  }
-  
-  if (plan.success_metrics && plan.success_metrics.length > 0) {
-    text += `\n=== MÉTRICAS DE SUCESSO ===\n\n`;
-    plan.success_metrics.forEach((metric, i) => {
-      text += `${i + 1}. ${metric.metric}: ${metric.target}\n`;
-      text += `   Como medir: ${metric.measurement}\n`;
-      text += `   Por quê é realista: ${metric.rationale}\n\n`;
-    });
-  }
-  
   text += `\n=== FASES DO PLANO ===\n\n`;
   plan.phases.forEach(phase => {
     text += `FASE ${phase.phase_number}: ${phase.phase_name}\n`;
@@ -175,11 +88,7 @@ export function generatePlanText(plan: MarketingPlan, eventName: string): string
       text += `   Canal: ${action.channel}\n`;
       text += `   Mensagem: ${action.message}\n`;
       text += `   Timing: ${action.timing}\n`;
-      text += `   KPI: ${action.kpi}\n`;
-      if (action.rationale) {
-        text += `   Por quê: ${action.rationale}\n`;
-      }
-      text += `\n`;
+      text += `   KPI: ${action.kpi}\n\n`;
     });
     text += `\n`;
   });

@@ -400,21 +400,46 @@ serve(async (req) => {
     const tenantId = profile.tenant_id;
     console.log(`🏢 Filtering data for tenant: ${tenantId}`);
 
-    // Fetch features using SECURITY DEFINER function to bypass RLS
-    console.log(`📊 Fetching data from view: ${config.view} using RPC function`);
+    // Fetch features from selected view, filtered by tenant_id
+    console.log(`📊 Fetching data from view: ${config.view}`);
     
-    const { data: features, error: fetchError } = await supabase
-      .rpc('get_clustering_data', {
-        _tenant_id: tenantId,
-        _view_name: config.view
-      });
+    // Get total count first
+    const { count: totalRecords } = await supabaseClient
+      .from(config.view)
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId);
 
-    if (fetchError) {
-      console.error('❌ Error fetching clustering data:', fetchError);
-      throw new Error(`Failed to fetch features: ${fetchError.message}`);
+    const totalCount = totalRecords || 0;
+    console.log(`📊 Total records available for tenant: ${totalCount}`);
+
+    // Fetch ALL data for tenant in batches
+    let allFeatures: any[] = [];
+    let rangeStart = 0;
+    const rangeSize = 1000; // Supabase default limit
+    
+    while (rangeStart < totalCount) {
+      const { data: batch, error: fetchError } = await supabaseClient
+        .from(config.view)
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order(config.idField)
+        .range(rangeStart, rangeStart + rangeSize - 1);
+      
+      if (fetchError) {
+        throw new Error(`Failed to fetch features: ${fetchError.message}`);
+      }
+      
+      if (batch && batch.length > 0) {
+        allFeatures = [...allFeatures, ...batch];
+        console.log(`📦 Fetched batch: ${batch.length} records (${allFeatures.length}/${totalCount})`);
+        rangeStart += batch.length;
+      } else {
+        break;
+      }
     }
-
-    console.log(`✅ Total features fetched via RPC: ${features?.length || 0}`);
+    
+    const features = allFeatures;
+    console.log(`✅ Total features fetched: ${features.length}`);
 
     if (!features || features.length < 10) {
       return new Response(
